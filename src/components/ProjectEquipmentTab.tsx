@@ -68,6 +68,24 @@ export function ProjectEquipmentTab({ projectId, projectStatus }: ProjectEquipme
         return;
       }
 
+      // Fetch testing scope configuration
+      const { data: testingScope, error: testingScopeError } = await supabase
+        .from('project_test_scope')
+        .select('*, test_templates(*)')
+        .eq('project_id', projectId)
+        .eq('is_enabled', true);
+
+      if (testingScopeError) throw testingScopeError;
+
+      if (!testingScope || testingScope.length === 0) {
+        toast({
+          title: 'No Testing Scope Defined',
+          description: 'Please define testing scope before generating equipment',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // Generate equipment instances
       const instances: any[] = [];
       for (const scopeItem of scopeItems) {
@@ -92,22 +110,16 @@ export function ProjectEquipmentTab({ projectId, projectStatus }: ProjectEquipme
 
       if (instanceError) throw instanceError;
 
-      // Fetch test templates for each equipment type
-      const { data: templates, error: templateError } = await supabase
-        .from('test_templates')
-        .select('*')
-        .eq('is_active', true);
-
-      if (templateError) throw templateError;
-
-      // Create test tasks
+      // Create test tasks using testing scope configuration
       const testTasks: any[] = [];
       for (const instance of createdInstances || []) {
-        const relevantTemplates = templates?.filter(
-          (t) => t.equipment_type === instance.equipment_type
-        );
+        // Get enabled test templates for this equipment type from testing scope
+        const relevantTemplates = testingScope
+          ?.filter(scope => scope.equipment_type === instance.equipment_type)
+          .map(scope => scope.test_templates)
+          .filter(Boolean) || [];
 
-        for (const template of relevantTemplates || []) {
+        for (const template of relevantTemplates) {
           testTasks.push({
             equipment_instance_id: instance.id,
             test_template_id: template.id,

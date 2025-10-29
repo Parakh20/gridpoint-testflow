@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Loader2, ArrowLeft, Printer } from 'lucide-react';
 import { ProjectStatusActions } from '@/components/ProjectStatusActions';
 import { ProjectScopeTab } from '@/components/ProjectScopeTab';
+import { ProjectTestingScopeTab } from '@/components/ProjectTestingScopeTab';
 import { ProjectEquipmentTab } from '@/components/ProjectEquipmentTab';
 import { ProjectTestsTab } from '@/components/ProjectTestsTab';
 import { ProjectPDFExport } from '@/components/ProjectPDFExport';
@@ -133,6 +134,7 @@ export default function ProjectDetail() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="scope">Scope</TabsTrigger>
+            <TabsTrigger value="testing-scope">Testing Scope</TabsTrigger>
             <TabsTrigger value="equipment">Equipment</TabsTrigger>
             <TabsTrigger value="tests">Tests</TabsTrigger>
           </TabsList>
@@ -193,6 +195,10 @@ export default function ProjectDetail() {
 
           <TabsContent value="scope">
             <ProjectScopeTab projectId={project.id} />
+          </TabsContent>
+
+          <TabsContent value="testing-scope">
+            <ProjectTestingScopeTab projectId={project.id} projectStatus={project.status} />
           </TabsContent>
 
           <TabsContent value="equipment">

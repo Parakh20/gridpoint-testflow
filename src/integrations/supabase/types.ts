@@ -166,6 +166,48 @@ export type Database = {
         }
         Relationships: []
       }
+      project_test_scope: {
+        Row: {
+          created_at: string
+          equipment_type: Database["public"]["Enums"]["equipment_type"]
+          id: string
+          is_enabled: boolean
+          project_id: string
+          test_template_id: string
+        }
+        Insert: {
+          created_at?: string
+          equipment_type: Database["public"]["Enums"]["equipment_type"]
+          id?: string
+          is_enabled?: boolean
+          project_id: string
+          test_template_id: string
+        }
+        Update: {
+          created_at?: string
+          equipment_type?: Database["public"]["Enums"]["equipment_type"]
+          id?: string
+          is_enabled?: boolean
+          project_id?: string
+          test_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_test_scope_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_test_scope_test_template_id_fkey"
+            columns: ["test_template_id"]
+            isOneToOne: false
+            referencedRelation: "test_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           approved_at: string | null
