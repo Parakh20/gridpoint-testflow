@@ -1,16 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckSquare, Square } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 import type { Database } from '@/integrations/supabase/types';
 
 type EquipmentType = Database['public']['Enums']['equipment_type'];
@@ -147,21 +140,27 @@ export function TestingScopeSelector({
     onChange(updatedScope);
   };
 
-  const handleToggleAll = (equipmentType: string, enabled: boolean) => {
-    const updatedConfigs = testConfigs.map(config =>
-      config.equipmentType === equipmentType
+  const handleToggleAll = (equipmentType: string) => {
+    const config = testConfigs.find(c => c.equipmentType === equipmentType);
+    if (!config) return;
+    
+    const allEnabled = config.templates.every(t => t.isEnabled);
+    const enabled = !allEnabled;
+    
+    const updatedConfigs = testConfigs.map(c =>
+      c.equipmentType === equipmentType
         ? {
-            ...config,
-            templates: config.templates.map(t => ({ ...t, isEnabled: enabled })),
+            ...c,
+            templates: c.templates.map(t => ({ ...t, isEnabled: enabled })),
           }
-        : config
+        : c
     );
     setTestConfigs(updatedConfigs);
 
     // Update parent state
     const updatedScope: Record<string, TestTemplate[]> = {};
-    updatedConfigs.forEach(config => {
-      updatedScope[config.equipmentType] = config.templates;
+    updatedConfigs.forEach(c => {
+      updatedScope[c.equipmentType] = c.templates;
     });
     onChange(updatedScope);
   };
@@ -196,105 +195,78 @@ export function TestingScopeSelector({
   const totalTests = calculateTotalTests();
 
   return (
-    <div className="space-y-6">
-      {/* Summary Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5" />
-            Testing Scope Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Equipment Types</p>
-              <p className="text-2xl font-bold">{testConfigs.length}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Test Tasks</p>
-              <p className="text-2xl font-bold">{totalTests}</p>
-            </div>
-          </div>
+    <div className="space-y-3">
+      {testConfigs.map(config => {
+        const enabledCount = config.templates.filter(t => t.isEnabled).length;
+        const totalCount = config.templates.length;
+        const allEnabled = enabledCount === totalCount;
+        const scopeItem = scopeItems.find(s => s.equipment_type === config.equipmentType);
+        const quantity = scopeItem?.quantity || 0;
+        const taskCount = enabledCount * quantity;
 
-          <div className="mt-4 space-y-2">
-            {testConfigs.map(config => {
-              const scopeItem = scopeItems.find(s => s.equipment_type === config.equipmentType);
-              const quantity = scopeItem?.quantity || 0;
-              const enabledTests = config.templates.filter(t => t.isEnabled).length;
-              const subtotal = quantity * enabledTests;
-
-              return (
-                <div key={config.equipmentType} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {config.equipmentType}: {quantity} × {enabledTests} tests
-                  </span>
-                  <span className="font-medium">{subtotal} tasks</span>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Test Configuration */}
-      <Accordion type="multiple" className="w-full">
-        {testConfigs.map(config => {
-          const enabledCount = config.templates.filter(t => t.isEnabled).length;
-          const totalCount = config.templates.length;
-          const allEnabled = enabledCount === totalCount;
-          const scopeItem = scopeItems.find(s => s.equipment_type === config.equipmentType);
-
-          return (
-            <AccordionItem key={config.equipmentType} value={config.equipmentType}>
-              <AccordionTrigger>
-                <div className="flex items-center justify-between w-full pr-4">
-                  <span className="font-medium">{config.equipmentType}</span>
+        return (
+          <Card key={config.equipmentType} className="overflow-hidden">
+            <div className="bg-muted/50 px-4 py-3 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h3 className="font-semibold text-base">
+                    {config.equipmentType.replace(/_/g, ' ')}
+                  </h3>
                   <span className="text-sm text-muted-foreground">
-                    {enabledCount}/{totalCount} tests • {scopeItem?.quantity || 0} equipment
+                    {enabledCount}/{totalCount} tests • {quantity} equipment • {taskCount} tasks
                   </span>
                 </div>
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-4 pt-2">
-                  {!readOnly && (
-                    <div className="flex justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleToggleAll(config.equipmentType, !allEnabled)}
-                      >
-                        {allEnabled ? 'Deselect All' : 'Select All'}
-                      </Button>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    {config.templates.map(template => (
-                      <div
-                        key={template.id}
-                        className="flex items-start space-x-3 p-3 rounded-lg border"
-                      >
-                        <Checkbox
-                          checked={template.isEnabled}
-                          onCheckedChange={() => handleToggleTest(config.equipmentType, template.id)}
-                          disabled={readOnly}
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium">{template.testName}</p>
-                            <span className="text-xs text-muted-foreground">{template.tab}</span>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{template.testCode}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
+                {!readOnly && (
+                  <button
+                    onClick={() => handleToggleAll(config.equipmentType)}
+                    className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
+                  >
+                    {allEnabled ? (
+                      <>
+                        <Square className="h-4 w-4" />
+                        Deselect All
+                      </>
+                    ) : (
+                      <>
+                        <CheckSquare className="h-4 w-4" />
+                        Select All
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3">
+              <div className="space-y-1">
+                {config.templates.map(template => (
+                  <label
+                    key={template.id}
+                    className="flex items-center gap-3 p-2 rounded hover:bg-accent/50 transition-colors cursor-pointer group"
+                  >
+                    <Checkbox
+                      checked={template.isEnabled}
+                      onCheckedChange={() => handleToggleTest(config.equipmentType, template.id)}
+                      disabled={readOnly}
+                    />
+                    <span className="flex-1 text-sm">
+                      {template.testName}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-mono opacity-0 group-hover:opacity-100 transition-opacity">
+                      {template.testCode}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+
+      <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground border-t">
+        <span>Total: {testConfigs.length} equipment types</span>
+        <span className="font-semibold">{totalTests} test tasks expected</span>
+      </div>
     </div>
   );
 }
