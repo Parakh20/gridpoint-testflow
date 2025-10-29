@@ -36,6 +36,7 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPDF, setShowPDF] = useState(false);
+  const [hasEquipment, setHasEquipment] = useState(false);
 
   const fetchProject = async () => {
     if (!id) return;
@@ -49,6 +50,15 @@ export default function ProjectDetail() {
 
       if (error) throw error;
       setProject(data);
+
+      // Check if equipment exists
+      const { data: equipmentData } = await supabase
+        .from('equipment_instances')
+        .select('id')
+        .eq('project_id', id)
+        .limit(1);
+
+      setHasEquipment(equipmentData && equipmentData.length > 0);
     } catch (error) {
       console.error('Error fetching project:', error);
       toast({
@@ -131,12 +141,16 @@ export default function ProjectDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
+          <TabsList className={`grid w-full ${hasEquipment ? 'grid-cols-5' : 'grid-cols-3'}`}>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="scope">Scope</TabsTrigger>
             <TabsTrigger value="testing-scope">Testing Scope</TabsTrigger>
-            <TabsTrigger value="equipment">Equipment</TabsTrigger>
-            <TabsTrigger value="tests">Tests</TabsTrigger>
+            {hasEquipment && (
+              <>
+                <TabsTrigger value="equipment">Equipment</TabsTrigger>
+                <TabsTrigger value="tests">Tests</TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -198,16 +212,24 @@ export default function ProjectDetail() {
           </TabsContent>
 
           <TabsContent value="testing-scope">
-            <ProjectTestingScopeTab projectId={project.id} projectStatus={project.status} />
+            <ProjectTestingScopeTab 
+              projectId={project.id} 
+              projectStatus={project.status}
+              onEquipmentGenerated={() => setHasEquipment(true)}
+            />
           </TabsContent>
 
-          <TabsContent value="equipment">
-            <ProjectEquipmentTab projectId={project.id} projectStatus={project.status} />
-          </TabsContent>
+          {hasEquipment && (
+            <>
+              <TabsContent value="equipment">
+                <ProjectEquipmentTab projectId={project.id} projectStatus={project.status} />
+              </TabsContent>
 
-          <TabsContent value="tests">
-            <ProjectTestsTab projectId={project.id} />
-          </TabsContent>
+              <TabsContent value="tests">
+                <ProjectTestsTab projectId={project.id} />
+              </TabsContent>
+            </>
+          )}
         </Tabs>
       </div>
 

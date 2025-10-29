@@ -6,11 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScopeManager } from '@/components/ScopeManager';
+import { TestingScopeSelector } from '@/components/TestingScopeSelector';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft } from 'lucide-react';
+import type { Database } from '@/integrations/supabase/types';
 
-type EquipmentType = 'TRANSFORMER' | 'SWITCHBOARD' | 'MOTOR' | 'GENERATOR' | 'PANEL' | 'CABLE' | 'CT' | 'CVT' | 'EARTH_PIT' | 'ISOLATOR' | 'LA' | 'POWER_TRANSFORMER' | 'SF6_BREAKER' | 'VCB';
+type EquipmentType = Database['public']['Enums']['equipment_type'];
 
 interface ScopeItem {
   equipment_type: EquipmentType;
@@ -35,6 +37,7 @@ export default function EditProject() {
   });
 
   const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
+  const [testingScope, setTestingScope] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     fetchProject();
@@ -111,9 +114,26 @@ export default function EditProject() {
     return true;
   };
 
+  const validateStep3 = () => {
+    const hasEnabledTests = Object.values(testingScope).some(templates =>
+      templates.some(t => t.isEnabled)
+    );
+    if (!hasEnabledTests) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select at least one test',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    return true;
+  };
+
   const handleNext = () => {
     if (currentStep === 1 && validateStep1()) {
       setCurrentStep(2);
+    } else if (currentStep === 2 && validateStep2()) {
+      setCurrentStep(3);
     }
   };
 
@@ -124,7 +144,7 @@ export default function EditProject() {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep1() || !validateStep2()) return;
+    if (!validateStep1() || !validateStep2() || !validateStep3()) return;
 
     setSaving(true);
     try {
@@ -163,6 +183,34 @@ export default function EditProject() {
         .insert(scopeData);
 
       if (scopeError) throw scopeError;
+
+      // Update testing scope
+      const { error: deleteTestScopeError } = await supabase
+        .from('project_test_scope')
+        .delete()
+        .eq('project_id', id);
+
+      if (deleteTestScopeError) throw deleteTestScopeError;
+
+      const testScopeRecords: any[] = [];
+      Object.entries(testingScope).forEach(([equipmentType, templates]) => {
+        templates.forEach((template: any) => {
+          testScopeRecords.push({
+            project_id: id,
+            equipment_type: equipmentType,
+            test_template_id: template.id,
+            is_enabled: template.isEnabled,
+          });
+        });
+      });
+
+      if (testScopeRecords.length > 0) {
+        const { error: testScopeError } = await supabase
+          .from('project_test_scope')
+          .insert(testScopeRecords);
+
+        if (testScopeError) throw testScopeError;
+      }
 
       toast({
         title: 'Success',
@@ -208,7 +256,7 @@ export default function EditProject() {
 
         {/* Progress Steps */}
         <div className="flex items-center justify-center gap-4 mb-8">
-          {[1, 2].map((step) => (
+          {[1, 2, 3].map((step, idx) => (
             <div key={step} className="flex items-center gap-2">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center font-medium ${
@@ -224,9 +272,9 @@ export default function EditProject() {
                   currentStep >= step ? 'text-foreground' : 'text-muted-foreground'
                 }`}
               >
-                {step === 1 ? 'Basic Info' : 'Equipment Scope'}
+                {step === 1 ? 'Basic Info' : step === 2 ? 'Equipment Scope' : 'Testing Scope'}
               </span>
-              {step < 2 && <div className="w-12 h-0.5 bg-muted mx-2" />}
+              {idx < 2 && <div className="w-12 h-0.5 bg-muted mx-2" />}
             </div>
           ))}
         </div>
@@ -325,6 +373,22 @@ export default function EditProject() {
           </Card>
         )}
 
+        {/* Step 3: Testing Scope */}
+        {currentStep === 3 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Testing Scope</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TestingScopeSelector
+                scopeItems={scopeItems}
+                testingScope={testingScope}
+                onChange={setTestingScope}
+              />
+            </CardContent>
+          </Card>
+        )}
+
         {/* Navigation Buttons */}
         <div className="flex justify-between">
           <div>
@@ -341,7 +405,7 @@ export default function EditProject() {
             >
               Cancel
             </Button>
-            {currentStep < 2 ? (
+            {currentStep < 3 ? (
               <Button onClick={handleNext}>Next</Button>
             ) : (
               <Button onClick={handleSubmit} disabled={saving}>

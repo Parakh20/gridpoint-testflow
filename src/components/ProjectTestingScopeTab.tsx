@@ -43,11 +43,13 @@ interface ScopeItem {
 interface ProjectTestingScopeTabProps {
   projectId: string;
   projectStatus: string;
+  onEquipmentGenerated?: () => void;
 }
 
-export function ProjectTestingScopeTab({ projectId, projectStatus }: ProjectTestingScopeTabProps) {
+export function ProjectTestingScopeTab({ projectId, projectStatus, onEquipmentGenerated }: ProjectTestingScopeTabProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [testConfigs, setTestConfigs] = useState<TestScopeConfig[]>([]);
   const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
   const { toast } = useToast();
@@ -207,6 +209,103 @@ export function ProjectTestingScopeTab({ projectId, projectStatus }: ProjectTest
       total += quantity * enabledTests;
     });
     return total;
+  };
+
+  const generateEquipment = async () => {
+    setGenerating(true);
+    try {
+      if (!scopeItems || scopeItems.length === 0) {
+        toast({
+          title: 'No Scope Defined',
+          description: 'Please define equipment scope first',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const enabledTests = testConfigs.filter(config => 
+        config.templates.some(t => t.isEnabled)
+      );
+
+      if (enabledTests.length === 0) {
+        toast({
+          title: 'No Tests Selected',
+          description: 'Please select at least one test before generating equipment',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Generate equipment instances - first fetch scope items with IDs
+      const { data: fetchedScopeItems, error: fetchScopeError } = await supabase
+        .from('scope_items')
+        .select('*')
+        .eq('project_id', projectId);
+
+      if (fetchScopeError) throw fetchScopeError;
+
+      const instances: any[] = [];
+      for (const scopeItem of fetchedScopeItems || []) {
+        const typePrefix = scopeItem.equipment_type.substring(0, 3).toUpperCase();
+        
+        for (let i = 1; i <= scopeItem.quantity; i++) {
+          instances.push({
+            project_id: projectId,
+            scope_item_id: scopeItem.id,
+            equipment_type: scopeItem.equipment_type,
+            seq_number: i,
+            label: `${typePrefix}-${String(i).padStart(3, '0')}`,
+            status: 'UNASSIGNED',
+          });
+        }
+      }
+
+      const { data: createdInstances, error: instanceError } = await supabase
+        .from('equipment_instances')
+        .insert(instances)
+        .select();
+
+      if (instanceError) throw instanceError;
+
+      // Create test tasks based on enabled tests
+      const testTasks: any[] = [];
+      for (const instance of createdInstances || []) {
+        const config = testConfigs.find(c => c.equipmentType === instance.equipment_type);
+        const enabledTemplates = config?.templates.filter(t => t.isEnabled) || [];
+
+        for (const template of enabledTemplates) {
+          testTasks.push({
+            equipment_instance_id: instance.id,
+            test_template_id: template.id,
+            status: 'DRAFT',
+          });
+        }
+      }
+
+      if (testTasks.length > 0) {
+        const { error: taskError } = await supabase
+          .from('test_tasks')
+          .insert(testTasks);
+
+        if (taskError) throw taskError;
+      }
+
+      toast({
+        title: 'Success',
+        description: `Generated ${instances.length} equipment instances and ${testTasks.length} test tasks`,
+      });
+
+      onEquipmentGenerated?.();
+    } catch (error) {
+      console.error('Error generating equipment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate equipment instances',
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+    }
   };
 
   if (loading) {
