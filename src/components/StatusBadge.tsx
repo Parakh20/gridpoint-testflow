@@ -21,7 +21,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       case 'submitted':
         return 'bg-status-submitted text-white';
       case 'approved':
-        return 'bg-status-approved text-white';
+        return 'bg-blue-500 text-white';
       case 'rework':
         return 'bg-status-rework text-white';
       case 'draft':
@@ -29,7 +29,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       case 'active':
         return 'bg-success text-success-foreground';
       case 'closed':
-        return 'bg-secondary text-secondary-foreground';
+        return 'bg-destructive text-destructive-foreground';
       default:
         return 'bg-muted text-muted-foreground';
     }

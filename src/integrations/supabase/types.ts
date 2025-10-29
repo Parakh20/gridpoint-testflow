@@ -168,6 +168,8 @@ export type Database = {
       }
       projects: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           client: string | null
           created_at: string
           created_by: string
@@ -181,6 +183,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           client?: string | null
           created_at?: string
           created_by: string
@@ -194,6 +198,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           client?: string | null
           created_at?: string
           created_by?: string
@@ -206,7 +212,15 @@ export type Database = {
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scope_items: {
         Row: {
@@ -434,7 +448,7 @@ export type Database = {
         | "REWORK"
         | "CANCELLED"
         | "DEFERRED"
-      project_status: "DRAFT" | "ACTIVE" | "CLOSED"
+      project_status: "DRAFT" | "APPROVED" | "ACTIVE" | "CLOSED"
       test_status: "DRAFT" | "IN_PROGRESS" | "SUBMITTED" | "APPROVED" | "REWORK"
     }
     CompositeTypes: {
@@ -584,7 +598,7 @@ export const Constants = {
         "CANCELLED",
         "DEFERRED",
       ],
-      project_status: ["DRAFT", "ACTIVE", "CLOSED"],
+      project_status: ["DRAFT", "APPROVED", "ACTIVE", "CLOSED"],
       test_status: ["DRAFT", "IN_PROGRESS", "SUBMITTED", "APPROVED", "REWORK"],
     },
   },
