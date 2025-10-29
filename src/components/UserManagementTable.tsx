@@ -74,32 +74,34 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
   const { data: users = [], isLoading, refetch } = useQuery({
     queryKey: ['users-with-roles'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch all profiles
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          id,
-          name,
-          email,
-          is_active,
-          created_at,
-          user_roles (
-            id,
-            role
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
 
-      const usersWithRoles: UserWithRole[] = data.map((user: any) => ({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        is_active: user.is_active,
-        role: user.user_roles?.[0]?.role || 'NONE',
-        role_id: user.user_roles?.[0]?.id || '',
-        created_at: user.created_at,
-      }));
+      // Fetch all user roles
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*');
+
+      if (rolesError) throw rolesError;
+
+      // Merge the data in JavaScript
+      const usersWithRoles: UserWithRole[] = (profilesData || []).map(profile => {
+        const userRole = (rolesData || []).find(r => r.user_id === profile.id);
+        return {
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          is_active: profile.is_active,
+          created_at: profile.created_at,
+          role: userRole?.role || 'NONE',
+          role_id: userRole?.id || '',
+        };
+      });
 
       onUserCountChange?.(usersWithRoles.length);
       return usersWithRoles;
