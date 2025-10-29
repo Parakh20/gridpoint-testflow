@@ -25,6 +25,7 @@ export function ProjectPDFExport({ project, onClose }: ProjectPDFExportProps) {
   const [scopeItems, setScopeItems] = useState<any[]>([]);
   const [equipment, setEquipment] = useState<any[]>([]);
   const [testStats, setTestStats] = useState({ total: 0, completed: 0, pass: 0, fail: 0 });
+  const [testingScope, setTestingScope] = useState<Record<string, any[]>>({});
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -64,8 +65,35 @@ export function ProjectPDFExport({ project, onClose }: ProjectPDFExportProps) {
       const pass = testRecords?.filter((r) => r.pass_fail === 'PASS').length || 0;
       const fail = testRecords?.filter((r) => r.pass_fail === 'FAIL').length || 0;
 
+      // Fetch testing scope
+      const { data: testScope } = await supabase
+        .from('project_test_scope')
+        .select(`
+          id,
+          equipment_type,
+          is_enabled,
+          test_template:test_templates(
+            test_code,
+            test_name,
+            tab
+          )
+        `)
+        .eq('project_id', project.id)
+        .eq('is_enabled', true)
+        .order('equipment_type');
+
+      // Group by equipment type
+      const groupedScope = testScope?.reduce((acc: Record<string, any[]>, item: any) => {
+        if (!acc[item.equipment_type]) {
+          acc[item.equipment_type] = [];
+        }
+        acc[item.equipment_type].push(item.test_template);
+        return acc;
+      }, {});
+
       setScopeItems(scope || []);
       setEquipment(equip || []);
+      setTestingScope(groupedScope || {});
       setTestStats({
         total: tests?.length || 0,
         completed,
@@ -187,6 +215,61 @@ export function ProjectPDFExport({ project, onClose }: ProjectPDFExportProps) {
                 </tbody>
               </table>
             </div>
+
+            {/* Testing Scope */}
+            {Object.keys(testingScope).length > 0 && (
+              <div className="space-y-4 print:page-break-before-always">
+                <h3 className="text-xl font-semibold">Testing Scope</h3>
+                <p className="text-sm text-muted-foreground">
+                  The following tests are configured for each equipment type in this project:
+                </p>
+                
+                {/* Summary Statistics */}
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="border p-3 rounded">
+                    <p className="text-xs text-muted-foreground">Equipment Types</p>
+                    <p className="text-xl font-bold">{Object.keys(testingScope).length}</p>
+                  </div>
+                  <div className="border p-3 rounded">
+                    <p className="text-xs text-muted-foreground">Total Test Types</p>
+                    <p className="text-xl font-bold">
+                      {Object.values(testingScope).reduce((sum: number, tests: any[]) => sum + tests.length, 0)}
+                    </p>
+                  </div>
+                  <div className="border p-3 rounded">
+                    <p className="text-xs text-muted-foreground">Expected Test Tasks</p>
+                    <p className="text-xl font-bold">{testStats.total}</p>
+                  </div>
+                </div>
+
+                {/* Test Details by Equipment Type */}
+                {Object.entries(testingScope).map(([equipmentType, tests]) => (
+                  <div key={equipmentType} className="space-y-2">
+                    <h4 className="font-semibold text-lg border-b pb-2">
+                      {equipmentType.replace(/_/g, ' ')}
+                    </h4>
+                    <table className="w-full border-collapse border text-sm">
+                      <thead>
+                        <tr className="bg-muted">
+                          <th className="border p-2 text-left w-24">Test Code</th>
+                          <th className="border p-2 text-left">Test Name</th>
+                          <th className="border p-2 text-left w-32">Tab</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tests.map((test: any, idx: number) => (
+                          <tr key={idx}>
+                            <td className="border p-2 font-mono text-xs">{test.test_code}</td>
+                            <td className="border p-2">{test.test_name}</td>
+                            <td className="border p-2 text-sm">{test.tab}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Equipment List */}
             {equipment.length > 0 && (
