@@ -11,6 +11,7 @@ import SuperadminDashboard from "./pages/dashboards/SuperadminDashboard";
 import GMDashboard from "./pages/dashboards/GMDashboard";
 import SupervisorDashboard from "./pages/dashboards/SupervisorDashboard";
 import EngineerDashboard from "./pages/dashboards/EngineerDashboard";
+import NewProject from "./pages/projects/NewProject";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/superadmin" element={<ProtectedRoute requiredRole="SUPERADMIN"><SuperadminDashboard /></ProtectedRoute>} />
             <Route path="/gm" element={<ProtectedRoute requiredRole="GM"><GMDashboard /></ProtectedRoute>} />
+            <Route path="/projects/new" element={<ProtectedRoute requiredRole="GM"><NewProject /></ProtectedRoute>} />
             <Route path="/supervisor" element={<ProtectedRoute requiredRole="SUPERVISOR"><SupervisorDashboard /></ProtectedRoute>} />
             <Route path="/engineer" element={<ProtectedRoute requiredRole="ENGINEER"><EngineerDashboard /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
