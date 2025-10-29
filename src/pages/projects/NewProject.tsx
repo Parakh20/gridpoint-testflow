@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ScopeManager } from '@/components/ScopeManager';
+import { TestingScopeSelector } from '@/components/TestingScopeSelector';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
@@ -45,6 +46,7 @@ export default function NewProject() {
   });
   
   const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
+  const [testingScope, setTestingScope] = useState<Record<string, any[]>>({});
 
   const handleInputChange = (field: keyof ProjectFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -75,9 +77,25 @@ export default function NewProject() {
     return true;
   };
 
+  const validateStep3 = () => {
+    const hasEnabledTests = Object.values(testingScope).some(
+      (tests: any[]) => tests.some(t => t.isEnabled)
+    );
+    if (!hasEnabledTests) {
+      toast({
+        title: 'No tests selected',
+        description: 'Please enable at least one test for the testing scope',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    return true;
+  };
+
   const handleNext = () => {
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
+    if (step === 3 && !validateStep3()) return;
     setStep(prev => prev + 1);
   };
 
@@ -118,6 +136,26 @@ export default function NewProject() {
 
       if (scopeError) throw scopeError;
 
+      // Save testing scope configuration
+      const testScopeRecords = Object.entries(testingScope).flatMap(
+        ([equipmentType, tests]: [string, any[]]) =>
+          tests
+            .filter(t => t.isEnabled)
+            .map(test => ({
+              project_id: project.id,
+              equipment_type: equipmentType as EquipmentType,
+              test_template_id: test.id,
+              is_enabled: true,
+            }))
+      );
+
+      if (testScopeRecords.length > 0) {
+        const { error: testScopeError } = await supabase
+          .from('project_test_scope')
+          .insert(testScopeRecords);
+        if (testScopeError) throw testScopeError;
+      }
+
       toast({
         title: 'Project created successfully',
         description: `Project ${formData.project_number} has been created as DRAFT`,
@@ -143,7 +181,7 @@ export default function NewProject() {
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
-            {[1, 2, 3].map((stepNumber) => (
+            {[1, 2, 3, 4].map((stepNumber) => (
               <div key={stepNumber} className="flex items-center flex-1">
                 <div className="flex items-center">
                   <div
@@ -163,11 +201,12 @@ export default function NewProject() {
                     <p className={`text-sm font-medium ${step >= stepNumber ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {stepNumber === 1 && 'Basic Info'}
                       {stepNumber === 2 && 'Equipment Scope'}
-                      {stepNumber === 3 && 'Review'}
+                      {stepNumber === 3 && 'Testing Scope'}
+                      {stepNumber === 4 && 'Review'}
                     </p>
                   </div>
                 </div>
-                {stepNumber < 3 && (
+                {stepNumber < 4 && (
                   <div className={`flex-1 h-0.5 mx-4 ${step > stepNumber ? 'bg-primary' : 'bg-muted'}`} />
                 )}
               </div>
@@ -263,6 +302,22 @@ export default function NewProject() {
         {step === 3 && (
           <Card>
             <CardHeader>
+              <CardTitle>Testing Scope</CardTitle>
+              <CardDescription>Select which tests should be performed for each equipment type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TestingScopeSelector
+                scopeItems={scopeItems}
+                testingScope={testingScope}
+                onChange={setTestingScope}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {step === 4 && (
+          <Card>
+            <CardHeader>
               <CardTitle>Review & Create</CardTitle>
               <CardDescription>Review project details before creating</CardDescription>
             </CardHeader>
@@ -318,6 +373,32 @@ export default function NewProject() {
                   </div>
                 </div>
               </div>
+
+              <div>
+                <h3 className="font-semibold mb-3">Testing Scope</h3>
+                <div className="space-y-2">
+                  {Object.entries(testingScope).map(([equipmentType, tests]: [string, any[]]) => {
+                    const enabledTests = tests.filter(t => t.isEnabled);
+                    const scopeItem = scopeItems.find(s => s.equipment_type === equipmentType);
+                    const quantity = scopeItem?.quantity || 0;
+                    const subtotal = quantity * enabledTests.length;
+
+                    return (
+                      <div key={equipmentType} className="p-3 bg-muted rounded-md">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium">{equipmentType}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {enabledTests.length} tests × {quantity} units = {subtotal} tasks
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {enabledTests.map(t => t.testCode).join(', ')}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -332,7 +413,7 @@ export default function NewProject() {
             {step === 1 ? 'Cancel' : 'Back'}
           </Button>
 
-          {step < 3 ? (
+          {step < 4 ? (
             <Button onClick={handleNext}>
               Next
               <ArrowRight className="h-4 w-4 ml-2" />
