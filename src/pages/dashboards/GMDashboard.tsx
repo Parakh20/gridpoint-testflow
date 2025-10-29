@@ -14,6 +14,28 @@ export default function GMDashboard() {
 
   useEffect(() => {
     fetchProjects();
+
+    // Subscribe to realtime changes on projects table
+    const channel = supabase
+      .channel('projects-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'projects'
+        },
+        (payload) => {
+          console.log('Project change detected:', payload);
+          fetchProjects(); // Refetch all projects when any change occurs
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchProjects = async () => {
