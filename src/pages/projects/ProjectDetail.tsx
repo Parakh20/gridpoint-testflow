@@ -6,13 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Loader2, ArrowLeft, Printer } from 'lucide-react';
+import { Loader2, ArrowLeft, Printer, UserCheck } from 'lucide-react';
 import { ProjectStatusActions } from '@/components/ProjectStatusActions';
 import { ProjectScopeTab } from '@/components/ProjectScopeTab';
 import { ProjectTestingScopeTab } from '@/components/ProjectTestingScopeTab';
 import { ProjectEquipmentTab } from '@/components/ProjectEquipmentTab';
 import { ProjectTestsTab } from '@/components/ProjectTestsTab';
 import { ProjectPDFExport } from '@/components/ProjectPDFExport';
+import { AssignProjectDialog } from '@/components/AssignProjectDialog';
 import { useToast } from '@/hooks/use-toast';
 
 interface Project {
@@ -27,6 +28,7 @@ interface Project {
   created_at: string;
   approved_at: string | null;
   approved_by: string | null;
+  assigned_to: string | null;
 }
 
 export default function ProjectDetail() {
@@ -37,6 +39,8 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [showPDF, setShowPDF] = useState(false);
   const [hasEquipment, setHasEquipment] = useState(false);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [assignedSupervisor, setAssignedSupervisor] = useState<{ id: string; name: string } | null>(null);
 
   const fetchProject = async () => {
     if (!id) return;
@@ -59,6 +63,21 @@ export default function ProjectDetail() {
         .limit(1);
 
       setHasEquipment(equipmentData && equipmentData.length > 0);
+
+      // Fetch assigned supervisor if exists
+      if (data.assigned_to) {
+        const { data: supervisorData } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .eq('id', data.assigned_to)
+          .single();
+
+        if (supervisorData) {
+          setAssignedSupervisor(supervisorData);
+        }
+      } else {
+        setAssignedSupervisor(null);
+      }
     } catch (error) {
       console.error('Error fetching project:', error);
       toast({
@@ -121,10 +140,25 @@ export default function ProjectDetail() {
             <div className="flex items-center gap-3 mt-2">
               <h2 className="text-2xl font-bold">{project.project_number}</h2>
               <StatusBadge status={project.status} />
+              {assignedSupervisor && (
+                <>
+                  <span className="text-muted-foreground">•</span>
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Assigned to: <span className="font-medium text-foreground">{assignedSupervisor.name}</span>
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
             <p className="text-lg text-muted-foreground">{project.site_name}</p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowAssignDialog(true)}>
+              <UserCheck className="h-4 w-4 mr-2" />
+              {assignedSupervisor ? 'Reassign' : 'Assign'}
+            </Button>
             <Button
               variant="outline"
               onClick={() => setShowPDF(true)}
@@ -239,6 +273,15 @@ export default function ProjectDetail() {
           onClose={() => setShowPDF(false)}
         />
       )}
+
+      <AssignProjectDialog
+        open={showAssignDialog}
+        onOpenChange={setShowAssignDialog}
+        projectId={project.id}
+        projectNumber={project.project_number}
+        currentAssignment={assignedSupervisor}
+        onSuccess={fetchProject}
+      />
     </DashboardLayout>
   );
 }

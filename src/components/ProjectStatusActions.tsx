@@ -65,6 +65,23 @@ export function ProjectStatusActions({ project, onStatusChange }: ProjectStatusA
   };
 
   const handleApprove = async () => {
+    // Check if project is assigned to a supervisor
+    const { data: projectData } = await supabase
+      .from('projects')
+      .select('assigned_to')
+      .eq('id', project.id)
+      .single();
+
+    if (!projectData?.assigned_to) {
+      toast({
+        title: 'Assignment Required',
+        description: 'Please assign this project to a supervisor before approving',
+        variant: 'destructive',
+      });
+      setShowDialog(false);
+      return;
+    }
+
     await updateProjectStatus('APPROVED', {
       approved_at: new Date().toISOString(),
       approved_by: user?.id,

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScopeManager } from '@/components/ScopeManager';
 import { TestingScopeSelector } from '@/components/TestingScopeSelector';
+import { SupervisorSelector } from '@/components/SupervisorSelector';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft } from 'lucide-react';
@@ -34,6 +35,7 @@ export default function EditProject() {
     client: '',
     start_date: '',
     end_date: '',
+    assigned_to: null as string | null,
   });
 
   const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
@@ -63,6 +65,7 @@ export default function EditProject() {
         client: project.client || '',
         start_date: project.start_date || '',
         end_date: project.end_date || '',
+        assigned_to: project.assigned_to || null,
       });
 
       // Fetch scope items
@@ -158,6 +161,7 @@ export default function EditProject() {
           client: formData.client || null,
           start_date: formData.start_date || null,
           end_date: formData.end_date || null,
+          assigned_to: formData.assigned_to,
         })
         .eq('id', id);
 
@@ -354,6 +358,12 @@ export default function EditProject() {
                   />
                 </div>
               </div>
+
+              <SupervisorSelector
+                value={formData.assigned_to || undefined}
+                onChange={(supervisorId) => setFormData({ ...formData, assigned_to: supervisorId })}
+                label="Assigned Supervisor"
+              />
             </CardContent>
           </Card>
         )}

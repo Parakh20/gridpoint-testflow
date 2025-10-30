@@ -212,6 +212,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          assigned_to: string | null
           client: string | null
           created_at: string
           created_by: string
@@ -227,6 +228,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          assigned_to?: string | null
           client?: string | null
           created_at?: string
           created_by: string
@@ -242,6 +244,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          assigned_to?: string | null
           client?: string | null
           created_at?: string
           created_by?: string
@@ -298,6 +301,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      supervisor_assignments: {
+        Row: {
+          created_at: string
+          created_by: string
+          gm_id: string
+          id: string
+          supervisor_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          gm_id: string
+          id?: string
+          supervisor_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          gm_id?: string
+          id?: string
+          supervisor_id?: string
+        }
+        Relationships: []
       }
       test_records: {
         Row: {
