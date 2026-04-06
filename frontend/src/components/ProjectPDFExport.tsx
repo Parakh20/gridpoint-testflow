@@ -146,32 +146,48 @@ export function ProjectPDFExport({ project, onClose }: ProjectPDFExportProps) {
       ]);
 
       captureRoot = document.createElement('div');
-      captureRoot.style.position = 'fixed';
-      captureRoot.style.left = '-100000px';
+      captureRoot.style.position = 'absolute';
+      captureRoot.style.left = '0';
       captureRoot.style.top = '0';
       captureRoot.style.width = '1120px';
       captureRoot.style.padding = '32px';
       captureRoot.style.background = '#ffffff';
-      captureRoot.style.zIndex = '-1';
+      captureRoot.style.color = '#0f172a';
+      captureRoot.style.fontFamily = 'system-ui, sans-serif';
+      captureRoot.style.visibility = 'hidden';
+      captureRoot.style.pointerEvents = 'none';
 
       const reportClone = printRef.current.cloneNode(true) as HTMLDivElement;
       reportClone.style.width = '100%';
       reportClone.style.maxWidth = 'none';
       reportClone.style.overflow = 'visible';
+      reportClone.style.height = 'auto';
       captureRoot.appendChild(reportClone);
       document.body.appendChild(captureRoot);
 
-      await new Promise(resolve => window.setTimeout(resolve, 100));
+      // Allow layout to compute
+      await new Promise(resolve => window.setTimeout(resolve, 300));
+
+      // Temporarily make visible for html2canvas
+      captureRoot.style.visibility = 'visible';
 
       const canvas = await html2canvas(captureRoot, {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
         logging: false,
-        width: captureRoot.scrollWidth,
+        width: 1120,
         height: captureRoot.scrollHeight,
-        windowWidth: captureRoot.scrollWidth,
+        windowWidth: 1120,
         windowHeight: captureRoot.scrollHeight,
+        onclone: (doc) => {
+          // Ensure CSS variables resolve by setting explicit colours on the clone root
+          doc.documentElement.style.setProperty('--foreground', '222 47% 11%');
+          doc.documentElement.style.setProperty('--muted-foreground', '215 16% 47%');
+          doc.documentElement.style.setProperty('--background', '0 0% 100%');
+          doc.documentElement.style.setProperty('--muted', '210 40% 96%');
+          doc.documentElement.style.setProperty('--border', '214 32% 91%');
+        },
       });
 
       const pdf = new jsPDF({
@@ -218,7 +234,7 @@ export function ProjectPDFExport({ project, onClose }: ProjectPDFExportProps) {
         variant: 'destructive',
       });
     } finally {
-      if (captureRoot) {
+      if (captureRoot && document.body.contains(captureRoot)) {
         document.body.removeChild(captureRoot);
       }
       setDownloading(false);
