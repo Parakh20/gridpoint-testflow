@@ -7,6 +7,9 @@ on:
     paths:
       - 'frontend/src/**'
       - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - 'frontend/eslint.config.js'
+      - 'frontend/tailwind.config.ts'
       - 'frontend/vite.config.ts'
       - '.github/workflows/frontend.yml'
 
