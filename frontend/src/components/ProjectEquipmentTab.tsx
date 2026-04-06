@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,21 +7,10 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Tables } from '@/integrations/supabase/types';
 
-interface EquipmentInstance {
-  id: string;
-  label: string;
-  equipment_type: string;
-  status: string;
-  seq_number: number;
-  assigned_to: string | null;
-}
-
-interface Engineer {
-  id: string;
-  name: string;
-  email: string;
-}
+type EquipmentInstance = Tables<'equipment_instances'>;
+type Engineer = Pick<Tables<'profiles'>, 'id' | 'name' | 'email'>;
 
 interface ProjectEquipmentTabProps {
   projectId: string;
@@ -38,12 +27,11 @@ export function ProjectEquipmentTab({ projectId, projectStatus }: ProjectEquipme
 
   const canAssign = userRole === 'SUPERVISOR' || userRole === 'GM' || userRole === 'SUPERADMIN';
 
-  useEffect(() => {
-    fetchEquipment();
-    fetchEngineers();
-  }, [projectId]);
+  const getErrorMessage = (error: unknown) => {
+    return error instanceof Error ? error.message : 'Something went wrong';
+  };
 
-  const fetchEquipment = async () => {
+  const fetchEquipment = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('equipment_instances')
@@ -59,9 +47,9 @@ export function ProjectEquipmentTab({ projectId, projectStatus }: ProjectEquipme
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
-  const fetchEngineers = async () => {
+  const fetchEngineers = useCallback(async () => {
     const { data: roles } = await supabase
       .from('user_roles')
       .select('user_id')
@@ -77,7 +65,12 @@ export function ProjectEquipmentTab({ projectId, projectStatus }: ProjectEquipme
       .order('name');
 
     setEngineers(profiles || []);
-  };
+  }, []);
+
+  useEffect(() => {
+    void fetchEquipment();
+    void fetchEngineers();
+  }, [fetchEquipment, fetchEngineers]);
 
   const handleAssignEngineer = async (equipmentId: string, engineerId: string | null) => {
     setAssigning(equipmentId);
@@ -95,8 +88,8 @@ export function ProjectEquipmentTab({ projectId, projectStatus }: ProjectEquipme
       ));
 
       toast({ title: engineerId ? 'Engineer assigned' : 'Engineer unassigned' });
-    } catch (error: any) {
-      toast({ title: 'Assignment failed', description: error.message, variant: 'destructive' });
+    } catch (error) {
+      toast({ title: 'Assignment failed', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setAssigning(null);
     }

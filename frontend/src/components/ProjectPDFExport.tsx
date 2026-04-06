@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,6 +6,7 @@ import { Loader2, Download } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
+import type { Json, Tables } from '@/integrations/supabase/types';
 
 interface ProjectPDFExportProps {
   project: {
@@ -22,28 +23,36 @@ interface ProjectPDFExportProps {
   onClose: () => void;
 }
 
+type ScopeItem = Tables<'scope_items'>;
+
+type TestPayload = Record<string, Json | undefined>;
+
 interface TaskWithRecord {
   id: string;
   status: string;
   equipment_instance: { label: string; equipment_type: string } | null;
-  test_template: { test_name: string; test_code: string; fields: any } | null;
-  record: { payload: any; instrument_id: string | null; pass_fail: string | null; remarks: string | null } | null;
+  test_template: { test_name: string; test_code: string; fields: Json } | null;
+  record: { payload: TestPayload; instrument_id: string | null; pass_fail: string | null; remarks: string | null } | null;
 }
 
 export function ProjectPDFExport({ project, onClose }: ProjectPDFExportProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
-  const [scopeItems, setScopeItems] = useState<any[]>([]);
+  const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
   const [tasksByEquipment, setTasksByEquipment] = useState<Record<string, TaskWithRecord[]>>({});
   const [testStats, setTestStats] = useState({ total: 0, completed: 0, pass: 0, fail: 0 });
   const printRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, [project.id]);
+  const toPayloadObject = (value: Json | null | undefined): TestPayload => {
+    if (!value || Array.isArray(value) || typeof value !== 'object') {
+      return {};
+    }
 
-  const fetchData = async () => {
+    return value as TestPayload;
+  };
+
+  const fetchData = useCallback(async () => {
     try {
       const { data: scope } = await supabase
         .from('scope_items')
@@ -83,8 +92,13 @@ export function ProjectPDFExport({ project, onClose }: ProjectPDFExportProps) {
 
       const enriched: TaskWithRecord[] = (tasks || []).map(t => ({
         ...t,
-        record: recordMap[t.id] || null,
-      })) as any;
+        record: recordMap[t.id]
+          ? {
+              ...recordMap[t.id],
+              payload: toPayloadObject(recordMap[t.id].payload),
+            }
+          : null,
+      }));
 
       // Group by equipment label
       const grouped: Record<string, TaskWithRecord[]> = {};
@@ -110,7 +124,11 @@ export function ProjectPDFExport({ project, onClose }: ProjectPDFExportProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [project.id]);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   const handleDownloadPDF = async () => {
     if (!printRef.current) {
