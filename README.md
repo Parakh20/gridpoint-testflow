@@ -1,73 +1,113 @@
-# Welcome to your Lovable project
+# TestFlow — Electrical Testing Management
 
-## Project info
+TestFlow is an internal web application for managing electrical substation commissioning projects. It digitizes test planning, field execution, review/approval workflows, and AI-powered report generation.
 
-**URL**: https://lovable.dev/projects/7508ad4e-458d-4c7a-958f-57a7c060a1da
+**4 roles** · **8 equipment types** · **46 test templates** · **4 dashboards** · **AI reports via Claude API**
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## Project Structure
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/7508ad4e-458d-4c7a-958f-57a7c060a1da) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+gridpoint-testflow/
+├── frontend/          ← React 18 + Vite + TypeScript SPA
+│   ├── src/           ← Application source code
+│   ├── public/        ← Static assets
+│   └── package.json   ← Frontend dependencies
+├── supabase/          ← Supabase project (database + backend)
+│   ├── migrations/    ← 9 PostgreSQL schema migrations
+│   └── functions/     ← Edge functions (Deno — server-side)
+│       └── generate-report/  ← AI report via Claude API
+├── skills/
+│   └── gridpoint-testflow/SKILL.md  ← Claude project skill
+└── .github/workflows/ ← CI/CD (auto-migrate, auto-deploy, lint+build)
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Quick Start
 
-**Use GitHub Codespaces**
+```bash
+# 1. Install frontend dependencies
+cd frontend && npm install
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# 2. Set up environment
+cp frontend/.env.example frontend/.env
+# → fill in VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY
 
-## What technologies are used for this project?
+# 3. Apply DB migrations (from repo root)
+supabase link --project-ref <project-ref>
+supabase db push
 
-This project is built with:
+# 4. Start development server
+npm run dev   # from root → http://localhost:8080
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+---
 
-## How can I deploy this project?
+## Available Scripts (run from root)
 
-Simply open [Lovable](https://lovable.dev/projects/7508ad4e-458d-4c7a-958f-57a7c060a1da) and click on Share -> Publish.
+| Command | Description |
+|---|---|
+| `npm run dev` | Start frontend dev server (port 8080) |
+| `npm run build` | Production build → `frontend/dist/` |
+| `npm run preview` | Preview production build |
+| `npm run lint` | Run ESLint |
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
+## Auth Options & Email Rate Limit
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Supabase's shared SMTP has a hard rate limit (~2–4 emails/hour on free plan). Google OAuth is already implemented as the primary fix.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+| Solution | Cost/month | Status |
+|---|---|---|
+| Google OAuth | $0 | ✅ Implemented — needs Supabase Dashboard config |
+| Resend custom SMTP (free tier) | $0 | 🔲 3,000 emails/month free |
+| Brevo custom SMTP (free tier) | $0 | 🔲 9,000 emails/month free |
+| AWS SES | ~$0.01 | 🔲 $0.10/1k emails |
+
+See [EMAIL_RATE_LIMIT.md](./EMAIL_RATE_LIMIT.md) for setup guides and full provider comparison.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18 + Vite + TypeScript |
+| UI | Tailwind CSS v3 + shadcn/ui |
+| Database | Supabase Postgres + RLS |
+| Auth | Supabase Auth (email/password + Google OAuth) |
+| Realtime | Supabase Realtime (project list updates) |
+| Backend | Supabase Edge Functions (Deno) |
+| AI | Anthropic Claude API (`claude-haiku-4-5-20251001`) |
+| CI/CD | GitHub Actions |
+
+---
+
+## Environment Variables
+
+| Layer | File | Variables |
+|---|---|---|
+| Frontend | `frontend/.env` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` |
+| GitHub Actions | repo → Settings → Secrets | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `SUPABASE_DB_PASSWORD`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` |
+| Edge Functions | `supabase secrets set` | `ANTHROPIC_API_KEY` |
+
+See `.env.example` for full details and where to get each key.
+
+---
+
+## Documentation
+
+| File | Contents |
+|---|---|
+| [CLAUDE.md](./CLAUDE.md) | Developer reference — stack, conventions, schema, gotchas |
+| [PROJECT.md](./PROJECT.md) | Domain description — roles, workflows, data model |
+| [DEVELOPMENT.md](./DEVELOPMENT.md) | Full setup guide, env vars, CI secrets, local Supabase |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Deployment guide — Vercel/Netlify, secrets, first-run checklist |
+| [IMPROVEMENTS.md](./IMPROVEMENTS.md) | Bug tracker and enhancement backlog (✅ fixed / 🔲 pending) |
+| [AI_REPORT_PLAN.md](./AI_REPORT_PLAN.md) | AI report generation plan — architecture, checklist, cost |
+| [FRONTEND_REVAMP.md](./FRONTEND_REVAMP.md) | Frontend design revamp — dark theme, 3D design, framer-motion, phased roadmap |
+| [EMAIL_RATE_LIMIT.md](./EMAIL_RATE_LIMIT.md) | Email rate limit solutions — OAuth (✅ done), custom SMTP, pricing |
+| [skills/gridpoint-testflow/SKILL.md](./skills/gridpoint-testflow/SKILL.md) | Claude project skill — critical rules, quick reference |

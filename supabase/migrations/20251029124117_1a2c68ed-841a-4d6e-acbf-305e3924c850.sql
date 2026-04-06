@@ -1,10 +1,15 @@
--- Add SFRA test to Power Transformer
-INSERT INTO test_templates (equipment_type, test_name, test_code, tab, fields, is_active)
+-- =============================================================================
+-- Migration: SFRA Test for Power Transformer
+-- Description: Adds Sweep Frequency Resonance Analysis (SFRA) as test PT-007
+--              for Power Transformer equipment type.
+-- =============================================================================
+
+INSERT INTO test_templates (equipment_type, test_code, test_name, tab, fields, is_active)
 VALUES (
   'POWER_TRANSFORMER',
-  'Sweep Frequency Resonance Analysis (SFRA) Test',
   'PT-007',
+  'Sweep Frequency Resonance Analysis (SFRA) Test',
   'PARAMETERS',
-  '[]'::jsonb,
-  true
+  '[]'::JSONB,
+  TRUE
 );
