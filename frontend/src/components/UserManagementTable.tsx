@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -33,7 +33,7 @@ import {
 import { UserRoleBadge } from './UserRoleBadge';
 import { EditRoleDialog } from './EditRoleDialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Edit, UserPlus } from 'lucide-react';
+import { Search, Edit, UserPlus, Trash2 } from 'lucide-react';
 import { InviteUserDialog } from './InviteUserDialog';
 
 interface UserWithRole {
@@ -51,6 +51,7 @@ interface UserManagementTableProps {
 }
 
 export function UserManagementTable({ onUserCountChange }: UserManagementTableProps) {
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -64,17 +65,20 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
     roleId: string;
   } | null>(null);
   const [toggleUserId, setToggleUserId] = useState<string | null>(null);
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Get current user ID
-  supabase.auth.getUser().then(({ data }) => {
-    if (data.user) setCurrentUserId(data.user.id);
-  });
+  // Fetch current user ID once on mount — never in render body
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setCurrentUserId(data.user.id);
+    });
+  }, []);
 
   const { data: users = [], isLoading, refetch } = useQuery({
     queryKey: ['users-with-roles'],
     queryFn: async () => {
-      // Fetch all profiles
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
@@ -82,14 +86,12 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
 
       if (profilesError) throw profilesError;
 
-      // Fetch all user roles
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('*');
 
       if (rolesError) throw rolesError;
 
-      // Merge the data in JavaScript
       const usersWithRoles: UserWithRole[] = (profilesData || []).map(profile => {
         const userRole = (rolesData || []).find(r => r.user_id === profile.id);
         return {
@@ -122,7 +124,6 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
   });
 
   const handleToggleActive = async (userId: string, currentStatus: boolean) => {
-    // Prevent superadmin from deactivating themselves
     if (userId === currentUserId && currentStatus) {
       toast.error('Cannot deactivate yourself');
       return;
@@ -136,7 +137,6 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
 
       if (error) throw error;
 
-      // Log the action
       await supabase.from('audit_logs').insert({
         entity_type: 'user',
         entity_id: userId,
@@ -155,6 +155,50 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
     setToggleUserId(null);
   };
 
+  const handleDeleteUser = async () => {
+    if (!deleteUserId) return;
+    const user = users.find(u => u.id === deleteUserId);
+    if (!user) return;
+
+    setDeleting(true);
+    try {
+      // Delete role assignment first (FK constraint)
+      if (user.role_id) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('id', user.role_id);
+        if (roleError) throw roleError;
+      }
+
+      // Delete profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', deleteUserId);
+      if (profileError) throw profileError;
+
+      // Log the deletion
+      await supabase.from('audit_logs').insert({
+        entity_type: 'user',
+        entity_id: deleteUserId,
+        action: 'DELETE',
+        actor_id: currentUserId,
+        before_data: { name: user.name, email: user.email, role: user.role },
+        after_data: null,
+      });
+
+      toast.success(`${user.name} removed successfully`);
+      queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast.error('Failed to remove user', { description: error.message });
+    } finally {
+      setDeleting(false);
+      setDeleteUserId(null);
+    }
+  };
+
   const openEditDialog = (user: UserWithRole) => {
     setSelectedUser({
       id: user.id,
@@ -165,6 +209,8 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
     });
     setEditDialogOpen(true);
   };
+
+  const userToDelete = users.find(u => u.id === deleteUserId);
 
   if (isLoading) {
     return (
@@ -263,14 +309,25 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditDialog(user)}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Role
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditDialog(user)}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Role
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          disabled={user.id === currentUserId}
+                          onClick={() => setDeleteUserId(user.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -293,6 +350,7 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
         user={selectedUser}
       />
 
+      {/* Deactivate confirmation */}
       <AlertDialog open={!!toggleUserId} onOpenChange={() => setToggleUserId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -312,6 +370,29 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
               }}
             >
               Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteUserId} onOpenChange={(open) => { if (!open) setDeleteUserId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove User</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove <strong>{userToDelete?.name}</strong> ({userToDelete?.email}) from TestFlow.
+              Their profile and role assignment will be deleted. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={handleDeleteUser}
+            >
+              {deleting ? 'Removing...' : 'Remove User'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

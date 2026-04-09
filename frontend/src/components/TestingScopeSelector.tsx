@@ -31,6 +31,8 @@ interface TestingScopeSelectorProps {
   testingScope: Record<string, TestTemplate[]>;
   onChange: (scope: Record<string, TestTemplate[]>) => void;
   readOnly?: boolean;
+  /** When provided, only these template IDs are pre-checked (used by EditProject to restore saved scope) */
+  initialEnabledIds?: Set<string>;
 }
 
 export function TestingScopeSelector({
@@ -38,6 +40,7 @@ export function TestingScopeSelector({
   testingScope,
   onChange,
   readOnly = false,
+  initialEnabledIds,
 }: TestingScopeSelectorProps) {
   const [loading, setLoading] = useState(true);
   const [testConfigs, setTestConfigs] = useState<TestScopeConfig[]>([]);
@@ -89,7 +92,8 @@ export function TestingScopeSelector({
             testName: template.test_name,
             testCode: template.test_code,
             tab: template.tab,
-            isEnabled: true, // Default to enabled
+            // If caller supplies saved IDs, restore their enabled state; otherwise default all on
+            isEnabled: initialEnabledIds ? initialEnabledIds.has(template.id) : true,
           }));
 
         configsByType[equipType] = {

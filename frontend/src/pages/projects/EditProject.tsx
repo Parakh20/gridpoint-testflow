@@ -43,6 +43,7 @@ export default function EditProject() {
 
   const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
   const [testingScope, setTestingScope] = useState<Record<string, any[]>>({});
+  const [savedEnabledIds, setSavedEnabledIds] = useState<Set<string> | undefined>(undefined);
 
   useEffect(() => {
     fetchProject();
@@ -82,6 +83,16 @@ export default function EditProject() {
 
       if (scopeError) throw scopeError;
       setScopeItems(scope || []);
+
+      // Fetch existing test scope so step 3 restores the saved selection
+      const { data: testScope } = await supabase
+        .from('project_test_scope')
+        .select('test_template_id')
+        .eq('project_id', id);
+
+      if (testScope?.length) {
+        setSavedEnabledIds(new Set(testScope.map(r => r.test_template_id)));
+      }
     } catch (error) {
       console.error('Error fetching project:', error);
       toast({
@@ -400,6 +411,7 @@ export default function EditProject() {
                 scopeItems={scopeItems}
                 testingScope={testingScope}
                 onChange={setTestingScope}
+                initialEnabledIds={savedEnabledIds}
               />
             </CardContent>
           </Card>

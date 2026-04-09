@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const inviteUserSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
@@ -48,6 +48,7 @@ interface InviteUserDialogProps {
 
 export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<InviteUserForm>({
     resolver: zodResolver(inviteUserSchema),
@@ -61,8 +62,12 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%';
-    const password = Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    // Use crypto.getRandomValues for cryptographically secure password generation
+    const bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes);
+    const password = Array.from(bytes, b => chars[b % chars.length]).join('');
     form.setValue('password', password);
+    setShowPassword(true);
   };
 
   const onSubmit = async (data: InviteUserForm) => {
@@ -185,9 +190,24 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
                 <FormItem>
                   <FormLabel>Temporary Password</FormLabel>
                   <div className="flex gap-2">
-                    <FormControl>
-                      <Input type="text" placeholder="Generate or enter password" {...field} />
-                    </FormControl>
+                    <div className="relative flex-1">
+                      <FormControl>
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Generate or enter password"
+                          className="pr-10"
+                          {...field}
+                        />
+                      </FormControl>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                     <Button type="button" variant="outline" onClick={generatePassword}>
                       Generate
                     </Button>

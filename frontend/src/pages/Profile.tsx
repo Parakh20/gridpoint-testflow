@@ -16,7 +16,6 @@ export default function Profile() {
   const [name, setName] = useState('');
   const [savingName, setSavingName] = useState(false);
 
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
@@ -66,9 +65,9 @@ export default function Profile() {
       const { error } = await updatePassword(newPassword);
       if (error) throw error;
       toast({ title: 'Password updated', description: 'Your password has been changed.' });
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+
     } catch (err: any) {
       console.error(err);
       toast({ title: 'Error', description: err.message ?? 'Failed to update password.', variant: 'destructive' });

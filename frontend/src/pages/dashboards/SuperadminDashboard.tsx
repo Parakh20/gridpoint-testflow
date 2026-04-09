@@ -35,7 +35,7 @@ export default function SuperadminDashboard() {
 
   return (
     <DashboardLayout title="Superadmin Dashboard">
-      <div className="grid gap-6 md:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-3">
         {statCards.map((card, i) => (
           <motion.div
             key={card.title}
