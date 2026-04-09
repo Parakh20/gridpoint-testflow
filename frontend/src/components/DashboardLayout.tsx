@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { NotificationBell } from '@/components/NotificationBell';
 import { dashboardPath } from '@/lib/routes';
 import {
   Zap,
@@ -11,7 +12,7 @@ import {
   LayoutDashboard,
   ClipboardList,
   Users,
-  Settings,
+  UserCircle,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -31,19 +32,23 @@ function getNavItems(role: string | null): NavItem[] {
       return [
         { label: 'Dashboard', href: '/superadmin', icon: <LayoutDashboard size={18} /> },
         { label: 'User Management', href: '/superadmin', icon: <Users size={18} /> },
+        { label: 'Profile', href: '/profile', icon: <UserCircle size={18} /> },
       ];
     case 'GM':
       return [
         { label: 'Projects', href: '/gm', icon: <FolderOpen size={18} /> },
         { label: 'New Project', href: '/projects/new', icon: <Plus size={18} /> },
+        { label: 'Profile', href: '/profile', icon: <UserCircle size={18} /> },
       ];
     case 'SUPERVISOR':
       return [
         { label: 'Dashboard', href: '/supervisor', icon: <LayoutDashboard size={18} /> },
+        { label: 'Profile', href: '/profile', icon: <UserCircle size={18} /> },
       ];
     case 'ENGINEER':
       return [
         { label: 'My Tasks', href: '/engineer', icon: <ClipboardList size={18} /> },
+        { label: 'Profile', href: '/profile', icon: <UserCircle size={18} /> },
       ];
     default:
       return [];
@@ -116,7 +121,10 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
             </div>
           </div>
           <div className="flex items-center justify-between px-1">
-            <ThemeToggle />
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+              <NotificationBell />
+            </div>
             <button
               onClick={signOut}
               aria-label="Sign out"

@@ -329,6 +329,7 @@ See `EMAIL_RATE_LIMIT.md` for full setup guide.
 - **`has_role` signature**: `has_role(_user_id UUID, _role app_role)` — note argument order in SQL.
 - **CI auto-deploys**: Push to `main` → GitHub Actions runs migrations + deploys edge functions automatically.
 - **Realtime**: `projects` table added to `supabase_realtime` publication (migration 4).
+- **The Supabase anon key in the browser bundle is intentional and safe.** It only grants access that RLS policies permit — it is not a secret and does not identify a privileged user. Security is enforced entirely by Row Level Security on the DB. Never remove RLS thinking the anon key will protect data instead.
 
 ---
 

@@ -24,9 +24,11 @@ interface ProjectStatusActionsProps {
     project_number: string;
   };
   onStatusChange: () => void;
+  /** Called immediately before the API call — lets the parent update UI optimistically */
+  onOptimisticUpdate?: (newStatus: string) => void;
 }
 
-export function ProjectStatusActions({ project, onStatusChange }: ProjectStatusActionsProps) {
+export function ProjectStatusActions({ project, onStatusChange, onOptimisticUpdate }: ProjectStatusActionsProps) {
   const { user, userRole } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -36,6 +38,8 @@ export function ProjectStatusActions({ project, onStatusChange }: ProjectStatusA
 
   const updateProjectStatus = async (newStatus: string, additionalFields: Record<string, unknown> = {}) => {
     setLoading(true);
+    // Optimistic update — parent can reflect new status in UI immediately
+    onOptimisticUpdate?.(newStatus);
     try {
       const { error } = await supabase
         .from('projects')

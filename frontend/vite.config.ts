@@ -4,7 +4,9 @@ import path from "path";
 
 export default defineConfig({
   server: {
-    host: "::",
+    // Use "localhost" for local-only dev. Change to "::" for Docker / WSL
+    // where the dev server must be reachable from outside the container.
+    host: "localhost",
     port: 8080,
   },
   plugins: [react()],
@@ -12,5 +14,11 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    css: false,
   },
 });

@@ -17,6 +17,7 @@ import EngineerProjectDetail from "./pages/engineer/EngineerProjectDetail";
 import NewProject from "@/pages/projects/NewProject";
 import ProjectDetail from "@/pages/projects/ProjectDetail";
 import EditProject from "@/pages/projects/EditProject";
+import Profile from "@/pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/projects/new" element={<ProtectedRoute requiredRole={['GM', 'SUPERADMIN']}><NewProject /></ProtectedRoute>} />
               <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
               <Route path="/projects/:id/edit" element={<ProtectedRoute requiredRole={['GM', 'SUPERADMIN']}><EditProject /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/supervisor" element={<ProtectedRoute requiredRole="SUPERVISOR"><SupervisorDashboard /></ProtectedRoute>} />
               <Route path="/engineer" element={<ProtectedRoute requiredRole="ENGINEER"><EngineerDashboard /></ProtectedRoute>} />
               <Route path="/engineer/projects/:id" element={<ProtectedRoute requiredRole="ENGINEER"><EngineerProjectDetail /></ProtectedRoute>} />

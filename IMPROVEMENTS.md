@@ -19,8 +19,6 @@ Legend: ✅ Fixed/Done | 🔲 Pending | ⚠️ Partial
 ### 3. ✅ `AuthContext` stuck loading on role fetch failure
 `fetchUserRole` wraps the Supabase call in try/catch/finally and always calls `setLoading(false)` in the `finally` block.
 
-**File:** `frontend/src/contexts/AuthContext.tsx`
-
 ---
 
 ### 4. ✅ `ProjectDetail` hardcodes navigation to `/gm`
@@ -29,229 +27,193 @@ All `navigate('/gm')` calls replaced with `navigate(dashboardPath(userRole))` vi
 ---
 
 ### 5. ✅ `test_records` has no unique constraint per `test_task_id`
-Migration added: `supabase/migrations/20260405000001_add_test_record_unique_constraint.sql`. Deduplicates existing rows (keeping most recent), then adds `UNIQUE(test_task_id)`.
+Migration added: `supabase/migrations/20260405000001_add_test_record_unique_constraint.sql`.
 
 ---
 
 ### 6. ✅ Email rate limit — Supabase shared SMTP
-Google OAuth added as the primary fix (`signInWithGoogle()` in `AuthContext`, "Continue with Google" button on `Auth.tsx`). See `EMAIL_RATE_LIMIT.md` for full setup.
+Google OAuth added as the primary fix. See `EMAIL_RATE_LIMIT.md` for setup.
 
 ---
 
 ### 7. 🔲 `test_templates.fields` is empty for most templates
-46 test templates exist in the DB, but most have `fields: []`. Dynamic test forms cannot render meaningful inputs until field schemas are defined.
-
-**Next step:** For each template, add a JSON Schema migration to populate the `fields` column:
-```json
-{
-  "type": "object",
-  "properties": {
-    "measurement": { "type": "number", "title": "Measurement (MΩ)" }
-  },
-  "required": ["measurement"]
-}
-```
-Write as a new migration — never edit existing ones.
+46 test templates exist but most have `fields: []`. Requires writing per-template JSON Schema migrations — one per template, 46 total. Deferred as content work (not a code bug). Prioritize when field engineers are onboarded.
 
 ---
 
 ### 8. ✅ No rework reason / comment from supervisor
-`rework_reason text` column added to `test_tasks` via migration `20260407000001_add_rework_reason_to_test_tasks.sql`. When supervisor clicks "Rework", a modal prompts for a reason (optional). The reason is stored and shown:
-- In `ProjectTestsTab` expanded row (orange callout)
-- In `SupervisorDashboard` rework dialog
-- In `EngineerProjectDetail` as an orange banner on tasks in `REWORK` status
+`rework_reason text` column added. Modal prompts for reason. Shown in ProjectTestsTab, SupervisorDashboard, and EngineerProjectDetail.
 
 ---
 
 ## High Priority
 
 ### 9. ⚠️ Data fetching inconsistency — `useEffect` vs TanStack Query
-`SuperadminDashboard` already uses TanStack Query. All other pages still use direct `useEffect` + Supabase calls. Full migration deferred as a standalone refactor. **New pages should use TanStack Query.**
+`SuperadminDashboard` uses TanStack Query. All other pages use `useEffect` + Supabase. Full migration deferred as standalone refactor. New pages should use TanStack Query.
 
 ---
 
-### 10. 🔲 No email / in-app notifications
-No notifications are sent when:
-- An engineer submits a test (supervisor should be notified)
-- A supervisor approves or sends back a test (engineer should be notified)
-- A project is assigned to a supervisor (supervisor should be notified)
+### 10. ✅ In-app notifications
+`NotificationBell` component added to the sidebar (bottom controls area) for SUPERVISOR and ENGINEER roles:
+- **Supervisor**: shows count of SUBMITTED tests across their assigned projects
+- **Engineer**: shows count of REWORK tasks on their assigned equipment
+Realtime subscription on `test_tasks` keeps count live.
 
-**Options:**
-- Supabase Edge Function triggered by DB webhook → send email via Resend
-- In-app notifications table (`notifications`) with unread badge in the header
+**Files:** `frontend/src/components/NotificationBell.tsx`, `DashboardLayout.tsx`
 
 ---
 
 ### 11. ✅ Project auto-close prompt when all tests are approved
-After the last test task is approved (individually or via bulk approve), `ProjectTestsTab` fires `onAllApproved()` callback. `ProjectDetail` handles this by toasting GM/SUPERADMIN with "All tests approved! You can now close the project." when the project is ACTIVE.
+`ProjectTestsTab` fires `onAllApproved()` callback after the last test is approved. `ProjectDetail` toasts GM/SUPERADMIN: "All tests approved! You can now close the project."
 
 ---
 
 ### 12. ✅ No bulk approve for supervisor
-Added checkbox multi-select in `ProjectTestsTab`. A toolbar appears when any `SUBMITTED` tests exist showing "Select all submitted (N)" checkbox and an "Approve Selected (N)" button. Individual row checkboxes appear on submitted tasks.
+Checkbox multi-select in `ProjectTestsTab`. Toolbar with "Select all submitted" + "Approve Selected (N)" button.
 
 ---
 
-### 13. ✅ AI report frontend integration incomplete
-Added "AI Report" button to `ProjectDetail.tsx` header — visible to GM/SUPERADMIN when `status = CLOSED`. Calls `supabase.functions.invoke('generate-report', { body: { project_id } })`. Report is displayed in a scrollable dialog with a "Download .md" button.
+### 13. ✅ AI report frontend integration
+"AI Report" button in `ProjectDetail` header — visible to GM/SUPERADMIN when `status = CLOSED`. Result shown in scrollable dialog with "Download .md" option.
 
 ---
 
 ## Medium Priority
 
 ### 14. ✅ PDF export — empty output / Lovable favicon
-Two bugs fixed:
-- **Empty PDF:** `position: fixed` + `left: -100000px` caused html2canvas to capture a blank area. Changed to `position: absolute` + `visibility: hidden`; CSS custom property values injected via the `onclone` callback.
-- **Favicon:** `public/favicon.ico` contained the Lovable heart logo. Replaced with a 64×64 ICO matching the app's SVG (blue rounded square + white lightning bolt).
+Fixed `position: absolute` + CSS custom property injection. Favicon replaced.
 
 ---
 
 ### 15. ✅ Supervisor can only approve tests from inside a project
-`SupervisorDashboard` now shows a **"Tests Pending Approval"** card listing all `SUBMITTED` tests across all assigned projects with inline Approve / Rework buttons. A "Pending Review" stat counter is shown at the top.
+`SupervisorDashboard` shows "Tests Pending Approval" card with inline Approve / Rework buttons.
 
 ---
 
 ### 16. 🔲 No pagination on project lists
-GM dashboard fetches all projects. Acceptable for current scale. Add offset pagination with `useInfiniteQuery` when project count exceeds ~500.
+Acceptable for current scale. Add `useInfiniteQuery` offset pagination when project count exceeds ~500.
 
 ---
 
 ### 17. 🔲 No optimistic updates
-Status changes still do a full round-trip. Add optimistic updates with TanStack Query `onMutate` when migrating data fetching.
+Status changes do a full round-trip. Add optimistic updates with TanStack Query `onMutate` when migrating data fetching.
 
 ---
 
-### 18. ✅ Dark theme implemented (Phase 1 + Phase 2 complete)
-Grid Control dark palette applied. Full sidebar layout. ThemeToggle persists to localStorage. See `FRONTEND_REVAMP.md`.
-
-**Delivered:**
-- `ThemeContext.tsx` + `ThemeToggle.tsx` — dark/light toggle, defaults to dark
-- Deep Grid Control dark CSS vars (`index.css`) + glow keyframes (`tailwind.config.ts`)
-- `DashboardLayout.tsx` — fixed 240px dark sidebar with role nav, frosted header, sign-out
-- `StatusBadge.tsx` — glow rings: amber pulse (ACTIVE), red pulse (REWORK), green/purple/blue glows
-- `HoverCard.tsx` + `PageTransition.tsx` + `AnimatedCounter.tsx` — framer-motion components
-- `Auth.tsx` — dark glass card with animated dot-grid background + glowing Zap logo
-- `GMDashboard.tsx` + `SupervisorDashboard.tsx` — animated stat counters + hover lift cards
-- `EquipmentIcon.tsx` — 8 IEEE-style schematic SVG symbols (PT, CT, CVT, LA, SF6, ISO, VCB, EP)
-- `EquipmentCard.tsx` — card with SVG icon colored by status + spring hover lift
-- `ProjectEquipmentTab.tsx` — card grid replacing flat table view
+### 18. ✅ Dark theme + frontend revamp (Phase 1 + Phase 2)
+- `ThemeContext.tsx` + `ThemeToggle.tsx` — dark/light toggle, defaults to dark, localStorage persistence
+- Pure black dark palette in `index.css` (`0 0% 5%` background, `0 0% 8%` card)
+- `DashboardLayout.tsx` — fixed 240px sidebar, role nav, frosted header
+- `StatusBadge.tsx` — glow rings: amber pulse (ACTIVE), red pulse (REWORK)
+- `HoverCard.tsx` + `PageTransition.tsx` + `AnimatedCounter.tsx` — framer-motion
+- `Auth.tsx` — dark glass card, animated dot-grid, glowing Zap logo
+- `GMDashboard.tsx` + `SupervisorDashboard.tsx` + `EngineerDashboard.tsx` + `SuperadminDashboard.tsx` — AnimatedCounter stat cards, motion hover lifts
+- `EquipmentIcon.tsx` — 8 IEEE schematic SVG symbols
+- `EquipmentCard.tsx` + `ProjectEquipmentTab.tsx` — card grid with SVG icons
+- `EngineerDashboard.tsx` — per-project progress bar with animated fill
 
 ---
 
 ### 19. ✅ No auto-save for engineer test forms
-`EngineerProjectDetail` now persists form drafts to `localStorage` keyed by `testflow_draft_<task_id>` on every field change. On load, drafts are restored for tasks with no existing DB record. Drafts are cleared after a successful save/submit. A "Draft" indicator (HardDrive icon) appears in the task header when an unsaved draft is detected.
+Draft persistence to `localStorage` keyed by `testflow_draft_<task_id>`. Drafts restored on load, cleared after save/submit. "Draft" indicator in task header.
 
 ---
 
 ### 20. 🔲 Instrument ID is a free-text field — no reuse
-Instrument IDs are typed as plain strings. There is no way to look up previously used instruments, their calibration dates, or validate format.
-
-**Next step:** Add an `instruments` table (`id`, `serial_number`, `type`, `last_calibrated_at`, `owned_by`). Replace the free-text input with a searchable `Combobox`. This also enables calibration expiry warnings.
+Requires new `instruments` DB table + searchable Combobox. Deferred — needs schema migration and calibration expiry logic.
 
 ---
 
-### 21. 🔲 No project-level activity log visible in UI
-The DB has an audit trigger that logs assignment changes, but there is no UI to view the log. Engineers and supervisors cannot see who changed what or when.
+### 21. ✅ No project-level activity log in UI
+"Activity" tab added to `ProjectDetail.tsx` reading from `audit_logs` table. Shows a timeline with color-coded dots, actor names, and readable action labels derived from before/after data diffs.
 
-**Next step:** Add an "Activity" tab to `ProjectDetail.tsx` that reads from the `audit_log` table (or a similar history table) and shows a timeline.
+**Files:** `frontend/src/components/ProjectActivityTab.tsx`, `ProjectDetail.tsx`
 
 ---
 
-### 22. ✅ Analytics / stats charts not rendered
-Added two charts to `GMDashboard` using the existing `recharts` dependency:
-- **Bar chart** — project status breakdown (Draft / Approved / Active / Closed)
-- **Donut pie chart** — assignment overview (Assigned vs Unassigned)
-Charts are conditionally rendered only when there is at least one project.
+### 22. ✅ Analytics / stats charts
+Bar chart (project status breakdown) + donut pie chart (assignment overview) in `GMDashboard` via `recharts`.
 
 ---
 
 ### 23. ✅ CSV export
-"Export CSV" button added to the Test Progress card in `ProjectTestsTab`. Downloads all test tasks with equipment label, type, test name/code, status, pass/fail, instrument ID, and remarks. No external library needed — uses native Blob + URL.createObjectURL.
+"Export CSV" button in `ProjectTestsTab`. Downloads all test tasks. Native Blob — no external library.
 
 ---
 
 ## Low Priority
 
 ### 24. 🔲 No test suite
-No unit, component, or E2E tests exist.
+No unit, component, or E2E tests.
 
-**Recommended setup:**
-- **Vitest** — zero-config test runner for Vite
-- **React Testing Library** — component tests for `ProjectTestsTab`, `AuthContext`
-- **Playwright** — E2E for critical flows (login, equipment generation, status transitions, PDF download)
+**Recommended:** Vitest (unit), React Testing Library (components), Playwright (E2E for login, equipment generation, PDF download).
 
 ---
 
-### 25. 🔲 No user profile page
-Users cannot change their display name or password from the UI. The only way to update profile data is via Supabase Dashboard.
+### 25. ✅ No user profile page
+`/profile` route added — name update (writes to `profiles` table) and password change (via `supabase.auth.updateUser`). Linked from sidebar nav for all roles.
 
-**Next step:** Add a `/profile` route with a form for name + password change (using `supabase.auth.updateUser`). Link from the header.
+**Files:** `frontend/src/pages/Profile.tsx`, `App.tsx`, `DashboardLayout.tsx`
 
 ---
 
 ### 26. ✅ Password reset flow
-"Forgot password?" button added below the Sign In form. Opens a dialog that calls `supabase.auth.resetPasswordForEmail()` with `redirectTo: /auth?reset=true`. `AuthContext` handles `PASSWORD_RECOVERY` event → navigates to `/auth?reset=true`. That URL renders a "Set New Password" form that calls `supabase.auth.updateUser({ password })`.
-
-**Files:** `Auth.tsx`, `AuthContext.tsx`
+"Forgot password?" dialog calls `resetPasswordForEmail`. `PASSWORD_RECOVERY` event → `/auth?reset=true` → "Set New Password" form.
 
 ---
 
 ### 27. 🔲 Dev server exposed on all network interfaces
-`vite.config.ts` uses `host: "::"`. Change to `host: "localhost"` for pure local dev. Leave as `"::"` only inside Docker or WSL.
+`vite.config.ts` uses `host: "::"`. Change to `host: "localhost"` for local-only dev; keep `"::"` for Docker/WSL.
 
 ---
 
-### 28. 🔲 No Content-Security-Policy headers
-No CSP configured. Add to the Vercel `vercel.json` headers config restricting `script-src` and `connect-src` to known origins.
+### 28. ✅ Content-Security-Policy headers
+CSP + security headers added to `frontend/vercel.json`:
+- `Content-Security-Policy` — restricts script-src, connect-src to Supabase, frame-ancestors none
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy` — disables camera, mic, geolocation
 
 ---
 
 ### 29. 🔲 Supabase anon key in browser bundle — undocumented
-By design for Supabase (RLS enforces security), but new devs may misunderstand it as a security hole and remove RLS. Document explicitly in `README.md` onboarding section.
+By design (RLS enforces security), but undocumented for new devs. Add explanation to README onboarding section.
 
 ---
 
 ## Dependency Cleanup
 
-| Package | Issue | Status |
-|---|---|---|
-| `next-themes` | Installed but dark theme not yet implemented | 🔲 Keep — needed for dark theme |
-| `embla-carousel-react` | shadcn/ui bundle dep — no carousel in the app | 🔲 Remove if no carousel planned |
-| `input-otp` | OTP component — no OTP flow | 🔲 Remove if no OTP planned |
-| `vaul` | Drawer component — not actively used | 🔲 Remove if no drawer planned |
-| `recharts` | Installed — no charts rendered yet | 🔲 Implement analytics charts or remove |
-| `papaparse` / `xlsx` | Not yet installed — needed for CSV export | 🔲 Add when CSV export is built |
+| Package | Status |
+|---|---|
+| `next-themes` | Kept — used by shadcn `sonner.tsx` |
+| `embla-carousel-react` | ✅ Removed — `carousel.tsx` shadcn component deleted (unused) |
+| `input-otp` | ✅ Removed — `input-otp.tsx` shadcn component deleted (unused) |
+| `vaul` | ✅ Removed — `drawer.tsx` shadcn component deleted (unused) |
+| `recharts` | ✅ In use — bar + donut charts in GMDashboard |
 
 ---
 
 ## Security Fixes Applied
 
 ### ✅ Unguarded JSON.parse on test_template.fields
-`EngineerProjectDetail.tsx` and `ProjectTestsTab.tsx` both called `JSON.parse(rawFields)` without a try/catch. If a template's `fields` column contained malformed JSON, the entire task list would crash. Wrapped in try/catch with `parsedFields = null` fallback — forms gracefully render the generic "Reading Value" input instead.
+Both `EngineerProjectDetail.tsx` and `ProjectTestsTab.tsx` wrapped in try/catch with `parsedFields = null` fallback.
 
 ---
 
 ## Implemented Features (Reference)
 
-### ✅ Google OAuth (`Auth.tsx` + `AuthContext.tsx`)
-- `signInWithGoogle()` calls `supabase.auth.signInWithOAuth`
-- "Continue with Google" button on both Sign In + Sign Up tabs
-- New OAuth users with no role land on Index.tsx "role being configured" screen
+### ✅ Google OAuth
+`signInWithGoogle()` in `AuthContext`. "Continue with Google" on Auth.tsx.
 
 ### ✅ AI Report Generation (Edge Function)
-- `supabase/functions/generate-report/index.ts` (Deno)
-- Fetches all project data, builds structured prompt, calls Claude API
-- Returns 5-section formal commissioning report as Markdown
+`supabase/functions/generate-report/index.ts` — Deno, Claude API (`claude-haiku-4-5-20251001`), returns Markdown.
 
-### ✅ GitHub Actions CI — Auto-migrate + deploy
-- `supabase.yml` — triggers on `supabase/migrations/**` or `supabase/functions/**` changes
-- `frontend.yml` — triggers on `frontend/src/**` changes
+### ✅ GitHub Actions CI
+`supabase.yml` — auto migrate + deploy on push to main. `frontend.yml` — lint + build check.
 
 ### ✅ GM-Supervisor Assignment
-- `supervisor_assignments` table with `UNIQUE(gm_id, supervisor_id)`
-- `assigned_to` column on `projects`
-- Audit trigger logs assignment changes
+`supervisor_assignments` table, `assigned_to` on projects, audit trigger.
 
 ### ✅ html2canvas PDF Download
-- `ProjectPDFExport` generates a multi-page A4 PDF client-side
-- Covers: project info, equipment scope, test results summary, per-equipment test tables with readings
+`ProjectPDFExport` — multi-page A4 PDF, client-side.

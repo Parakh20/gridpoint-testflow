@@ -14,6 +14,7 @@ import { ProjectScopeTab } from '@/components/ProjectScopeTab';
 import { ProjectTestingScopeTab } from '@/components/ProjectTestingScopeTab';
 import { ProjectEquipmentTab } from '@/components/ProjectEquipmentTab';
 import { ProjectTestsTab } from '@/components/ProjectTestsTab';
+import { ProjectActivityTab } from '@/components/ProjectActivityTab';
 import { ProjectPDFExport } from '@/components/ProjectPDFExport';
 import { AssignProjectDialog } from '@/components/AssignProjectDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -87,6 +88,11 @@ export default function ProjectDetail() {
   useEffect(() => { fetchProject(); }, [id]);
 
   const handleStatusChange = () => fetchProject(true);
+
+  // Optimistic update: mutate local state immediately, server refetch confirms it
+  const handleOptimisticStatusUpdate = (newStatus: string) => {
+    setProject(prev => prev ? { ...prev, status: newStatus as any } : prev);
+  };
 
   const handleGenerateReport = async () => {
     if (!id) return;
@@ -193,16 +199,18 @@ export default function ProjectDetail() {
             <ProjectStatusActions
               project={project}
               onStatusChange={handleStatusChange}
+              onOptimisticUpdate={handleOptimisticStatusUpdate}
             />
           </div>
         </div>
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className={`grid w-full ${hasEquipment ? 'grid-cols-5' : 'grid-cols-3'}`}>
+          <TabsList className={`grid w-full ${hasEquipment ? 'grid-cols-6' : 'grid-cols-4'}`}>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="scope">Scope</TabsTrigger>
             <TabsTrigger value="testing-scope">Testing Scope</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
             {hasEquipment && (
               <>
                 <TabsTrigger value="equipment">Equipment</TabsTrigger>
@@ -265,6 +273,10 @@ export default function ProjectDetail() {
               projectStatus={project.status}
               onEquipmentGenerated={() => setHasEquipment(true)}
             />
+          </TabsContent>
+
+          <TabsContent value="activity">
+            <ProjectActivityTab projectId={project.id} />
           </TabsContent>
 
           {hasEquipment && (

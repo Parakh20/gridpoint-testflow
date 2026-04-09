@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save, HardDrive } from 'lucide-react';
+import { InstrumentSelector } from '@/components/InstrumentSelector';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -377,10 +378,9 @@ export default function EngineerProjectDetail() {
                       <div className="grid grid-cols-2 gap-4 pt-2 border-t">
                         <div className="space-y-1">
                           <Label>Instrument ID</Label>
-                          <Input
+                          <InstrumentSelector
                             value={formData[task.id]?._instrument_id || ''}
-                            onChange={e => handleFieldChange(task.id, '_instrument_id', e.target.value)}
-                            placeholder="Instrument serial / ID"
+                            onChange={v => handleFieldChange(task.id, '_instrument_id', v)}
                             disabled={isReadonly}
                           />
                         </div>
