@@ -318,8 +318,8 @@ const statusColors = {
 ```
 
 ---
-
-## Phase 3 — Cinematic 3D Experience
+3D not to be implemented until and unless stated
+<!-- ## Phase 3 — Cinematic 3D Experience
 **Goal:** Replace SVG icons with interactive low-poly 3D models. Dashboards get immersive 3D scenes. Engineers and supervisors feel like they're inside a real substation control room.
 
 ### 3.1 Equipment 3D Models
@@ -508,7 +508,7 @@ const canUseWebGL = (() => {
 })();
 
 // Fallback: 2D SVG version for low-powered devices or no WebGL
-```
+``` -->
 
 ---
 

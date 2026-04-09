@@ -6,42 +6,41 @@ interface StatusBadgeProps {
   className?: string;
 }
 
-export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const getStatusColor = (status: string) => {
-    const statusLower = status.toLowerCase().replace('_', '');
-    
-    switch (statusLower) {
-      case 'unassigned':
-        return 'bg-status-unassigned text-white';
-      case 'assigned':
-        return 'bg-status-assigned text-white';
-      case 'inprogress':
-      case 'in_progress':
-        return 'bg-status-inProgress text-white';
-      case 'submitted':
-        return 'bg-status-submitted text-white';
-      case 'approved':
-        return 'bg-blue-500 text-white';
-      case 'rework':
-        return 'bg-status-rework text-white';
-      case 'draft':
-        return 'bg-muted text-muted-foreground';
-      case 'active':
-        return 'bg-success text-success-foreground';
-      case 'closed':
-        return 'bg-destructive text-destructive-foreground';
-      default:
-        return 'bg-muted text-muted-foreground';
-    }
-  };
+const STATUS_CONFIG: Record<string, { bg: string; text: string; darkGlow?: string }> = {
+  // Equipment / task statuses
+  unassigned:  { bg: 'bg-slate-500/20 border border-slate-500/30', text: 'text-slate-400' },
+  assigned:    { bg: 'bg-blue-500/20 border border-blue-500/30',   text: 'text-blue-400' },
+  in_progress: { bg: 'bg-cyan-500/20 border border-cyan-500/30',   text: 'text-cyan-400' },
+  inprogress:  { bg: 'bg-cyan-500/20 border border-cyan-500/30',   text: 'text-cyan-400' },
+  submitted:   { bg: 'bg-violet-500/20 border border-violet-500/30', text: 'text-violet-400', darkGlow: 'dark:shadow-glow-purple dark:animate-glow-blue' },
+  approved:    { bg: 'bg-emerald-500/20 border border-emerald-500/30', text: 'text-emerald-400', darkGlow: 'dark:shadow-glow-green' },
+  rework:      { bg: 'bg-red-500/20 border border-red-500/30',     text: 'text-red-400',     darkGlow: 'dark:animate-glow-pulse-red' },
+  // Project statuses
+  draft:       { bg: 'bg-slate-500/20 border border-slate-500/30', text: 'text-slate-400' },
+  active:      { bg: 'bg-amber-500/20 border border-amber-500/30', text: 'text-amber-400',  darkGlow: 'dark:animate-glow-pulse-amber' },
+  closed:      { bg: 'bg-slate-400/15 border border-slate-500/20', text: 'text-slate-400' },
+  // Project approval
+  aclosed:     { bg: 'bg-slate-400/15 border border-slate-500/20', text: 'text-slate-400' },
+};
 
-  const formatStatus = (status: string) => {
-    return status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-  };
+export function StatusBadge({ status, className }: StatusBadgeProps) {
+  const key = status.toLowerCase().replace(/ /g, '_');
+  const config = STATUS_CONFIG[key] ?? STATUS_CONFIG['draft'];
+
+  const formatted = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
   return (
-    <Badge className={cn(getStatusColor(status), className)} variant="secondary">
-      {formatStatus(status)}
+    <Badge
+      variant="secondary"
+      className={cn(
+        'text-[11px] font-semibold px-2 py-0.5 rounded-md border-0',
+        config.bg,
+        config.text,
+        config.darkGlow,
+        className
+      )}
+    >
+      {formatted}
     </Badge>
   );
 }

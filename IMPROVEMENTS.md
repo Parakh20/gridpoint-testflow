@@ -55,10 +55,11 @@ Write as a new migration — never edit existing ones.
 
 ---
 
-### 8. 🔲 No rework reason / comment from supervisor
-When a supervisor sends a test back for rework, no reason is stored or shown to the engineer. The engineer only sees the status change to `REWORK` with no context.
-
-**Next step:** Add a `rework_reason` text column to `test_tasks`. Show a required textarea modal when the supervisor clicks "Rework". Display the last rework reason in the engineer's test form.
+### 8. ✅ No rework reason / comment from supervisor
+`rework_reason text` column added to `test_tasks` via migration `20260407000001_add_rework_reason_to_test_tasks.sql`. When supervisor clicks "Rework", a modal prompts for a reason (optional). The reason is stored and shown:
+- In `ProjectTestsTab` expanded row (orange callout)
+- In `SupervisorDashboard` rework dialog
+- In `EngineerProjectDetail` as an orange banner on tasks in `REWORK` status
 
 ---
 
@@ -81,24 +82,18 @@ No notifications are sent when:
 
 ---
 
-### 11. 🔲 Project auto-close when all tests are approved
-There is no workflow to automatically (or prompt to) mark a project `CLOSED` when every test task reaches `APPROVED` status. Currently a GM must manually trigger closure.
-
-**Next step:** In `syncEquipmentStatus` (or a Supabase trigger), check if all test_tasks for a project are `APPROVED` and prompt the GM to close the project.
+### 11. ✅ Project auto-close prompt when all tests are approved
+After the last test task is approved (individually or via bulk approve), `ProjectTestsTab` fires `onAllApproved()` callback. `ProjectDetail` handles this by toasting GM/SUPERADMIN with "All tests approved! You can now close the project." when the project is ACTIVE.
 
 ---
 
-### 12. 🔲 No bulk approve for supervisor
-Supervisors must approve tests one at a time. For large projects (50+ tests) this is very slow.
-
-**Next step:** Add a "Select All / Approve Selected" multi-select action to `ProjectTestsTab` and the pending-review list on `SupervisorDashboard`.
+### 12. ✅ No bulk approve for supervisor
+Added checkbox multi-select in `ProjectTestsTab`. A toolbar appears when any `SUBMITTED` tests exist showing "Select all submitted (N)" checkbox and an "Approve Selected (N)" button. Individual row checkboxes appear on submitted tasks.
 
 ---
 
-### 13. 🔲 AI report frontend integration incomplete
-The edge function (`generate-report`) is deployed and working. The frontend trigger UI is not built.
-
-**Next step:** Add a "Generate AI Report" button to `ProjectDetail.tsx` (visible to GM when status = CLOSED). See `AI_REPORT_PLAN.md` for full checklist.
+### 13. ✅ AI report frontend integration incomplete
+Added "AI Report" button to `ProjectDetail.tsx` header — visible to GM/SUPERADMIN when `status = CLOSED`. Calls `supabase.functions.invoke('generate-report', { body: { project_id } })`. Report is displayed in a scrollable dialog with a "Download .md" button.
 
 ---
 
@@ -126,17 +121,25 @@ Status changes still do a full round-trip. Add optimistic updates with TanStack 
 
 ---
 
-### 18. 🔲 Dark theme not yet implemented
-`next-themes` is installed and `tailwind.config.ts` has `darkMode: 'class'`. Implementation is planned in `FRONTEND_REVAMP.md`.
+### 18. ✅ Dark theme implemented (Phase 1 + Phase 2 complete)
+Grid Control dark palette applied. Full sidebar layout. ThemeToggle persists to localStorage. See `FRONTEND_REVAMP.md`.
 
-**Pending:** `ThemeContext.tsx`, `ThemeToggle.tsx`, CSS variable overrides, `DashboardLayout` revamp.
+**Delivered:**
+- `ThemeContext.tsx` + `ThemeToggle.tsx` — dark/light toggle, defaults to dark
+- Deep Grid Control dark CSS vars (`index.css`) + glow keyframes (`tailwind.config.ts`)
+- `DashboardLayout.tsx` — fixed 240px dark sidebar with role nav, frosted header, sign-out
+- `StatusBadge.tsx` — glow rings: amber pulse (ACTIVE), red pulse (REWORK), green/purple/blue glows
+- `HoverCard.tsx` + `PageTransition.tsx` + `AnimatedCounter.tsx` — framer-motion components
+- `Auth.tsx` — dark glass card with animated dot-grid background + glowing Zap logo
+- `GMDashboard.tsx` + `SupervisorDashboard.tsx` — animated stat counters + hover lift cards
+- `EquipmentIcon.tsx` — 8 IEEE-style schematic SVG symbols (PT, CT, CVT, LA, SF6, ISO, VCB, EP)
+- `EquipmentCard.tsx` — card with SVG icon colored by status + spring hover lift
+- `ProjectEquipmentTab.tsx` — card grid replacing flat table view
 
 ---
 
-### 19. 🔲 No auto-save for engineer test forms
-If an engineer fills in a test form and navigates away (or the session expires), all unsaved data is lost.
-
-**Next step:** Persist draft payloads to `localStorage` keyed by `test_task_id`. Restore on re-open, clear on successful save.
+### 19. ✅ No auto-save for engineer test forms
+`EngineerProjectDetail` now persists form drafts to `localStorage` keyed by `testflow_draft_<task_id>` on every field change. On load, drafts are restored for tasks with no existing DB record. Drafts are cleared after a successful save/submit. A "Draft" indicator (HardDrive icon) appears in the task header when an unsaved draft is detected.
 
 ---
 
@@ -154,17 +157,16 @@ The DB has an audit trigger that logs assignment changes, but there is no UI to 
 
 ---
 
-### 22. 🔲 Analytics / stats charts not rendered
-`recharts` is installed but no charts are shown anywhere. The stat cards on dashboards are plain numbers.
-
-**Next step:** Add a simple bar/pie chart to `GMDashboard` showing project status breakdown, and a line chart showing test approval rate over time. Use existing `recharts` — no new dependency needed.
+### 22. ✅ Analytics / stats charts not rendered
+Added two charts to `GMDashboard` using the existing `recharts` dependency:
+- **Bar chart** — project status breakdown (Draft / Approved / Active / Closed)
+- **Donut pie chart** — assignment overview (Assigned vs Unassigned)
+Charts are conditionally rendered only when there is at least one project.
 
 ---
 
-### 23. 🔲 No export to CSV / Excel
-There is no way to download raw test data in a spreadsheet format. Clients often ask for this alongside the PDF report.
-
-**Next step:** Add a "Export CSV" button to `ProjectTestsTab`. Use the `papaparse` or `xlsx` library (both are lightweight) to generate a spreadsheet from `tasksByEquipment`.
+### 23. ✅ CSV export
+"Export CSV" button added to the Test Progress card in `ProjectTestsTab`. Downloads all test tasks with equipment label, type, test name/code, status, pass/fail, instrument ID, and remarks. No external library needed — uses native Blob + URL.createObjectURL.
 
 ---
 
@@ -187,10 +189,10 @@ Users cannot change their display name or password from the UI. The only way to 
 
 ---
 
-### 26. 🔲 No password reset flow
-There is no "Forgot password" link on the login page. Users who forget their password are locked out unless a superadmin resets it manually.
+### 26. ✅ Password reset flow
+"Forgot password?" button added below the Sign In form. Opens a dialog that calls `supabase.auth.resetPasswordForEmail()` with `redirectTo: /auth?reset=true`. `AuthContext` handles `PASSWORD_RECOVERY` event → navigates to `/auth?reset=true`. That URL renders a "Set New Password" form that calls `supabase.auth.updateUser({ password })`.
 
-**Next step:** Add a "Forgot password?" link on `Auth.tsx` → call `supabase.auth.resetPasswordForEmail()`. Handle the `PASSWORD_RECOVERY` event in `AuthContext` to redirect to a reset form.
+**Files:** `Auth.tsx`, `AuthContext.tsx`
 
 ---
 
@@ -219,6 +221,13 @@ By design for Supabase (RLS enforces security), but new devs may misunderstand i
 | `vaul` | Drawer component — not actively used | 🔲 Remove if no drawer planned |
 | `recharts` | Installed — no charts rendered yet | 🔲 Implement analytics charts or remove |
 | `papaparse` / `xlsx` | Not yet installed — needed for CSV export | 🔲 Add when CSV export is built |
+
+---
+
+## Security Fixes Applied
+
+### ✅ Unguarded JSON.parse on test_template.fields
+`EngineerProjectDetail.tsx` and `ProjectTestsTab.tsx` both called `JSON.parse(rawFields)` without a try/catch. If a template's `fields` column contained malformed JSON, the entire task list would crash. Wrapped in try/catch with `parsedFields = null` fallback — forms gracefully render the generic "Reading Value" input instead.
 
 ---
 

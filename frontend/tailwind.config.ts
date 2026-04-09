@@ -72,25 +72,44 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "glow-pulse-amber": {
+          "0%, 100%": { boxShadow: "0 0 0 1px #f59e0b40, 0 0 12px #f59e0b20" },
+          "50%":       { boxShadow: "0 0 0 1px #f59e0b60, 0 0 24px #f59e0b35" },
+        },
+        "glow-pulse-red": {
+          "0%, 100%": { boxShadow: "0 0 0 1px #ef444440, 0 0 12px #ef444420" },
+          "50%":       { boxShadow: "0 0 0 1px #ef444460, 0 0 24px #ef444435" },
+        },
+        "glow-blue": {
+          "0%, 100%": { boxShadow: "0 0 0 1px #3b82f640, 0 0 16px #3b82f620" },
+          "50%":       { boxShadow: "0 0 0 1px #3b82f660, 0 0 24px #3b82f630" },
+        },
+        shimmer: {
+          "0%":   { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
         },
       },
       animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
+        "accordion-down":    "accordion-down 0.2s ease-out",
+        "accordion-up":      "accordion-up 0.2s ease-out",
+        "glow-pulse-amber":  "glow-pulse-amber 2s ease-in-out infinite",
+        "glow-pulse-red":    "glow-pulse-red 2s ease-in-out infinite",
+        "glow-blue":         "glow-blue 2.5s ease-in-out infinite",
+        shimmer:             "shimmer 2s linear infinite",
+      },
+      boxShadow: {
+        "glow-blue":    "0 0 0 1px #3b82f640, 0 0 24px #3b82f620",
+        "glow-green":   "0 0 0 1px #10b98140, 0 0 16px #10b98115",
+        "glow-amber":   "0 0 0 1px #f59e0b40, 0 0 20px #f59e0b15",
+        "glow-red":     "0 0 0 1px #ef444440, 0 0 16px #ef444415",
+        "glow-purple":  "0 0 0 1px #8b5cf640, 0 0 16px #8b5cf415",
       },
     },
   },

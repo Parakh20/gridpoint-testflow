@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/DashboardLayout';
+import { AnimatedCounter } from '@/components/AnimatedCounter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +13,18 @@ import { AssignProjectDialog } from '@/components/AssignProjectDialog';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/format';
 import type { Tables } from '@/integrations/supabase/types';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts';
 
 type Project = Tables<'projects'> & {
   assigned_supervisor: { id: string; name: string } | null;
@@ -113,41 +127,27 @@ export default function GMDashboard() {
     <DashboardLayout title="General Manager Dashboard">
       <div className="flex justify-between items-center mb-6">
         <div className="grid gap-4 md:grid-cols-5 flex-1 mr-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-              <FolderOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent><div className="text-2xl font-bold">{stats.total}</div></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent><div className="text-2xl font-bold text-accent">{stats.active}</div></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent><div className="text-2xl font-bold text-success">{stats.closed}</div></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Assigned</CardTitle>
-              <UserCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent><div className="text-2xl font-bold text-accent">{stats.assigned}</div></CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Unassigned</CardTitle>
-              <UserX className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent><div className="text-2xl font-bold text-warning">{stats.unassigned}</div></CardContent>
-          </Card>
+          {[
+            { label: 'Total Projects', value: stats.total,     icon: <FolderOpen className="h-4 w-4 text-muted-foreground" />, color: 'text-foreground' },
+            { label: 'Active',        value: stats.active,     icon: <Clock className="h-4 w-4 text-amber-400" />,           color: 'text-amber-400' },
+            { label: 'Completed',     value: stats.closed,     icon: <CheckCircle className="h-4 w-4 text-emerald-400" />,   color: 'text-emerald-400' },
+            { label: 'Assigned',      value: stats.assigned,   icon: <UserCheck className="h-4 w-4 text-blue-400" />,        color: 'text-blue-400' },
+            { label: 'Unassigned',    value: stats.unassigned, icon: <UserX className="h-4 w-4 text-orange-400" />,          color: 'text-orange-400' },
+          ].map(s => (
+            <motion.div key={s.label} whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">{s.label}</CardTitle>
+                  {s.icon}
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold font-mono ${s.color}`}>
+                    <AnimatedCounter value={s.value} />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
 
         <Button onClick={() => navigate('/projects/new')} size="lg">
@@ -155,6 +155,70 @@ export default function GMDashboard() {
           New Test Plan
         </Button>
       </div>
+
+      {/* Analytics charts */}
+      {projects.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2 mb-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Project Status Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={[
+                  { name: 'Draft', value: projects.filter(p => p.status === 'DRAFT').length, fill: '#94a3b8' },
+                  { name: 'Approved', value: projects.filter(p => p.status === 'APPROVED').length, fill: '#60a5fa' },
+                  { name: 'Active', value: projects.filter(p => p.status === 'ACTIVE').length, fill: '#34d399' },
+                  { name: 'Closed', value: projects.filter(p => p.status === 'CLOSED').length, fill: '#a78bfa' },
+                ]} margin={{ top: 4, right: 8, left: -20, bottom: 4 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {[
+                      { fill: '#94a3b8' },
+                      { fill: '#60a5fa' },
+                      { fill: '#34d399' },
+                      { fill: '#a78bfa' },
+                    ].map((entry, index) => (
+                      <Cell key={index} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Assignment Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Assigned', value: stats.assigned },
+                      { name: 'Unassigned', value: stats.unassigned },
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={70}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    <Cell fill="#34d399" />
+                    <Cell fill="#f87171" />
+                  </Pie>
+                  <Tooltip />
+                  <Legend iconSize={10} />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -201,9 +265,11 @@ export default function GMDashboard() {
           ) : (
             <div className="space-y-4">
               {filteredProjects.map(project => (
-                <div
+                <motion.div
                   key={project.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                  whileHover={{ y: -1 }}
+                  transition={{ type: 'spring', stiffness: 320, damping: 22 }}
+                  className="flex items-center justify-between p-4 border border-border rounded-lg hover:border-primary/30 hover:bg-muted/30 transition-colors cursor-pointer"
                   onClick={() => navigate(`/projects/${project.id}`)}
                 >
                   <div className="flex-1">
@@ -236,7 +302,7 @@ export default function GMDashboard() {
                     </Button>
                     <StatusBadge status={project.status} />
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}

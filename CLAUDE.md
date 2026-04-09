@@ -153,6 +153,7 @@ test_templates     — JSON Schema field definitions drive dynamic form renderin
 
 test_tasks         — one per (instance × template)
                      status: DRAFT → IN_PROGRESS → SUBMITTED → APPROVED | REWORK
+                     rework_reason: text — set by supervisor when sending back; shown to engineer
 
 test_records       — JSONB test data. UNIQUE(test_task_id) — always upsert, never insert
 
@@ -262,6 +263,7 @@ Dashboards subscribe to Postgres changes on `projects`. Use separate `INSERT`/`U
 GM triggers `supabase.functions.invoke('generate-report', { body: { project_id } })`.
 Edge function fetches data → builds prompt → calls Anthropic API → returns Markdown report.
 Model: `claude-haiku-4-5-20251001`. See `AI_REPORT_PLAN.md` for full plan.
+**Frontend UI:** "AI Report" button in `ProjectDetail.tsx` header — visible to GM/SUPERADMIN when `status = CLOSED`. Displays result in a scrollable dialog with a "Download .md" option.
 
 ### Google OAuth
 `AuthContext.signInWithGoogle()` calls `supabase.auth.signInWithOAuth({ provider: 'google' })`.

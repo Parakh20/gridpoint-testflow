@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/DashboardLayout';
+import { AnimatedCounter } from '@/components/AnimatedCounter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { ClipboardCheck, AlertCircle, FolderOpen, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +36,9 @@ export default function SupervisorDashboard() {
   const [pendingTests, setPendingTests] = useState<PendingTest[]>([]);
   const [stats, setStats] = useState({ total: 0, active: 0, pendingStart: 0, pendingReview: 0 });
   const [reviewingTaskId, setReviewingTaskId] = useState<string | null>(null);
+  const [reworkDialogTask, setReworkDialogTask] = useState<PendingTest | null>(null);
+  const [reworkReason, setReworkReason] = useState('');
+  const [submittingRework, setSubmittingRework] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -131,13 +139,13 @@ export default function SupervisorDashboard() {
     setStats(prev => ({ ...prev, pendingReview: enriched.length }));
   };
 
-  const handleTaskReview = async (task: PendingTest, nextStatus: 'APPROVED' | 'REWORK') => {
+  const handleTaskReview = async (task: PendingTest, nextStatus: 'APPROVED' | 'REWORK', reason?: string) => {
     setReviewingTaskId(task.id);
     try {
-      const update =
+      const update: Record<string, any> =
         nextStatus === 'APPROVED'
-          ? { status: 'APPROVED', approved_at: new Date().toISOString() }
-          : { status: 'REWORK', approved_at: null };
+          ? { status: 'APPROVED', approved_at: new Date().toISOString(), rework_reason: null }
+          : { status: 'REWORK', approved_at: null, rework_reason: reason || null };
 
       const { error } = await supabase
         .from('test_tasks')
@@ -170,52 +178,44 @@ export default function SupervisorDashboard() {
     }
   };
 
+  const handleReworkClick = (task: PendingTest) => {
+    setReworkDialogTask(task);
+    setReworkReason('');
+  };
+
+  const handleReworkConfirm = async () => {
+    if (!reworkDialogTask) return;
+    setSubmittingRework(true);
+    await handleTaskReview(reworkDialogTask, 'REWORK', reworkReason.trim() || undefined);
+    setSubmittingRework(false);
+    setReworkDialogTask(null);
+    setReworkReason('');
+  };
+
   return (
     <DashboardLayout title="Supervisor Dashboard">
       <div className="grid gap-6 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Assigned Projects</CardTitle>
-            <FolderOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">Total projects assigned</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
-            <ClipboardCheck className="h-4 w-4 text-accent" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-accent">{stats.active}</div>
-            <p className="text-xs text-muted-foreground">Currently in progress</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Start</CardTitle>
-            <AlertCircle className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">{stats.pendingStart}</div>
-            <p className="text-xs text-muted-foreground">Awaiting activation</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
-            <ClipboardCheck className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-500">{stats.pendingReview}</div>
-            <p className="text-xs text-muted-foreground">Tests awaiting approval</p>
-          </CardContent>
-        </Card>
+        {[
+          { label: 'Assigned Projects', value: stats.total,        icon: <FolderOpen className="h-4 w-4 text-muted-foreground" />,  color: 'text-foreground',    sub: 'Total projects assigned' },
+          { label: 'Active Projects',   value: stats.active,       icon: <ClipboardCheck className="h-4 w-4 text-cyan-400" />,      color: 'text-cyan-400',      sub: 'Currently in progress' },
+          { label: 'Pending Start',     value: stats.pendingStart, icon: <AlertCircle className="h-4 w-4 text-amber-400" />,        color: 'text-amber-400',     sub: 'Awaiting activation' },
+          { label: 'Pending Review',    value: stats.pendingReview,icon: <ClipboardCheck className="h-4 w-4 text-orange-400" />,    color: 'text-orange-400',    sub: 'Tests awaiting approval' },
+        ].map(s => (
+          <motion.div key={s.label} whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }}>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{s.label}</CardTitle>
+                {s.icon}
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold font-mono ${s.color}`}>
+                  <AnimatedCounter value={s.value} />
+                </div>
+                <p className="text-xs text-muted-foreground">{s.sub}</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
       {/* Pending test approvals */}
@@ -262,7 +262,7 @@ export default function SupervisorDashboard() {
                       size="sm"
                       variant="outline"
                       disabled={reviewingTaskId === task.id}
-                      onClick={() => handleTaskReview(task, 'REWORK')}
+                      onClick={() => handleReworkClick(task)}
                     >
                       {reviewingTaskId === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3 mr-1" />}
                       Rework
@@ -321,6 +321,41 @@ export default function SupervisorDashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* Rework reason dialog */}
+      <Dialog open={!!reworkDialogTask} onOpenChange={open => { if (!open) { setReworkDialogTask(null); setReworkReason(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Back for Rework</DialogTitle>
+            <DialogDescription>
+              Provide a reason so the engineer knows what to correct.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rework-reason-sv">Rework Reason</Label>
+            <Textarea
+              id="rework-reason-sv"
+              placeholder="Describe what needs to be corrected..."
+              value={reworkReason}
+              onChange={e => setReworkReason(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setReworkDialogTask(null); setReworkReason(''); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={submittingRework}
+              onClick={handleReworkConfirm}
+            >
+              {submittingRework && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Send for Rework
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

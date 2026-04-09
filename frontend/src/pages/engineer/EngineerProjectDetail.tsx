@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/StatusBadge';
-import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save, HardDrive } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 interface TestTask {
   id: string;
   status: string;
+  rework_reason: string | null;
   equipment_instance: { id: string; label: string; equipment_type: string; assigned_to: string | null } | null;
   test_template: { id: string; test_name: string; test_code: string; fields: any } | null;
   existing_record?: any;
@@ -62,7 +63,7 @@ export default function EngineerProjectDetail() {
       const { data: taskData, error } = await supabase
         .from('test_tasks')
         .select(`
-          id, status,
+          id, status, rework_reason,
           equipment_instance:equipment_instances(id, label, equipment_type, assigned_to),
           test_template:test_templates(id, test_name, test_code, fields)
         `)
@@ -87,7 +88,7 @@ export default function EngineerProjectDetail() {
 
       setTasks(enriched);
 
-      // Pre-fill form data from existing records
+      // Pre-fill form data from existing records; fall back to localStorage draft
       const prefilled: Record<string, Record<string, any>> = {};
       enriched.forEach(t => {
         if (t.existing_record) {
@@ -97,6 +98,12 @@ export default function EngineerProjectDetail() {
             _pass_fail: t.existing_record.pass_fail || '',
             _instrument_id: t.existing_record.instrument_id || '',
           };
+        } else {
+          // Restore unsaved draft from localStorage
+          try {
+            const raw = localStorage.getItem(`testflow_draft_${t.id}`);
+            if (raw) prefilled[t.id] = JSON.parse(raw);
+          } catch { /* corrupted draft — ignore */ }
         }
       });
       setFormData(prefilled);
@@ -107,11 +114,24 @@ export default function EngineerProjectDetail() {
     }
   };
 
+  const draftKey = (taskId: string) => `testflow_draft_${taskId}`;
+
   const handleFieldChange = (taskId: string, field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [taskId]: { ...(prev[taskId] || {}), [field]: value },
-    }));
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        [taskId]: { ...(prev[taskId] || {}), [field]: value },
+      };
+      // Persist draft to localStorage
+      try {
+        localStorage.setItem(draftKey(taskId), JSON.stringify(next[taskId]));
+      } catch { /* quota exceeded — ignore */ }
+      return next;
+    });
+  };
+
+  const clearDraft = (taskId: string) => {
+    try { localStorage.removeItem(draftKey(taskId)); } catch { /* ignore */ }
   };
 
   const deriveEquipmentStatus = (nextTasks: TestTask[]) => {
@@ -196,6 +216,7 @@ export default function EngineerProjectDetail() {
 
       if (equipmentError) throw equipmentError;
 
+      clearDraft(task.id);
       setTasks(nextTasks);
       if (submit) {
         toast({ title: 'Test submitted for review' });
@@ -283,7 +304,10 @@ export default function EngineerProjectDetail() {
             tasks.map(task => {
               const isExpanded = expandedTask === task.id;
               const rawFields = task.test_template?.fields;
-              const parsedFields = typeof rawFields === 'string' ? JSON.parse(rawFields) : rawFields;
+              let parsedFields: any = null;
+              try {
+                parsedFields = typeof rawFields === 'string' ? JSON.parse(rawFields) : rawFields;
+              } catch { parsedFields = null; }
               const fields = parsedFields?.properties || {};
               const isReadonly = task.status === 'SUBMITTED' || task.status === 'APPROVED';
 
@@ -304,6 +328,11 @@ export default function EngineerProjectDetail() {
                       </div>
                       <div className="flex items-center gap-3">
                         <StatusBadge status={task.status} />
+                        {!task.existing_record && formData[task.id] && Object.keys(formData[task.id]).length > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <HardDrive className="h-3 w-3" /> Draft
+                          </span>
+                        )}
                         {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </div>
                     </div>
@@ -311,6 +340,13 @@ export default function EngineerProjectDetail() {
 
                   {isExpanded && (
                     <CardContent className="space-y-4 border-t pt-4">
+                      {/* Rework reason banner */}
+                      {task.status === 'REWORK' && task.rework_reason && (
+                        <div className="rounded border border-orange-200 bg-orange-50 p-3">
+                          <p className="text-xs font-semibold text-orange-700 uppercase mb-1">Rework Required</p>
+                          <p className="text-sm text-orange-900">{task.rework_reason}</p>
+                        </div>
+                      )}
                       {/* Dynamic fields from template */}
                       {Object.keys(fields).length > 0 ? (
                         <div>

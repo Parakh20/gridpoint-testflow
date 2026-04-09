@@ -1,52 +1,145 @@
 import { ReactNode } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { LogOut, Zap } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { dashboardPath } from '@/lib/routes';
+import {
+  Zap,
+  LogOut,
+  FolderOpen,
+  Plus,
+  LayoutDashboard,
+  ClipboardList,
+  Users,
+  Settings,
+} from 'lucide-react';
 
 interface DashboardLayoutProps {
   children: ReactNode;
   title: string;
 }
 
+interface NavItem {
+  label: string;
+  href: string;
+  icon: ReactNode;
+}
+
+function getNavItems(role: string | null): NavItem[] {
+  switch (role) {
+    case 'SUPERADMIN':
+      return [
+        { label: 'Dashboard', href: '/superadmin', icon: <LayoutDashboard size={18} /> },
+        { label: 'User Management', href: '/superadmin', icon: <Users size={18} /> },
+      ];
+    case 'GM':
+      return [
+        { label: 'Projects', href: '/gm', icon: <FolderOpen size={18} /> },
+        { label: 'New Project', href: '/projects/new', icon: <Plus size={18} /> },
+      ];
+    case 'SUPERVISOR':
+      return [
+        { label: 'Dashboard', href: '/supervisor', icon: <LayoutDashboard size={18} /> },
+      ];
+    case 'ENGINEER':
+      return [
+        { label: 'My Tasks', href: '/engineer', icon: <ClipboardList size={18} /> },
+      ];
+    default:
+      return [];
+  }
+}
+
+function RolePill({ role }: { role: string | null }) {
+  const colors: Record<string, string> = {
+    SUPERADMIN: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    GM:         'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    SUPERVISOR: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    ENGINEER:   'bg-green-500/20 text-green-300 border-green-500/30',
+  };
+  if (!role) return null;
+  return (
+    <span className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded border ${colors[role] ?? 'bg-muted text-muted-foreground border-border'}`}>
+      {role.toLowerCase()}
+    </span>
+  );
+}
+
 export function DashboardLayout({ children, title }: DashboardLayoutProps) {
   const { signOut, user, userRole } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const navItems = getNavItems(userRole);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary rounded-lg">
-                <Zap className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">TestFlow</h1>
-                <p className="text-sm text-muted-foreground">Electrical Testing Management</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-medium">{user?.email}</p>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {userRole?.toLowerCase()}
-                </p>
-              </div>
-              <Button onClick={signOut} variant="outline" size="sm">
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
+    <div className="flex min-h-screen bg-background">
+      {/* ── Sidebar ── */}
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-border bg-card">
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary shadow-glow-blue">
+            <Zap className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-bold tracking-tight text-foreground">TestFlow</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">Grid Control</p>
           </div>
         </div>
-      </header>
-      
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h2 className="text-3xl font-bold text-foreground">{title}</h2>
+
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          {navItems.map(item => {
+            const active = location.pathname === item.href;
+            return (
+              <button
+                key={item.href + item.label}
+                onClick={() => navigate(item.href)}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  active
+                    ? 'bg-primary/15 text-primary border border-primary/20'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                <span className={active ? 'text-primary' : 'text-muted-foreground'}>{item.icon}</span>
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom — user info + controls */}
+        <div className="border-t border-border px-3 py-4 space-y-2">
+          <div className="flex items-center gap-2 px-2 py-1 rounded-lg">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-foreground truncate">{user?.email}</p>
+              <RolePill role={userRole} />
+            </div>
+          </div>
+          <div className="flex items-center justify-between px-1">
+            <ThemeToggle />
+            <button
+              onClick={signOut}
+              aria-label="Sign out"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <LogOut size={14} />
+              Sign out
+            </button>
+          </div>
         </div>
-        {children}
-      </main>
+      </aside>
+
+      {/* ── Main content ── */}
+      <div className="flex flex-col flex-1 ml-60 min-w-0">
+        {/* Frosted top bar */}
+        <header className="sticky top-0 z-30 flex h-14 items-center border-b border-border bg-card/80 backdrop-blur-sm px-6">
+          <h1 className="text-base font-semibold text-foreground">{title}</h1>
+        </header>
+
+        <main className="flex-1 px-6 py-6">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

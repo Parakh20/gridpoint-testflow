@@ -5,8 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Loader2, ArrowLeft, Download, UserCheck, RefreshCw } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, UserCheck, RefreshCw, FileText } from 'lucide-react';
 import { ProjectStatusActions } from '@/components/ProjectStatusActions';
 import { ProjectScopeTab } from '@/components/ProjectScopeTab';
 import { ProjectTestingScopeTab } from '@/components/ProjectTestingScopeTab';
@@ -34,6 +36,8 @@ export default function ProjectDetail() {
   const [hasEquipment, setHasEquipment] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [assignedSupervisor, setAssignedSupervisor] = useState<{ id: string; name: string } | null>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportMarkdown, setReportMarkdown] = useState<string | null>(null);
 
   const fetchProject = async (isRefetch = false) => {
     if (!id) return;
@@ -83,6 +87,27 @@ export default function ProjectDetail() {
   useEffect(() => { fetchProject(); }, [id]);
 
   const handleStatusChange = () => fetchProject(true);
+
+  const handleGenerateReport = async () => {
+    if (!id) return;
+    setGeneratingReport(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-report', {
+        body: { project_id: id },
+      });
+      if (error) throw error;
+      setReportMarkdown(data?.report ?? data ?? 'No report content returned.');
+    } catch (error: any) {
+      console.error('Error generating report:', error);
+      toast({
+        title: 'Report generation failed',
+        description: error.message ?? 'Unable to generate AI report',
+        variant: 'destructive',
+      });
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -150,6 +175,14 @@ export default function ProjectDetail() {
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
+            {(userRole === 'GM' || userRole === 'SUPERADMIN') && project.status === 'CLOSED' && (
+              <Button variant="outline" disabled={generatingReport} onClick={handleGenerateReport}>
+                {generatingReport
+                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  : <FileText className="h-4 w-4 mr-2" />}
+                {generatingReport ? 'Generating…' : 'AI Report'}
+              </Button>
+            )}
             <ProjectStatusActions
               project={project}
               onStatusChange={handleStatusChange}
@@ -233,7 +266,17 @@ export default function ProjectDetail() {
                 <ProjectEquipmentTab projectId={project.id} projectStatus={project.status} />
               </TabsContent>
               <TabsContent value="tests">
-                <ProjectTestsTab projectId={project.id} />
+                <ProjectTestsTab
+                  projectId={project.id}
+                  onAllApproved={() => {
+                    if ((userRole === 'GM' || userRole === 'SUPERADMIN') && project.status === 'ACTIVE') {
+                      toast({
+                        title: 'All tests approved!',
+                        description: 'Every test has been approved. You can now close the project.',
+                      });
+                    }
+                  }}
+                />
               </TabsContent>
             </>
           )}
@@ -255,6 +298,33 @@ export default function ProjectDetail() {
         currentAssignment={assignedSupervisor}
         onSuccess={fetchProject}
       />
+
+      {/* AI Report dialog */}
+      <Dialog open={!!reportMarkdown} onOpenChange={open => { if (!open) setReportMarkdown(null); }}>
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>AI Commissioning Report — {project.project_number}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="flex-1 mt-2 pr-2">
+            <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed">{reportMarkdown}</pre>
+          </ScrollArea>
+          <div className="flex justify-end pt-2 border-t">
+            <Button variant="outline" onClick={() => {
+              if (!reportMarkdown) return;
+              const blob = new Blob([reportMarkdown], { type: 'text/markdown' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${project.project_number}-ai-report.md`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}>
+              <Download className="h-4 w-4 mr-2" />
+              Download .md
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
