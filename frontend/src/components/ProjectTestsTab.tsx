@@ -215,7 +215,7 @@ export function ProjectTestsTab({ projectId, onAllApproved }: ProjectTestsTabPro
 
       if (error) throw error;
 
-      let nextTasks = testTasks.map(t =>
+      const nextTasks = testTasks.map(t =>
         selectedTaskIds.has(t.id) && t.status === 'SUBMITTED'
           ? { ...t, status: 'APPROVED', rework_reason: null }
           : t
