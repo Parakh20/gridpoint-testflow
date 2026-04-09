@@ -10,6 +10,8 @@ import { TestingScopeSelector } from '@/components/TestingScopeSelector';
 import { SupervisorSelector } from '@/components/SupervisorSelector';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { dashboardPath } from '@/lib/routes';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -24,6 +26,7 @@ export default function EditProject() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { userRole } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -58,13 +61,16 @@ export default function EditProject() {
 
       if (projectError) throw projectError;
 
+      // Truncate to YYYY-MM-DD — HTML date inputs reject timestamps
+      const toDateInput = (v: string | null) => (v ? v.slice(0, 10) : '');
+
       setFormData({
         project_number: project.project_number,
         site_name: project.site_name,
         site_address: project.site_address,
         client: project.client || '',
-        start_date: project.start_date || '',
-        end_date: project.end_date || '',
+        start_date: toDateInput(project.start_date),
+        end_date: toDateInput(project.end_date),
         assigned_to: project.assigned_to || null,
       });
 
@@ -83,7 +89,7 @@ export default function EditProject() {
         description: 'Failed to load project',
         variant: 'destructive',
       });
-      navigate('/gm');
+      navigate(dashboardPath(userRole));
     } finally {
       setLoading(false);
     }

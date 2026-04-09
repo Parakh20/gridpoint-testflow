@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Loader2, ArrowLeft, Download, UserCheck, RefreshCw, FileText } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, UserCheck, RefreshCw, FileText, Pencil } from 'lucide-react';
 import { ProjectStatusActions } from '@/components/ProjectStatusActions';
 import { ProjectScopeTab } from '@/components/ProjectScopeTab';
 import { ProjectTestingScopeTab } from '@/components/ProjectTestingScopeTab';
@@ -167,6 +167,13 @@ export default function ProjectDetail() {
             <p className="text-lg text-muted-foreground">{project.site_name}</p>
           </div>
           <div className="flex gap-2">
+            {(userRole === 'GM' || userRole === 'SUPERADMIN') &&
+              (project.status === 'DRAFT' || project.status === 'APPROVED') && (
+              <Button variant="outline" onClick={() => navigate(`/projects/${project.id}/edit`)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setShowAssignDialog(true)}>
               <UserCheck className="h-4 w-4 mr-2" />
               {assignedSupervisor ? 'Reassign' : 'Assign'}

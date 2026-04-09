@@ -62,24 +62,24 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* Grid Control dark palette */
-    --background: 222 42% 7%;      /* #0a0e17 near-black cold blue */
-    --foreground: 215 25% 89%;     /* #cbd5e1 body text */
+    /* Pure dark — neutral black, no navy tint */
+    --background: 0 0% 5%;         /* #0d0d0d almost pure black */
+    --foreground: 0 0% 90%;        /* #e6e6e6 light grey text */
 
-    --card: 221 38% 9%;            /* #0f1520 surface */
-    --card-foreground: 215 25% 89%;
+    --card: 0 0% 8%;               /* #141414 card surface */
+    --card-foreground: 0 0% 90%;
 
-    --popover: 222 43% 11%;        /* #141c2e surface raised */
-    --popover-foreground: 214 32% 97%;
+    --popover: 0 0% 10%;           /* #1a1a1a popover surface */
+    --popover-foreground: 0 0% 95%;
 
     --primary: 217 91% 60%;        /* #3b82f6 electric blue */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 221 38% 14%;
-    --secondary-foreground: 215 25% 89%;
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 85%;
 
-    --muted: 221 38% 14%;          /* surface raised for muted areas */
-    --muted-foreground: 215 16% 47%;
+    --muted: 0 0% 12%;             /* #1f1f1f muted surface */
+    --muted-foreground: 0 0% 50%;
 
     --accent: 189 94% 43%;
     --accent-foreground: 0 0% 100%;
@@ -93,8 +93,8 @@ All colors MUST be HSL.
     --destructive: 0 84% 60%;      /* #ef4444 */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 218 38% 19%;         /* #1e2d45 */
-    --input: 218 38% 19%;
+    --border: 0 0% 16%;            /* #292929 subtle neutral border */
+    --input: 0 0% 16%;
     --ring: 217 91% 60%;
 
     --status-unassigned: 0 0% 45%;
