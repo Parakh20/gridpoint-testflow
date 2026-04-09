@@ -173,8 +173,7 @@ export default function ProjectDetail() {
             <p className="text-lg text-muted-foreground">{project.site_name}</p>
           </div>
           <div className="flex gap-2">
-            {(userRole === 'GM' || userRole === 'SUPERADMIN') &&
-              (project.status === 'DRAFT' || project.status === 'APPROVED') && (
+            {(userRole === 'GM' || userRole === 'SUPERADMIN') && (
               <Button variant="outline" onClick={() => navigate(`/projects/${project.id}/edit`)}>
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit

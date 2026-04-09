@@ -32,6 +32,7 @@ function getNavItems(role: string | null): NavItem[] {
       return [
         { label: 'Dashboard', href: '/superadmin', icon: <LayoutDashboard size={18} /> },
         { label: 'User Management', href: '/superadmin', icon: <Users size={18} /> },
+        { label: 'Projects', href: '/gm', icon: <FolderOpen size={18} /> },
         { label: 'Profile', href: '/profile', icon: <UserCircle size={18} /> },
       ];
     case 'GM':
