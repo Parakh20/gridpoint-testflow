@@ -322,13 +322,13 @@ export default function EngineerProjectDetail() {
   const handleFieldChange = (taskId: string, field: string, value: any) => {
     setFormData(prev => {
       const next = { ...prev, [taskId]: { ...(prev[taskId] || {}), [field]: value } };
-      try { localStorage.setItem(draftKey(taskId), JSON.stringify(next[taskId])); } catch { }
+      try { localStorage.setItem(draftKey(taskId), JSON.stringify(next[taskId])); } catch { /* storage quota exceeded */ }
       return next;
     });
   };
 
   const clearDraft = (taskId: string) => {
-    try { localStorage.removeItem(draftKey(taskId)); } catch { }
+    try { localStorage.removeItem(draftKey(taskId)); } catch { /* storage unavailable */ }
   };
 
   const deriveEquipmentStatus = (nextTasks: TestTask[]) => {
@@ -619,7 +619,7 @@ export default function EngineerProjectDetail() {
                         const isExpanded = expandedTask === task.id;
                         const rawFields = task.test_template?.fields;
                         let parsedFields: any = null;
-                        try { parsedFields = typeof rawFields === 'string' ? JSON.parse(rawFields) : rawFields; } catch { }
+                        try { parsedFields = typeof rawFields === 'string' ? JSON.parse(rawFields) : rawFields; } catch { /* invalid JSON — leave null */ }
                         const isV2 = parsedFields?.version === 2;
                         const v2Sections = isV2 ? (parsedFields?.sections ?? []) : [];
                         const fields = (!isV2 && parsedFields?.properties) || {};
