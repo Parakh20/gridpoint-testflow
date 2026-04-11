@@ -511,6 +511,7 @@ export type Database = {
         | "ISOLATOR"
         | "VCB"
         | "EARTH_PIT"
+        | "VT"
       instance_status:
         | "UNASSIGNED"
         | "ASSIGNED"
@@ -659,6 +660,7 @@ export const Constants = {
         "ISOLATOR",
         "VCB",
         "EARTH_PIT",
+        "VT",
       ],
       instance_status: [
         "UNASSIGNED",

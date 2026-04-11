@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
-type EquipmentType = 'POWER_TRANSFORMER' | 'SF6_BREAKER' | 'VCB' | 'CT' | 'CVT' | 'LA' | 'ISOLATOR' | 'EARTH_PIT';
+type EquipmentType = 'POWER_TRANSFORMER' | 'SF6_BREAKER' | 'VCB' | 'CT' | 'CVT' | 'LA' | 'ISOLATOR' | 'EARTH_PIT' | 'VT';
 
 type ProjectFormData = {
   project_number: string;

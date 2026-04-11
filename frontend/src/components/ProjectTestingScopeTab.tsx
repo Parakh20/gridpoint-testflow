@@ -25,6 +25,7 @@ const EQUIPMENT_LABEL: Record<EquipmentType, string> = {
   ISOLATOR:         'ISO',
   VCB:              'VCB',
   EARTH_PIT:        'EP',
+  VT:               'VT',
 };
 
 interface TestScopeConfig {

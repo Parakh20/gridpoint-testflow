@@ -16,7 +16,8 @@ export type EquipmentType =
   | 'SF6_BREAKER'
   | 'ISOLATOR'
   | 'VCB'
-  | 'EARTH_PIT';
+  | 'EARTH_PIT'
+  | 'VT';
 
 /* ─── Individual SVG Symbols ─── */
 
@@ -173,6 +174,7 @@ const ICON_MAP: Record<EquipmentType, (props: IconProps) => JSX.Element> = {
   ISOLATOR:         IsolatorIcon,
   VCB:              VCBIcon,
   EARTH_PIT:        EarthPitIcon,
+  VT:               CVTIcon,   // VT shares the CVT icon (both are voltage-measuring transformers)
 };
 
 interface EquipmentIconProps {

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2 } from 'lucide-react';
 
-type EquipmentType = 'POWER_TRANSFORMER' | 'SF6_BREAKER' | 'VCB' | 'CT' | 'CVT' | 'LA' | 'ISOLATOR' | 'EARTH_PIT';
+type EquipmentType = 'POWER_TRANSFORMER' | 'SF6_BREAKER' | 'VCB' | 'CT' | 'CVT' | 'LA' | 'ISOLATOR' | 'EARTH_PIT' | 'VT';
 
 type ScopeItem = {
   equipment_type: EquipmentType;
@@ -21,6 +21,7 @@ const EQUIPMENT_TYPES = [
   'CVT',
   'LA',
   'ISOLATOR',
+  'VT',
   'EARTH_PIT',
 ] as const;
 
