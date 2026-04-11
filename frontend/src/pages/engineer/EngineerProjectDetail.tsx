@@ -51,12 +51,13 @@ export default function EngineerProjectDetail() {
       setProject(projectData);
 
       // Get instances assigned to this engineer in this project
-      const { data: instances } = await supabase
+      const { data: instances, error: instanceError } = await supabase
         .from('equipment_instances')
         .select('id')
         .eq('project_id', projectId)
         .eq('assigned_to', user.id);
 
+      if (instanceError) throw instanceError;
       if (!instances?.length) { setLoading(false); return; }
 
       const instanceIds = instances.map(i => i.id);
@@ -108,8 +109,9 @@ export default function EngineerProjectDetail() {
         }
       });
       setFormData(prefilled);
-    } catch (error) {
-      console.error('Error:', error);
+    } catch (error: any) {
+      console.error('Error loading project tasks:', error);
+      toast({ title: 'Error loading tasks', description: error?.message ?? 'Something went wrong', variant: 'destructive' });
     } finally {
       setLoading(false);
     }

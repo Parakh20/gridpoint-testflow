@@ -380,6 +380,7 @@ export type Database = {
           created_at: string
           equipment_instance_id: string
           id: string
+          rework_reason: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["test_status"]
           submitted_at: string | null
@@ -393,6 +394,7 @@ export type Database = {
           created_at?: string
           equipment_instance_id: string
           id?: string
+          rework_reason?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["test_status"]
           submitted_at?: string | null
@@ -406,6 +408,7 @@ export type Database = {
           created_at?: string
           equipment_instance_id?: string
           id?: string
+          rework_reason?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["test_status"]
           submitted_at?: string | null
