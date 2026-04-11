@@ -103,6 +103,7 @@ interface Section {
   cores?: string[];
   // ir_fixed / ir_fixed_phase
   rows?: RowDef[];
+  row_label_header?: string;  // overrides the default "Insulation / Measurement" column title
 }
 
 interface Props {
@@ -560,9 +561,10 @@ function PhaseCoreUploadSection({ section, taskId, formData, onChange, isReadonl
   );
 }
 
-function IrFixedSection({ section, taskId, formData, onChange, isReadonly }: Props & { section: Section }) {
+function IrFixedSection({ section, formData, onChange, isReadonly }: Props & { section: Section }) {
   const predefinedRows = section.rows ?? [];
   const cols = section.columns ?? [];
+  const rowLabelHeader = section.row_label_header ?? 'Insulation / Measurement';
 
   const getCellValue = (rowId: string, colKey: string) =>
     formData[k(section.id, rowId, colKey)] ?? '';
@@ -579,8 +581,8 @@ function IrFixedSection({ section, taskId, formData, onChange, isReadonly }: Pro
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr className="bg-muted">
-            <th className="border px-2 py-1 text-left">Sr.</th>
-            <th className="border px-2 py-1 text-left">Insulation / Measurement</th>
+            <th className="border px-2 py-1 text-left w-8">Sr.</th>
+            <th className="border px-2 py-1 text-left">{rowLabelHeader}</th>
             {cols.map((c) => (
               <th key={c.key} className="border px-2 py-1 text-center">
                 {c.title}
@@ -595,25 +597,28 @@ function IrFixedSection({ section, taskId, formData, onChange, isReadonly }: Pro
               <td className="border px-2 py-1">{row.label ?? row.parameter ?? row.id}</td>
               {cols.map((c) => {
                 const isPI = c.calculated && c.formula?.includes('val_600s');
-                const cellValue = isPI ? computePI(row.id) : getCellValue(row.id, c.key);
+                if (isPI) {
+                  return (
+                    <td key={c.key} className="border px-1 py-1">
+                      <Input
+                        className="h-8 text-xs bg-muted/40"
+                        type="number"
+                        value={computePI(row.id)}
+                        readOnly
+                        disabled
+                        placeholder="auto"
+                      />
+                    </td>
+                  );
+                }
                 return (
                   <td key={c.key} className="border px-1 py-1">
-                    <Input
-                      className="h-8 text-xs"
-                      type="number"
-                      value={cellValue}
-                      onChange={
-                        isPI
-                          ? undefined
-                          : (e) =>
-                              onChange(
-                                k(section.id, row.id, c.key),
-                                e.target.value === '' ? '' : parseFloat(e.target.value),
-                              )
-                      }
-                      disabled={isReadonly || isPI}
-                      placeholder={c.title}
-                      readOnly={isPI}
+                    <FieldInput
+                      fieldKey={k(section.id, row.id, c.key)}
+                      def={c}
+                      value={getCellValue(row.id, c.key)}
+                      onChange={(v) => onChange(k(section.id, row.id, c.key), v)}
+                      isReadonly={isReadonly}
                     />
                   </td>
                 );
@@ -626,9 +631,10 @@ function IrFixedSection({ section, taskId, formData, onChange, isReadonly }: Pro
   );
 }
 
-function IrFixedPhaseSection({ section, taskId, formData, onChange, isReadonly }: Props & { section: Section }) {
+function IrFixedPhaseSection({ section, formData, onChange, isReadonly }: Props & { section: Section }) {
   const predefinedRows = section.rows ?? [];
   const phases = section.phases ?? ['R', 'Y', 'B'];
+  const rowLabelHeader = section.row_label_header ?? 'Insulation Tested';
 
   return (
     <div className="overflow-x-auto">
@@ -636,7 +642,7 @@ function IrFixedPhaseSection({ section, taskId, formData, onChange, isReadonly }
         <thead>
           <tr className="bg-muted">
             <th className="border px-2 py-1 text-center w-8">Sr.</th>
-            <th className="border px-2 py-1 text-left">Insulation Tested</th>
+            <th className="border px-2 py-1 text-left">{rowLabelHeader}</th>
             <th className="border px-2 py-1 text-center w-20">Test Voltage</th>
             <th className="border px-2 py-1 text-center w-16">Unit</th>
             {phases.map((ph) => (
