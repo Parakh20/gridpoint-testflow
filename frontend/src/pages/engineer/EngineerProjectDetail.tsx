@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { StatusBadge } from '@/components/StatusBadge';
 import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save, HardDrive } from 'lucide-react';
 import { InstrumentSelector } from '@/components/InstrumentSelector';
+import { TestFormV2 } from '@/components/TestFormV2';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -311,7 +312,9 @@ export default function EngineerProjectDetail() {
               try {
                 parsedFields = typeof rawFields === 'string' ? JSON.parse(rawFields) : rawFields;
               } catch { parsedFields = null; }
-              const fields = parsedFields?.properties || {};
+              const isV2 = parsedFields?.version === 2;
+              const v2Sections = isV2 ? (parsedFields?.sections ?? []) : [];
+              const fields = (!isV2 && parsedFields?.properties) || {};
               const isReadonly = task.status === 'SUBMITTED' || task.status === 'APPROVED';
 
               return (
@@ -351,7 +354,15 @@ export default function EngineerProjectDetail() {
                         </div>
                       )}
                       {/* Dynamic fields from template */}
-                      {Object.keys(fields).length > 0 ? (
+                      {isV2 ? (
+                        <TestFormV2
+                          taskId={task.id}
+                          sections={v2Sections}
+                          formData={formData[task.id] || {}}
+                          onChange={(key, value) => handleFieldChange(task.id, key, value)}
+                          isReadonly={isReadonly}
+                        />
+                      ) : Object.keys(fields).length > 0 ? (
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">Measurement Readings</p>
                           <div className="grid grid-cols-2 gap-4">
