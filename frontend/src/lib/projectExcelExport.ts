@@ -115,7 +115,8 @@ function renderSection(section: Section, payload: Record<string, any>): AoA {
     }
 
     case 'tap_table': {
-      const tapCount = section.tap_count_default ?? 17;
+      const extraCount: number = payload[k(section.id, 'extra_tap_count')] ?? 0;
+      const tapCount = (section.tap_count_default ?? 17) + extraCount;
       const cols = section.columns ?? [];
       rows.push(['Tap No.', ...cols.map(c => c.title)]);
       for (let n = 1; n <= tapCount; n++) {
@@ -135,7 +136,8 @@ function renderSection(section: Section, payload: Record<string, any>): AoA {
     }
 
     case 'core_table': {
-      const numCores = section.num_cores_default ?? 4;
+      const extraCount: number = payload[k(section.id, 'extra_core_count')] ?? 0;
+      const numCores = (section.num_cores_default ?? 4) + extraCount;
       const cols = section.columns ?? [];
       rows.push(['Core No.', ...cols.map(c => c.title)]);
       for (let n = 1; n <= numCores; n++) {
@@ -147,9 +149,13 @@ function renderSection(section: Section, payload: Record<string, any>): AoA {
     case 'ir_fixed': {
       const sectionRows = section.rows ?? [];
       const cols = section.columns ?? [];
+      const extraRows: Array<{ id: string; label: string }> = payload[k(section.id, 'extra_rows')] ?? [];
       rows.push([section.row_label_header ?? 'Measurement', ...cols.map(c => c.title)]);
       for (const row of sectionRows) {
         rows.push([row.label ?? row.insulation ?? '', ...cols.map(c => payload[k(section.id, row.id, c.key)] ?? '')]);
+      }
+      for (const row of extraRows) {
+        rows.push([row.label ?? '', ...cols.map(c => payload[k(section.id, row.id, c.key)] ?? '')]);
       }
       break;
     }
@@ -157,10 +163,21 @@ function renderSection(section: Section, payload: Record<string, any>): AoA {
     case 'ir_fixed_phase': {
       const phases = section.phases ?? ['R', 'Y', 'B'];
       const sectionRows = section.rows ?? [];
+      const extraRows: Array<{ id: string; insulation: string; voltage: string; unit: string }> =
+        payload[k(section.id, 'extra_rows')] ?? [];
       rows.push(['Sr.', 'Insulation Tested', 'Applied Voltage', 'Unit', ...phases.map(p => `${p} Phase`)]);
       for (const row of sectionRows) {
         rows.push([
           row.sr ?? '',
+          row.insulation ?? '',
+          row.voltage ?? '',
+          row.unit ?? '',
+          ...phases.map(ph => payload[k(section.id, row.id, ph)] ?? ''),
+        ]);
+      }
+      for (const row of extraRows) {
+        rows.push([
+          '',
           row.insulation ?? '',
           row.voltage ?? '',
           row.unit ?? '',

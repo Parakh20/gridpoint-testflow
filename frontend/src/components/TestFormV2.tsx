@@ -280,42 +280,55 @@ function PhaseRowsSection({ section, taskId, formData, onChange, isReadonly }: P
 }
 
 function TapTableSection({ section, taskId, formData, onChange, isReadonly }: Props & { section: Section }) {
-  const tapCount = section.tap_count_default ?? 17;
+  const defaultTapCount = section.tap_count_default ?? 17;
   const cols = section.columns ?? [];
-  const taps = Array.from({ length: tapCount }, (_, i) => i + 1);
+  const extraCountKey = k(section.id, 'extra_tap_count');
+  const extraCount: number = formData[extraCountKey] ?? 0;
+  const totalTaps = defaultTapCount + extraCount;
+  const taps = Array.from({ length: totalTaps }, (_, i) => i + 1);
+
+  const addTap = () => onChange(extraCountKey, extraCount + 1);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs border-collapse">
-        <thead>
-          <tr className="bg-muted">
-            <th className="border px-2 py-1 text-center w-16">Tap No.</th>
-            {cols.map((c) => (
-              <th key={c.key} className="border px-2 py-1 text-center">
-                {c.title}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {taps.map((n) => (
-            <tr key={n} className="even:bg-muted/30">
-              <td className="border px-2 py-1 font-semibold text-center">{n}</td>
+    <div className="space-y-2">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-muted">
+              <th className="border px-2 py-1 text-center w-16">Tap No.</th>
               {cols.map((c) => (
-                <td key={c.key} className="border px-1 py-1">
-                  <FieldInput
-                    fieldKey={k(section.id, `tap${n}`, c.key)}
-                    def={c}
-                    value={formData[k(section.id, `tap${n}`, c.key)]}
-                    onChange={(v) => onChange(k(section.id, `tap${n}`, c.key), v)}
-                    isReadonly={isReadonly}
-                  />
-                </td>
+                <th key={c.key} className="border px-2 py-1 text-center">
+                  {c.title}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {taps.map((n) => (
+              <tr key={n} className={`even:bg-muted/30 ${n > defaultTapCount ? 'bg-blue-50/30' : ''}`}>
+                <td className="border px-2 py-1 font-semibold text-center">{n}</td>
+                {cols.map((c) => (
+                  <td key={c.key} className="border px-1 py-1">
+                    <FieldInput
+                      fieldKey={k(section.id, `tap${n}`, c.key)}
+                      def={c}
+                      value={formData[k(section.id, `tap${n}`, c.key)]}
+                      onChange={(v) => onChange(k(section.id, `tap${n}`, c.key), v)}
+                      isReadonly={isReadonly}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!isReadonly && (
+        <Button type="button" variant="outline" size="sm" onClick={addTap} className="text-xs h-7">
+          <Plus className="h-3 w-3 mr-1" />
+          Add Tap
+        </Button>
+      )}
     </div>
   );
 }
@@ -421,41 +434,54 @@ function CoreTableSection({ section, taskId, formData, onChange, isReadonly }: P
     ? formData[k(section.id.replace('core_table', 'core_count_header'), section.num_cores_from_field)] ??
       formData[`core_count_header__${section.num_cores_from_field}`]
     : null;
-  const numCores = parseInt(numCoresRaw ?? section.num_cores_default ?? '4', 10) || 4;
-  const coreRows = Array.from({ length: numCores }, (_, i) => i + 1);
+  const defaultCores = parseInt(numCoresRaw ?? section.num_cores_default ?? '4', 10) || 4;
+  const extraCountKey = k(section.id, 'extra_core_count');
+  const extraCount: number = formData[extraCountKey] ?? 0;
+  const totalCores = defaultCores + extraCount;
+  const coreRows = Array.from({ length: totalCores }, (_, i) => i + 1);
+
+  const addCore = () => onChange(extraCountKey, extraCount + 1);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs border-collapse">
-        <thead>
-          <tr className="bg-muted">
-            <th className="border px-2 py-1 text-center w-20">Core No.</th>
-            {cols.map((c) => (
-              <th key={c.key} className="border px-2 py-1 text-center">
-                {c.title}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {coreRows.map((n) => (
-            <tr key={n} className="even:bg-muted/30">
-              <td className="border px-2 py-1 font-semibold text-center">{n}</td>
+    <div className="space-y-2">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-muted">
+              <th className="border px-2 py-1 text-center w-20">Core No.</th>
               {cols.map((c) => (
-                <td key={c.key} className="border px-1 py-1">
-                  <FieldInput
-                    fieldKey={k(section.id, `core${n}`, c.key)}
-                    def={c}
-                    value={formData[k(section.id, `core${n}`, c.key)]}
-                    onChange={(v) => onChange(k(section.id, `core${n}`, c.key), v)}
-                    isReadonly={isReadonly}
-                  />
-                </td>
+                <th key={c.key} className="border px-2 py-1 text-center">
+                  {c.title}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {coreRows.map((n) => (
+              <tr key={n} className={`even:bg-muted/30 ${n > defaultCores ? 'bg-blue-50/30' : ''}`}>
+                <td className="border px-2 py-1 font-semibold text-center">{n}</td>
+                {cols.map((c) => (
+                  <td key={c.key} className="border px-1 py-1">
+                    <FieldInput
+                      fieldKey={k(section.id, `core${n}`, c.key)}
+                      def={c}
+                      value={formData[k(section.id, `core${n}`, c.key)]}
+                      onChange={(v) => onChange(k(section.id, `core${n}`, c.key), v)}
+                      isReadonly={isReadonly}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!isReadonly && (
+        <Button type="button" variant="outline" size="sm" onClick={addCore} className="text-xs h-7">
+          <Plus className="h-3 w-3 mr-1" />
+          Add Core
+        </Button>
+      )}
     </div>
   );
 }
@@ -565,6 +591,8 @@ function IrFixedSection({ section, formData, onChange, isReadonly }: Props & { s
   const predefinedRows = section.rows ?? [];
   const cols = section.columns ?? [];
   const rowLabelHeader = section.row_label_header ?? 'Insulation / Measurement';
+  const extraRowsKey = k(section.id, 'extra_rows');
+  const extraRows: Array<{ id: string; label: string }> = formData[extraRowsKey] ?? [];
 
   const getCellValue = (rowId: string, colKey: string) =>
     formData[k(section.id, rowId, colKey)] ?? '';
@@ -576,57 +604,117 @@ function IrFixedSection({ section, formData, onChange, isReadonly }: Props & { s
     return (v600 / v60).toFixed(2);
   };
 
+  const addExtraRow = () => {
+    onChange(extraRowsKey, [...extraRows, { id: `extra_${Date.now()}`, label: '' }]);
+  };
+
+  const removeExtraRow = (idx: number) => {
+    onChange(extraRowsKey, extraRows.filter((_, i) => i !== idx));
+  };
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs border-collapse">
-        <thead>
-          <tr className="bg-muted">
-            <th className="border px-2 py-1 text-left w-8">Sr.</th>
-            <th className="border px-2 py-1 text-left">{rowLabelHeader}</th>
-            {cols.map((c) => (
-              <th key={c.key} className="border px-2 py-1 text-center">
-                {c.title}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {predefinedRows.map((row, idx) => (
-            <tr key={row.id} className="even:bg-muted/30">
-              <td className="border px-2 py-1 text-center">{row.sr ?? idx + 1}</td>
-              <td className="border px-2 py-1">{row.label ?? row.parameter ?? row.id}</td>
-              {cols.map((c) => {
-                const isPI = c.calculated && c.formula?.includes('val_600s');
-                if (isPI) {
+    <div className="space-y-2">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-muted">
+              <th className="border px-2 py-1 text-left w-8">Sr.</th>
+              <th className="border px-2 py-1 text-left">{rowLabelHeader}</th>
+              {cols.map((c) => (
+                <th key={c.key} className="border px-2 py-1 text-center">
+                  {c.title}
+                </th>
+              ))}
+              {!isReadonly && <th className="border px-1 py-1 w-8" />}
+            </tr>
+          </thead>
+          <tbody>
+            {predefinedRows.map((row, idx) => (
+              <tr key={row.id} className="even:bg-muted/30">
+                <td className="border px-2 py-1 text-center">{row.sr ?? idx + 1}</td>
+                <td className="border px-2 py-1">{row.label ?? row.parameter ?? row.id}</td>
+                {cols.map((c) => {
+                  const isPI = c.calculated && c.formula?.includes('val_600s');
+                  if (isPI) {
+                    return (
+                      <td key={c.key} className="border px-1 py-1">
+                        <Input
+                          className="h-8 text-xs bg-muted/40"
+                          type="number"
+                          value={computePI(row.id)}
+                          readOnly
+                          disabled
+                          placeholder="auto"
+                        />
+                      </td>
+                    );
+                  }
                   return (
                     <td key={c.key} className="border px-1 py-1">
-                      <Input
-                        className="h-8 text-xs bg-muted/40"
-                        type="number"
-                        value={computePI(row.id)}
-                        readOnly
-                        disabled
-                        placeholder="auto"
+                      <FieldInput
+                        fieldKey={k(section.id, row.id, c.key)}
+                        def={c}
+                        value={getCellValue(row.id, c.key)}
+                        onChange={(v) => onChange(k(section.id, row.id, c.key), v)}
+                        isReadonly={isReadonly}
                       />
                     </td>
                   );
-                }
-                return (
+                })}
+                {!isReadonly && <td className="border px-1 py-1 w-8" />}
+              </tr>
+            ))}
+            {extraRows.map((row, idx) => (
+              <tr key={row.id} className="even:bg-muted/30 bg-blue-50/30">
+                <td className="border px-2 py-1 text-center text-muted-foreground">
+                  {predefinedRows.length + idx + 1}
+                </td>
+                <td className="border px-1 py-1">
+                  <Input
+                    className="h-8 text-xs"
+                    value={row.label}
+                    onChange={(e) =>
+                      onChange(extraRowsKey, extraRows.map((r, i) =>
+                        i === idx ? { ...r, label: e.target.value } : r
+                      ))
+                    }
+                    disabled={isReadonly}
+                    placeholder="Description…"
+                  />
+                </td>
+                {cols.map((c) => (
                   <td key={c.key} className="border px-1 py-1">
                     <FieldInput
                       fieldKey={k(section.id, row.id, c.key)}
                       def={c}
-                      value={getCellValue(row.id, c.key)}
+                      value={formData[k(section.id, row.id, c.key)] ?? ''}
                       onChange={(v) => onChange(k(section.id, row.id, c.key), v)}
                       isReadonly={isReadonly}
                     />
                   </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                ))}
+                {!isReadonly && (
+                  <td className="border px-1 py-1 text-center">
+                    <button
+                      type="button"
+                      onClick={() => removeExtraRow(idx)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!isReadonly && (
+        <Button type="button" variant="outline" size="sm" onClick={addExtraRow} className="text-xs h-7">
+          <Plus className="h-3 w-3 mr-1" />
+          Add Row
+        </Button>
+      )}
     </div>
   );
 }
@@ -635,51 +723,141 @@ function IrFixedPhaseSection({ section, formData, onChange, isReadonly }: Props 
   const predefinedRows = section.rows ?? [];
   const phases = section.phases ?? ['R', 'Y', 'B'];
   const rowLabelHeader = section.row_label_header ?? 'Insulation Tested';
+  const extraRowsKey = k(section.id, 'extra_rows');
+  const extraRows: Array<{ id: string; insulation: string; voltage: string; unit: string }> =
+    formData[extraRowsKey] ?? [];
+
+  const addExtraRow = () => {
+    onChange(extraRowsKey, [
+      ...extraRows,
+      { id: `extra_${Date.now()}`, insulation: '', voltage: '', unit: 'MΩ' },
+    ]);
+  };
+
+  const removeExtraRow = (idx: number) => {
+    onChange(extraRowsKey, extraRows.filter((_, i) => i !== idx));
+  };
+
+  const updateExtraRowMeta = (idx: number, field: string, value: string) => {
+    onChange(extraRowsKey, extraRows.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
+  };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs border-collapse">
-        <thead>
-          <tr className="bg-muted">
-            <th className="border px-2 py-1 text-center w-8">Sr.</th>
-            <th className="border px-2 py-1 text-left">{rowLabelHeader}</th>
-            <th className="border px-2 py-1 text-center w-20">Test Voltage</th>
-            <th className="border px-2 py-1 text-center w-16">Unit</th>
-            {phases.map((ph) => (
-              <th key={ph} className="border px-2 py-1 text-center">
-                Phase {ph}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {predefinedRows.map((row, idx) => (
-            <tr key={row.id} className="even:bg-muted/30">
-              <td className="border px-2 py-1 text-center">{row.sr ?? idx + 1}</td>
-              <td className="border px-2 py-1">{row.insulation ?? row.label ?? row.id}</td>
-              <td className="border px-2 py-1 text-center text-muted-foreground">{row.voltage ?? '—'}</td>
-              <td className="border px-2 py-1 text-center text-muted-foreground">{row.unit ?? 'MΩ'}</td>
+    <div className="space-y-2">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-muted">
+              <th className="border px-2 py-1 text-center w-8">Sr.</th>
+              <th className="border px-2 py-1 text-left">{rowLabelHeader}</th>
+              <th className="border px-2 py-1 text-center w-20">Test Voltage</th>
+              <th className="border px-2 py-1 text-center w-16">Unit</th>
               {phases.map((ph) => (
-                <td key={ph} className="border px-1 py-1">
+                <th key={ph} className="border px-2 py-1 text-center">
+                  Phase {ph}
+                </th>
+              ))}
+              {!isReadonly && <th className="border px-1 py-1 w-8" />}
+            </tr>
+          </thead>
+          <tbody>
+            {predefinedRows.map((row, idx) => (
+              <tr key={row.id} className="even:bg-muted/30">
+                <td className="border px-2 py-1 text-center">{row.sr ?? idx + 1}</td>
+                <td className="border px-2 py-1">{row.insulation ?? row.label ?? row.id}</td>
+                <td className="border px-2 py-1 text-center text-muted-foreground">{row.voltage ?? '—'}</td>
+                <td className="border px-2 py-1 text-center text-muted-foreground">{row.unit ?? 'MΩ'}</td>
+                {phases.map((ph) => (
+                  <td key={ph} className="border px-1 py-1">
+                    <Input
+                      className="h-8 text-xs"
+                      type="number"
+                      value={formData[k(section.id, row.id, ph)] ?? ''}
+                      onChange={(e) =>
+                        onChange(
+                          k(section.id, row.id, ph),
+                          e.target.value === '' ? '' : parseFloat(e.target.value),
+                        )
+                      }
+                      disabled={isReadonly}
+                      placeholder="Value"
+                    />
+                  </td>
+                ))}
+                {!isReadonly && <td className="border px-1 py-1 w-8" />}
+              </tr>
+            ))}
+            {extraRows.map((row, idx) => (
+              <tr key={row.id} className="even:bg-muted/30 bg-blue-50/30">
+                <td className="border px-2 py-1 text-center text-muted-foreground">
+                  {predefinedRows.length + idx + 1}
+                </td>
+                <td className="border px-1 py-1">
                   <Input
                     className="h-8 text-xs"
-                    type="number"
-                    value={formData[k(section.id, row.id, ph)] ?? ''}
-                    onChange={(e) =>
-                      onChange(
-                        k(section.id, row.id, ph),
-                        e.target.value === '' ? '' : parseFloat(e.target.value),
-                      )
-                    }
+                    value={row.insulation}
+                    onChange={(e) => updateExtraRowMeta(idx, 'insulation', e.target.value)}
                     disabled={isReadonly}
-                    placeholder="Value"
+                    placeholder="Insulation tested…"
                   />
                 </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                <td className="border px-1 py-1">
+                  <Input
+                    className="h-8 text-xs"
+                    value={row.voltage}
+                    onChange={(e) => updateExtraRowMeta(idx, 'voltage', e.target.value)}
+                    disabled={isReadonly}
+                    placeholder="e.g. 5 kV"
+                  />
+                </td>
+                <td className="border px-1 py-1">
+                  <Input
+                    className="h-8 text-xs"
+                    value={row.unit}
+                    onChange={(e) => updateExtraRowMeta(idx, 'unit', e.target.value)}
+                    disabled={isReadonly}
+                    placeholder="MΩ"
+                  />
+                </td>
+                {phases.map((ph) => (
+                  <td key={ph} className="border px-1 py-1">
+                    <Input
+                      className="h-8 text-xs"
+                      type="number"
+                      value={formData[k(section.id, row.id, ph)] ?? ''}
+                      onChange={(e) =>
+                        onChange(
+                          k(section.id, row.id, ph),
+                          e.target.value === '' ? '' : parseFloat(e.target.value),
+                        )
+                      }
+                      disabled={isReadonly}
+                      placeholder="Value"
+                    />
+                  </td>
+                ))}
+                {!isReadonly && (
+                  <td className="border px-1 py-1 text-center">
+                    <button
+                      type="button"
+                      onClick={() => removeExtraRow(idx)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!isReadonly && (
+        <Button type="button" variant="outline" size="sm" onClick={addExtraRow} className="text-xs h-7">
+          <Plus className="h-3 w-3 mr-1" />
+          Add Row
+        </Button>
+      )}
     </div>
   );
 }
