@@ -21,6 +21,7 @@
 | Build | Vite with SWC (`@vitejs/plugin-react-swc`) |
 | Package Manager | npm (primary; run from root or `frontend/`) |
 | AI Reports | Anthropic Claude API (`claude-haiku-4-5-20251001`) — called from Supabase Edge Function only |
+| Excel Export | SheetJS (`xlsx`) — browser-side `.xlsx` generation; one sheet per equipment instance |
 | CI/CD | GitHub Actions → `supabase db push` + `supabase functions deploy` on push to main |
 
 **Important:** This is a pure Vite SPA. There is no Next.js. Do not add `'use client'` directives — they are meaningless here.
@@ -39,9 +40,10 @@ gridpoint-testflow/                  ← repo root
 │   │   ├── contexts/
 │   │   │   └── AuthContext.tsx      # Auth state + role fetch (deadlock-safe setTimeout) + Google OAuth
 │   │   ├── lib/
-│   │   │   ├── routes.ts            # dashboardPath(role) — never hardcode /gm
-│   │   │   ├── format.ts            # formatDate / formatDateTime with date-fns
-│   │   │   └── utils.ts             # cn() Tailwind helper
+│   │   │   ├── routes.ts                # dashboardPath(role) — never hardcode /gm
+│   │   │   ├── format.ts                # formatDate / formatDateTime with date-fns
+│   │   │   ├── utils.ts                 # cn() Tailwind helper
+│   │   │   └── projectExcelExport.ts    # SheetJS-based Excel export (one sheet per equipment instance)
 │   │   ├── hooks/
 │   │   │   ├── use-toast.ts         # Sonner toast hook
 │   │   │   └── use-mobile.tsx       # Mobile viewport detection
@@ -54,6 +56,7 @@ gridpoint-testflow/                  ← repo root
 │   │   │   ├── InviteUserDialog.tsx        # Invite new user (SUPERADMIN)
 │   │   │   ├── ProjectEquipmentTab.tsx     # Equipment instances list + assignment
 │   │   │   ├── ProjectPDFExport.tsx        # Browser print-to-PDF export
+│   │   └── (see lib/projectExcelExport.ts for Excel export)
 │   │   │   ├── ProjectScopeTab.tsx         # Equipment types + quantities
 │   │   │   ├── ProjectStatusActions.tsx    # DRAFT→APPROVED→ACTIVE→CLOSED transitions
 │   │   │   ├── ProjectTestingScopeTab.tsx  # Scope config + idempotent equipment gen

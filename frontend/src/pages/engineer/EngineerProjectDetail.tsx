@@ -116,16 +116,10 @@ const NAMEPLATE_FIELDS: Record<string, NameplateField[]> = {
     { key: 'chemical_treatment', label: 'Chemical Treatment (Yes / No)' },
   ],
   VT: [
-    { key: 'manufacturer', label: 'Manufacturer' },
-    { key: 'serial_number', label: 'Serial Number' },
-    { key: 'year_of_manufacture', label: 'Year of Manufacture', type: 'number' },
-    { key: 'rated_voltage', label: 'Rated Primary Voltage', unit: 'kV', type: 'number' },
-    { key: 'rated_secondary_voltage', label: 'Secondary Voltage', unit: 'V', type: 'number' },
-    { key: 'rated_burden_va', label: 'Rated Burden', unit: 'VA', type: 'number' },
-    { key: 'accuracy_class', label: 'Accuracy Class' },
+    { key: 'equipment_location', label: 'Equipment Location / Bay', span: 'full' },
+    { key: 'phase', label: 'Phase (R / Y / B)' },
+    { key: 'rated_primary_voltage', label: 'Rated Primary Voltage' },
     { key: 'rated_frequency', label: 'Rated Frequency', unit: 'Hz', type: 'number' },
-    { key: 'voltage_factor', label: 'Voltage Factor' },
-    { key: 'insulation_level', label: 'Insulation Level', unit: 'kV' },
   ],
 };
 

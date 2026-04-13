@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Loader2, ArrowLeft, Download, UserCheck, RefreshCw, FileText, Pencil } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, UserCheck, RefreshCw, FileText, Pencil, FileSpreadsheet } from 'lucide-react';
+import { exportProjectExcel, type ExportTask } from '@/lib/projectExcelExport';
 import { ProjectStatusActions } from '@/components/ProjectStatusActions';
 import { ProjectScopeTab } from '@/components/ProjectScopeTab';
 import { ProjectTestingScopeTab } from '@/components/ProjectTestingScopeTab';
@@ -39,6 +40,7 @@ export default function ProjectDetail() {
   const [assignedSupervisor, setAssignedSupervisor] = useState<{ id: string; name: string } | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportMarkdown, setReportMarkdown] = useState<string | null>(null);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const fetchProject = async (isRefetch = false) => {
     if (!id) return;
@@ -92,6 +94,66 @@ export default function ProjectDetail() {
   // Optimistic update: mutate local state immediately, server refetch confirms it
   const handleOptimisticStatusUpdate = (newStatus: string) => {
     setProject(prev => prev ? { ...prev, status: newStatus as any } : prev);
+  };
+
+  const handleExportExcel = async () => {
+    if (!id || !project) return;
+    setExportingExcel(true);
+    try {
+      // Fetch all equipment instances for this project
+      const { data: instances } = await supabase
+        .from('equipment_instances')
+        .select('id, label, equipment_type')
+        .eq('project_id', id);
+
+      if (!instances?.length) {
+        toast({ title: 'No equipment found', description: 'Generate equipment first.', variant: 'destructive' });
+        return;
+      }
+
+      const instanceIds = instances.map(i => i.id);
+
+      // Fetch all test tasks with templates
+      const { data: taskData } = await supabase
+        .from('test_tasks')
+        .select(`
+          id,
+          equipment_instance_id,
+          test_template:test_templates(test_name, fields)
+        `)
+        .in('equipment_instance_id', instanceIds)
+        .order('created_at');
+
+      // Fetch all test records
+      const taskIds = (taskData ?? []).map((t: any) => t.id);
+      const { data: records } = await supabase
+        .from('test_records')
+        .select('test_task_id, payload')
+        .in('test_task_id', taskIds);
+
+      const recordMap = Object.fromEntries((records ?? []).map((r: any) => [r.test_task_id, r.payload ?? {}]));
+      const instanceMap = Object.fromEntries(instances.map(i => [i.id, i]));
+
+      const exportTasks: ExportTask[] = (taskData ?? []).map((t: any) => {
+        const inst = instanceMap[t.equipment_instance_id];
+        return {
+          id: t.id,
+          instanceLabel: inst?.label ?? t.equipment_instance_id,
+          equipmentType: inst?.equipment_type ?? '',
+          testName: t.test_template?.test_name ?? 'Unknown Test',
+          templateFields: t.test_template?.fields ?? null,
+          payload: recordMap[t.id] ?? {},
+        };
+      });
+
+      exportProjectExcel(project.project_number, project.site_name, exportTasks);
+      toast({ title: 'Excel exported', description: 'File downloaded to your device.' });
+    } catch (err: any) {
+      console.error('Excel export error:', err);
+      toast({ title: 'Export failed', description: err?.message ?? 'Something went wrong', variant: 'destructive' });
+    } finally {
+      setExportingExcel(false);
+    }
   };
 
   const handleGenerateReport = async () => {
@@ -187,6 +249,14 @@ export default function ProjectDetail() {
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
+            {hasEquipment && (
+              <Button variant="outline" disabled={exportingExcel} onClick={handleExportExcel}>
+                {exportingExcel
+                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  : <FileSpreadsheet className="h-4 w-4 mr-2" />}
+                {exportingExcel ? 'Exporting…' : 'Export Excel'}
+              </Button>
+            )}
             {(userRole === 'GM' || userRole === 'SUPERADMIN') && project.status === 'CLOSED' && (
               <Button variant="outline" disabled={generatingReport} onClick={handleGenerateReport}>
                 {generatingReport
