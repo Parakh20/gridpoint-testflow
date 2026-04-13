@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save, HardDrive, ClipboardCheck, SendHorizonal } from 'lucide-react';
 import { InstrumentSelector } from '@/components/InstrumentSelector';
 import { TestFormV2 } from '@/components/TestFormV2';
+import { TEMPLATE_FALLBACKS } from '@/lib/templateFallbacks';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -644,8 +645,13 @@ export default function EngineerProjectDetail() {
                             const rawFields = task.test_template?.fields;
                             let parsedFields: any = null;
                             try { parsedFields = typeof rawFields === 'string' ? JSON.parse(rawFields) : rawFields; } catch { /* invalid JSON */ }
-                            const isV2 = parsedFields?.version === 2;
-                            const v2Sections = isV2 ? (parsedFields?.sections ?? []) : [];
+                            // Use hardcoded fallback schema when DB still has v1 template
+                            const testCode = task.test_template?.test_code ?? '';
+                            const effectiveSchema = (parsedFields?.version === 2)
+                              ? parsedFields
+                              : (TEMPLATE_FALLBACKS[testCode] ?? parsedFields);
+                            const isV2 = effectiveSchema?.version === 2;
+                            const v2Sections = isV2 ? (effectiveSchema?.sections ?? []) : [];
                             const fields = (!isV2 && parsedFields?.properties) || {};
                             const isReadonly = task.status === 'SUBMITTED' || task.status === 'APPROVED';
 
