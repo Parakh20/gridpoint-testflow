@@ -157,7 +157,7 @@ export default function EngineerProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('nameplate');
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>('');
-  const [expandedTask, setExpandedTask] = useState<string | null>(null);
+  const [expandedTask] = useState<string | null>(null); // unused, kept for future use
   const [formData, setFormData] = useState<Record<string, Record<string, any>>>({});
   const [nameplateData, setNameplateData] = useState<Record<string, Record<string, any>>>({});
   const [saving, setSaving] = useState<string | null>(null);
@@ -486,7 +486,7 @@ export default function EngineerProjectDetail() {
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-3 flex-1 min-w-[260px]">
                     <Label className="whitespace-nowrap font-medium">Select Equipment Unit</Label>
-                    <Select value={selectedInstanceId} onValueChange={id => { setSelectedInstanceId(id); setExpandedTask(null); }}>
+                    <Select value={selectedInstanceId} onValueChange={id => { setSelectedInstanceId(id); }}>
                       <SelectTrigger className="w-64">
                         <SelectValue placeholder="Select equipment..." />
                       </SelectTrigger>
@@ -598,10 +598,10 @@ export default function EngineerProjectDetail() {
                 )}
 
                 {/* ══════════════════════════════════════════════════════════
-                    TAB 2 — Testing Parameters
+                    TAB 2 — Testing Parameters (single continuous form)
                 ══════════════════════════════════════════════════════════ */}
                 {activeTab === 'testing' && (
-                  <div className="space-y-3">
+                  <div className="space-y-0">
                     {instanceTasks.length === 0 ? (
                       <Card>
                         <CardContent className="py-12 text-center text-muted-foreground">
@@ -609,45 +609,69 @@ export default function EngineerProjectDetail() {
                         </CardContent>
                       </Card>
                     ) : (
-                      instanceTasks.map(task => {
-                        const isExpanded = expandedTask === task.id;
-                        const rawFields = task.test_template?.fields;
-                        let parsedFields: any = null;
-                        try { parsedFields = typeof rawFields === 'string' ? JSON.parse(rawFields) : rawFields; } catch { /* invalid JSON — leave null */ }
-                        const isV2 = parsedFields?.version === 2;
-                        const v2Sections = isV2 ? (parsedFields?.sections ?? []) : [];
-                        const fields = (!isV2 && parsedFields?.properties) || {};
-                        const isReadonly = task.status === 'SUBMITTED' || task.status === 'APPROVED';
-
-                        return (
-                          <Card key={task.id}>
-                            <CardHeader
-                              className="cursor-pointer py-3"
-                              onClick={() => setExpandedTask(isExpanded ? null : task.id)}
+                      <Card>
+                        {/* Sticky action bar */}
+                        <div className="flex items-center justify-between px-6 py-3 border-b bg-muted/30 sticky top-0 z-10">
+                          <p className="text-sm font-medium">
+                            {selectedInstance?.label} — {instanceTasks.length} test{instanceTasks.length !== 1 ? 's' : ''}
+                          </p>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={!!saving || submittingAll}
+                              onClick={async () => {
+                                const editable = instanceTasks.filter(t => t.status !== 'SUBMITTED' && t.status !== 'APPROVED');
+                                for (const t of editable) await handleSaveTask(t, false);
+                              }}
                             >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <CardTitle className="text-sm font-semibold">
-                                    {task.test_template?.test_name}
-                                  </CardTitle>
-                                  <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                                    {task.test_template?.test_code}
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <StatusBadge status={task.status} />
-                                  {!task.existing_record && formData[task.id] && Object.keys(formData[task.id]).length > 0 && (
-                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                      <HardDrive className="h-3 w-3" /> Draft
-                                    </span>
-                                  )}
-                                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                </div>
-                              </div>
-                            </CardHeader>
+                              {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                              Save All Drafts
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={!!saving || submittingAll || allSubmitted}
+                              onClick={handleSubmitAll}
+                            >
+                              {submittingAll ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <SendHorizonal className="h-4 w-4 mr-1" />}
+                              Submit All
+                            </Button>
+                          </div>
+                        </div>
 
-                            {isExpanded && (
-                              <CardContent className="space-y-4 border-t pt-4">
+                        <CardContent className="p-0 divide-y">
+                          {instanceTasks.map((task, taskIdx) => {
+                            const rawFields = task.test_template?.fields;
+                            let parsedFields: any = null;
+                            try { parsedFields = typeof rawFields === 'string' ? JSON.parse(rawFields) : rawFields; } catch { /* invalid JSON */ }
+                            const isV2 = parsedFields?.version === 2;
+                            const v2Sections = isV2 ? (parsedFields?.sections ?? []) : [];
+                            const fields = (!isV2 && parsedFields?.properties) || {};
+                            const isReadonly = task.status === 'SUBMITTED' || task.status === 'APPROVED';
+
+                            return (
+                              <div key={task.id} className="p-6 space-y-4">
+                                {/* Section header */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+                                      {taskIdx + 1}
+                                    </span>
+                                    <div>
+                                      <p className="font-semibold text-sm">{task.test_template?.test_name}</p>
+                                      <p className="text-xs text-muted-foreground font-mono">{task.test_template?.test_code}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {!task.existing_record && formData[task.id] && Object.keys(formData[task.id]).length > 0 && (
+                                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <HardDrive className="h-3 w-3" /> Draft
+                                      </span>
+                                    )}
+                                    <StatusBadge status={task.status} />
+                                  </div>
+                                </div>
+
                                 {task.status === 'REWORK' && task.rework_reason && (
                                   <div className="rounded border border-orange-200 bg-orange-50 p-3">
                                     <p className="text-xs font-semibold text-orange-700 uppercase mb-1">Rework Required</p>
@@ -655,7 +679,7 @@ export default function EngineerProjectDetail() {
                                   </div>
                                 )}
 
-                                {/* Dynamic test form */}
+                                {/* Test form */}
                                 {isV2 ? (
                                   <TestFormV2
                                     taskId={task.id}
@@ -665,13 +689,10 @@ export default function EngineerProjectDetail() {
                                     isReadonly={isReadonly}
                                   />
                                 ) : Object.keys(fields).length > 0 ? (
-                                  <div>
-                                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">Measurement Readings</p>
-                                    <div className="grid grid-cols-2 gap-4">
-                                      {Object.entries(fields).map(([key, schema]: [string, any]) =>
-                                        renderLegacyField(task.id, key, schema)
-                                      )}
-                                    </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    {Object.entries(fields).map(([key, schema]: [string, any]) =>
+                                      renderLegacyField(task.id, key, schema)
+                                    )}
                                   </div>
                                 ) : (
                                   <div className="space-y-1">
@@ -686,10 +707,10 @@ export default function EngineerProjectDetail() {
                                   </div>
                                 )}
 
-                                {/* Common fields */}
-                                <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                                {/* Per-test instrument / pass-fail / remarks */}
+                                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-dashed">
                                   <div className="space-y-1">
-                                    <Label>Instrument ID</Label>
+                                    <Label className="text-xs">Instrument Used</Label>
                                     <InstrumentSelector
                                       value={formData[task.id]?._instrument_id || ''}
                                       onChange={v => handleFieldChange(task.id, '_instrument_id', v)}
@@ -697,13 +718,13 @@ export default function EngineerProjectDetail() {
                                     />
                                   </div>
                                   <div className="space-y-1">
-                                    <Label>Pass / Fail</Label>
+                                    <Label className="text-xs">Pass / Fail</Label>
                                     <Select
                                       value={formData[task.id]?._pass_fail || ''}
                                       onValueChange={v => handleFieldChange(task.id, '_pass_fail', v)}
                                       disabled={isReadonly}
                                     >
-                                      <SelectTrigger><SelectValue placeholder="Select result" /></SelectTrigger>
+                                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select result" /></SelectTrigger>
                                       <SelectContent>
                                         <SelectItem value="PASS">Pass</SelectItem>
                                         <SelectItem value="FAIL">Fail</SelectItem>
@@ -713,37 +734,21 @@ export default function EngineerProjectDetail() {
                                   </div>
                                 </div>
                                 <div className="space-y-1">
-                                  <Label>Remarks</Label>
+                                  <Label className="text-xs">Remarks</Label>
                                   <Textarea
+                                    className="text-xs"
                                     value={formData[task.id]?._remarks || ''}
                                     onChange={e => handleFieldChange(task.id, '_remarks', e.target.value)}
-                                    placeholder="Any observations or notes..."
+                                    placeholder="Observations or notes…"
                                     disabled={isReadonly}
+                                    rows={2}
                                   />
                                 </div>
-
-                                {isReadonly ? (
-                                  <p className="text-sm text-muted-foreground">
-                                    This test has been {task.status.toLowerCase()} and cannot be edited.
-                                  </p>
-                                ) : (
-                                  <div className="flex gap-2 justify-end">
-                                    <Button variant="outline" onClick={() => handleSaveTask(task, false)} disabled={saving === task.id}>
-                                      {saving === task.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                      <Save className="h-4 w-4 mr-2" />
-                                      Save Draft
-                                    </Button>
-                                    <Button onClick={() => handleSaveTask(task, true)} disabled={saving === task.id}>
-                                      {saving === task.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                      Submit for Review
-                                    </Button>
-                                  </div>
-                                )}
-                              </CardContent>
-                            )}
-                          </Card>
-                        );
-                      })
+                              </div>
+                            );
+                          })}
+                        </CardContent>
+                      </Card>
                     )}
                   </div>
                 )}
