@@ -95,6 +95,10 @@ export default {
           "0%":   { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(16px)" },
+          to:   { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down":    "accordion-down 0.2s ease-out",
@@ -103,6 +107,7 @@ export default {
         "glow-pulse-red":    "glow-pulse-red 2s ease-in-out infinite",
         "glow-blue":         "glow-blue 2.5s ease-in-out infinite",
         shimmer:             "shimmer 2s linear infinite",
+        "fade-up":           "fade-up 0.4s ease-out both",
       },
       boxShadow: {
         "glow-blue":    "0 0 0 1px #3b82f640, 0 0 24px #3b82f620",

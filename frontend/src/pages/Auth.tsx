@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap } from 'lucide-react';
+import { Loader2, Zap, Activity, FileCheck, Users } from 'lucide-react';
 
 function GoogleIcon() {
   return (
@@ -20,6 +19,12 @@ function GoogleIcon() {
     </svg>
   );
 }
+
+const STATS = [
+  { icon: Activity, value: '8', label: 'Equipment Types' },
+  { icon: FileCheck, value: '46', label: 'Test Templates' },
+  { icon: Users, value: '4', label: 'Role Levels' },
+];
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -108,51 +113,19 @@ export default function Auth() {
     }
   };
 
-  // Background: animated grid dot pattern + radial gradient overlay
-  const pageBg = (
-    <div className="fixed inset-0 -z-10 overflow-hidden dark:bg-[#0a0e17] bg-slate-50">
-      {/* Grid dots */}
-      <div
-        className="absolute inset-0 opacity-[0.15] dark:opacity-[0.07]"
-        style={{
-          backgroundImage: 'radial-gradient(circle, #3b82f6 1px, transparent 1px)',
-          backgroundSize: '32px 32px',
-        }}
-      />
-      {/* Center radial glow — dark only */}
-      <div className="absolute inset-0 dark:bg-[radial-gradient(ellipse_80%_60%_at_50%_60%,#1d3461_0%,transparent_70%)] pointer-events-none" />
-      {/* Animated gradient orbs */}
-      <motion.div
-        className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full dark:bg-blue-500/5 bg-blue-500/10 blur-3xl"
-        animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
-        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="absolute bottom-1/4 right-1/4 w-64 h-64 rounded-full dark:bg-cyan-500/5 bg-cyan-400/10 blur-3xl"
-        animate={{ scale: [1.2, 1, 1.2], opacity: [0.4, 0.7, 0.4] }}
-        transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-      />
-    </div>
-  );
-
   if (isResetMode) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        {pageBg}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="w-full max-w-md"
-        >
+      <div className="flex min-h-screen items-center justify-center p-4 bg-background">
+        <div className="tf-bg-grid" />
+        <div className="relative z-10 w-full max-w-md">
           <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-2xl p-8">
             <div className="flex items-center gap-3 mb-6">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-glow-blue">
-                <Zap className="h-5 w-5 text-white" />
+                <Zap className="h-5 w-5 text-primary-foreground" />
               </div>
               <div>
                 <p className="font-bold text-foreground">TestFlow</p>
-                <p className="text-xs text-muted-foreground">Set new password</p>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">Set new password</p>
               </div>
             </div>
             <form onSubmit={handleUpdatePassword} className="space-y-4">
@@ -170,137 +143,148 @@ export default function Auth() {
               </Button>
             </form>
           </div>
-        </motion.div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      {pageBg}
+    <div className="min-h-screen bg-background" style={{ display: 'grid', gridTemplateColumns: '1fr 480px' }}>
+      <div className="tf-bg-grid" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: 'easeOut' }}
-        className="w-full max-w-md"
-      >
-        {/* Glass card */}
-        <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="px-8 pt-8 pb-6 border-b border-border">
-            <div className="flex items-center gap-3 mb-1">
-              <motion.div
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary"
-                animate={{ boxShadow: ['0 0 12px #3b82f640', '0 0 28px #3b82f660', '0 0 12px #3b82f640'] }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-              >
-                <Zap className="h-5 w-5 text-white" />
-              </motion.div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground tracking-tight">TestFlow</h1>
-                <p className="text-xs text-muted-foreground">Electrical Testing Management</p>
-              </div>
-            </div>
+      {/* ── Left panel ── */}
+      <div className="relative flex flex-col justify-between p-12 overflow-hidden">
+        {/* Radial glow */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'radial-gradient(ellipse 70% 60% at 40% 55%, hsl(var(--primary)/0.12) 0%, transparent 70%)' }}
+        />
+
+        {/* Brand */}
+        <div className="relative z-10 flex items-center gap-3 animate-fade-up">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary shadow-glow-blue">
+            <Zap className="h-6 w-6 text-primary-foreground" />
           </div>
-
-          <div className="px-8 py-6">
-            <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="signin">
-                <div className="space-y-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2"
-                    onClick={handleGoogleSignIn}
-                    disabled={oauthLoading || isLoading}
-                  >
-                    <GoogleIcon />
-                    {oauthLoading ? 'Redirecting…' : 'Continue with Google'}
-                  </Button>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-card px-2 text-muted-foreground">or</span>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleSignIn} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" placeholder="engineer@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
-                      <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={isLoading || oauthLoading}>
-                      {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Signing in…</> : 'Sign In'}
-                    </Button>
-                    <button
-                      type="button"
-                      className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => { setForgotEmail(email); setForgotOpen(true); }}
-                    >
-                      Forgot password?
-                    </button>
-                  </form>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="signup">
-                <div className="space-y-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2"
-                    onClick={handleGoogleSignIn}
-                    disabled={oauthLoading || isLoading}
-                  >
-                    <GoogleIcon />
-                    {oauthLoading ? 'Redirecting…' : 'Continue with Google'}
-                  </Button>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-card px-2 text-muted-foreground">or</span>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleSignUp} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-name">Full Name</Label>
-                      <Input id="signup-name" type="text" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email">Email</Label>
-                      <Input id="signup-email" type="email" placeholder="engineer@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password">Password</Label>
-                      <Input id="signup-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={isLoading || oauthLoading}>
-                      {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating…</> : 'Create Account'}
-                    </Button>
-                  </form>
-                </div>
-              </TabsContent>
-            </Tabs>
+          <div>
+            <p className="text-lg font-bold tracking-tight text-foreground">TestFlow</p>
+            <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">Grid Control</p>
           </div>
         </div>
-      </motion.div>
+
+        {/* Tagline */}
+        <div className="relative z-10 space-y-4 animate-fade-up" style={{ animationDelay: '80ms' }}>
+          <h2 className="text-4xl font-bold tracking-tight text-foreground leading-tight">
+            From test sheet<br />to energized bus.
+          </h2>
+          <p className="text-base text-muted-foreground max-w-sm leading-relaxed">
+            Manage commissioning projects, record field measurements, and generate reports — all in one place.
+          </p>
+
+          {/* Stats strip */}
+          <div className="flex gap-6 pt-4">
+            {STATS.map(({ icon: Icon, value, label }) => (
+              <div key={label} className="flex items-center gap-2">
+                <Icon size={14} className="text-primary" />
+                <span className="font-mono text-sm font-semibold text-foreground">{value}</span>
+                <span className="text-xs text-muted-foreground">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer tags */}
+        <div className="relative z-10 flex gap-2 animate-fade-up" style={{ animationDelay: '160ms' }}>
+          {['Power Systems', 'Field Testing', 'Commissioning'].map(tag => (
+            <span key={tag} className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded border border-border text-muted-foreground">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Right panel — sign in form ── */}
+      <div className="relative z-10 flex items-center justify-center border-l border-border bg-card/60 backdrop-blur-sm p-10">
+        <div className="w-full max-w-sm">
+          <Tabs defaultValue="signin" className="w-full">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-foreground">Welcome back</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">Sign in to your account to continue</p>
+            </div>
+
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="signin">Sign In</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="signin">
+              <div className="space-y-4">
+                <Button type="button" variant="outline" className="w-full gap-2" onClick={handleGoogleSignIn} disabled={oauthLoading || isLoading}>
+                  <GoogleIcon />
+                  {oauthLoading ? 'Redirecting…' : 'Continue with Google'}
+                </Button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">or</span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" placeholder="engineer@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading || oauthLoading}>
+                    {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Signing in…</> : 'Sign In'}
+                  </Button>
+                  <button type="button" className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setForgotEmail(email); setForgotOpen(true); }}>
+                    Forgot password?
+                  </button>
+                </form>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="signup">
+              <div className="space-y-4">
+                <Button type="button" variant="outline" className="w-full gap-2" onClick={handleGoogleSignIn} disabled={oauthLoading || isLoading}>
+                  <GoogleIcon />
+                  {oauthLoading ? 'Redirecting…' : 'Continue with Google'}
+                </Button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">or</span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-name">Full Name</Label>
+                    <Input id="signup-name" type="text" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input id="signup-email" type="email" placeholder="engineer@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <Input id="signup-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading || oauthLoading}>
+                    {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating…</> : 'Create Account'}
+                  </Button>
+                </form>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
 
       {/* Forgot password dialog */}
       <Dialog open={forgotOpen} onOpenChange={open => { setForgotOpen(open); if (!open) setForgotEmail(''); }}>

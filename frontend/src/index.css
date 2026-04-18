@@ -62,47 +62,47 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* Pure dark — neutral black, no navy tint */
-    --background: 0 0% 5%;         /* #0d0d0d almost pure black */
-    --foreground: 0 0% 90%;        /* #e6e6e6 light grey text */
+    /* Grid Control — blue-gray tinted dark palette */
+    --background: 245 9% 15%;
+    --foreground: 245 20% 97%;
 
-    --card: 0 0% 8%;               /* #141414 card surface */
-    --card-foreground: 0 0% 90%;
+    --card: 245 10% 18%;
+    --card-foreground: 245 15% 88%;
 
-    --popover: 0 0% 10%;           /* #1a1a1a popover surface */
-    --popover-foreground: 0 0% 95%;
+    --popover: 245 10% 20%;
+    --popover-foreground: 245 20% 97%;
 
-    --primary: 217 91% 60%;        /* #3b82f6 electric blue */
+    --primary: 217 91% 60%;        /* keep original blue */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 13%;
-    --secondary-foreground: 0 0% 85%;
+    --secondary: 245 10% 22%;
+    --secondary-foreground: 245 15% 87%;
 
-    --muted: 0 0% 12%;             /* #1f1f1f muted surface */
-    --muted-foreground: 0 0% 50%;
+    --muted: 245 10% 24%;
+    --muted-foreground: 245 8% 62%;
 
     --accent: 189 94% 43%;
     --accent-foreground: 0 0% 100%;
 
-    --success: 160 84% 39%;        /* #10b981 */
+    --success: 148 55% 40%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;         /* #f59e0b amber */
+    --warning: 38 85% 52%;
     --warning-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;      /* #ef4444 */
+    --destructive: 5 72% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 16%;            /* #292929 subtle neutral border */
-    --input: 0 0% 16%;
+    --border: 245 10% 27%;
+    --input: 245 10% 27%;
     --ring: 217 91% 60%;
 
-    --status-unassigned: 0 0% 45%;
+    --status-unassigned: 245 6% 48%;
     --status-assigned: 217 91% 60%;
-    --status-in-progress: 189 94% 43%;
+    --status-in-progress: 220 60% 55%;
     --status-submitted: 271 81% 56%;
-    --status-approved: 160 84% 39%;
-    --status-rework: 0 84% 60%;
+    --status-approved: 148 55% 40%;
+    --status-rework: 5 72% 50%;
   }
 }
 
@@ -114,6 +114,35 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.tf-bg-grid {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    linear-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--border) / 0.5) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.25;
+  mask-image: radial-gradient(ellipse at center, black 20%, transparent 80%);
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseAmber {
+  0%, 100% { box-shadow: 0 0 0 1px #f59e0b40, 0 0 12px #f59e0b20; }
+  50%       { box-shadow: 0 0 0 1px #f59e0b60, 0 0 24px #f59e0b35; }
+}
+
+@keyframes pulseRed {
+  0%, 100% { box-shadow: 0 0 0 1px #ef444440, 0 0 12px #ef444420; }
+  50%       { box-shadow: 0 0 0 1px #ef444460, 0 0 24px #ef444435; }
 }
 
 @media print {
