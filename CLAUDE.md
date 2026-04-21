@@ -4,7 +4,11 @@
 
 ## What This Project Is
 
-**TestFlow** is an electrical substation commissioning management system. Field teams use it to manage test projects, record measurements on electrical equipment (power transformers, CTs, breakers, etc.), and generate PDF/AI reports. Internal operations tool — not public-facing.
+**TestFlow** is a **multi-tenant B2B SaaS** platform for electrical substation commissioning. Each client company gets an isolated workspace at their own subdomain (`company.testflow.io`). Field teams manage test projects, record measurements, and generate PDF/AI reports. Sold to commissioning companies — not a public consumer product.
+
+**Multi-tenancy model:** Single Supabase project, `company_id` column on root tables, RLS enforces isolation. Users cannot see or touch another company's data.
+
+**No public sign-up.** All accounts are created by Company SUPERADMINs via the User Management dashboard, which calls the `create-user` Edge Function (Admin API, server-side). Self-registration is permanently disabled.
 
 ---
 
@@ -38,7 +42,8 @@ gridpoint-testflow/                  ← repo root
 │   │   ├── App.tsx                  # Routes + providers + ErrorBoundary + QueryClient
 │   │   ├── main.tsx                 # React entry point
 │   │   ├── contexts/
-│   │   │   └── AuthContext.tsx      # Auth state + role fetch (deadlock-safe setTimeout) + Google OAuth
+│   │   │   ├── AuthContext.tsx      # Auth state + role fetch (deadlock-safe setTimeout); NO signUp/signInWithGoogle
+│   │   │   └── CompanyContext.tsx   # Reads subdomain slug → fetches company row → exposes { company, loading }
 │   │   ├── lib/
 │   │   │   ├── routes.ts                # dashboardPath(role) — never hardcode /gm
 │   │   │   ├── format.ts                # formatDate / formatDateTime with date-fns
@@ -268,10 +273,16 @@ Edge function fetches data → builds prompt → calls Anthropic API → returns
 Model: `claude-haiku-4-5-20251001`. See `AI_REPORT_PLAN.md` for full plan.
 **Frontend UI:** "AI Report" button in `ProjectDetail.tsx` header — visible to GM/SUPERADMIN when `status = CLOSED`. Displays result in a scrollable dialog with a "Download .md" option.
 
-### Google OAuth
-`AuthContext.signInWithGoogle()` calls `supabase.auth.signInWithOAuth({ provider: 'google' })`.
-Requires Google OAuth credentials set in Supabase Dashboard → Auth → Providers → Google.
-See `EMAIL_RATE_LIMIT.md` for full setup guide.
+### User Creation (Admin-only)
+SUPERADMIN creates users via `InviteUserDialog` → `supabase.functions.invoke('create-user', { body })`.
+Edge Function authenticates the caller, verifies SUPERADMIN role, then uses `admin.createUser()` (service role key) to create the auth user with `email_confirm: true`. It immediately updates the new user's profile with the caller's `company_id` and inserts the role row. Public `signUp()` is never called from the browser.
+
+### User Deletion
+`UserManagementTable` delete button → `supabase.functions.invoke('delete-user', { body: { user_id } })`.
+Edge Function verifies target user is in the same company, then calls `admin.deleteUser()` which cascades to profiles and user_roles via DB foreign key constraints.
+
+### Company Resolution
+`CompanyContext` reads `window.location.hostname` on mount, extracts subdomain (e.g. `powergrid` from `powergrid.testflow.io`), fetches the `companies` row by slug, and exposes `{ company, loading }`. On localhost (no subdomain), `company` is `null` — app works in dev mode. Unknown slugs render `CompanyNotFound` page.
 
 ---
 
@@ -305,6 +316,8 @@ See `EMAIL_RATE_LIMIT.md` for full setup guide.
 
 **Frontend env file lives at `frontend/.env`** (not root). Copy from `frontend/.env.example`.
 
+**Edge Functions automatically get** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` injected by Supabase — no manual setup needed for those.
+
 ---
 
 ## Project Documentation Files
@@ -312,6 +325,7 @@ See `EMAIL_RATE_LIMIT.md` for full setup guide.
 | File | Purpose |
 |---|---|
 | `CLAUDE.md` | This file — developer reference |
+| `SAAS_ROADMAP.md` | Full multi-tenant SaaS transformation plan and remaining roadmap |
 | `PROJECT.md` | Domain/product description — roles, workflows, data model |
 | `DEVELOPMENT.md` | Setup, env vars, local Supabase, building, CI secrets |
 | `DEPLOYMENT.md` | Deployment guide — Vercel/Netlify, secrets safety, first-run checklist |
@@ -350,6 +364,37 @@ Add these in: repo → Settings → Secrets and variables → Actions
 
 ---
 
+## Multi-Tenancy Architecture
+
+### Tables with `company_id` column
+`profiles`, `user_roles`, `projects`, `audit_logs`, `instruments` — all have a direct `company_id UUID` column.
+
+### Tables protected via FK chain (no extra column)
+`scope_items`, `project_test_scope`, `equipment_instances`, `test_tasks`, `nameplate_records`, `test_records` — RLS uses `EXISTS` subquery up the FK chain to `projects.company_id`.
+
+### Global tables (no company isolation)
+`test_templates` — shared library across all tenants. All authenticated users can read them.
+
+### Key SQL function
+`my_company_id()` — `SECURITY DEFINER` function that returns `auth.uid()`'s company_id from profiles. Used in every RLS policy. Returning NULL means user has no company → they see nothing.
+
+### Onboarding a new client (GridPoint internal)
+1. `INSERT INTO companies (name, slug) VALUES ('Acme Corp', 'acme');` — run in Supabase Dashboard
+2. Create their SUPERADMIN user via Supabase Dashboard → Auth → Users → Create user
+3. Run SQL to set profile `company_id` and insert `user_roles` row for that user
+4. Hand them `https://acme.testflow.io` + credentials — they create their own team from there
+
+### Edge Functions
+| Function | Purpose |
+|---|---|
+| `create-user` | Admin-only user creation via `auth.admin.createUser()` — sets `company_id`, assigns role |
+| `delete-user` | Admin-only user deletion via `auth.admin.deleteUser()` — cascades to profile/roles |
+| `generate-report` | AI report generation via Anthropic API |
+
+All functions share CORS headers from `supabase/functions/_shared/cors.ts`.
+
+---
+
 ## Common Gotchas
 
 1. **`AuthContext` uses `setTimeout(..., 0)`** to defer role fetching — avoids Supabase deadlock inside `onAuthStateChange`. Do not remove.
@@ -361,6 +406,10 @@ Add these in: repo → Settings → Secrets and variables → Actions
 7. **`scope_items` has a unique constraint** on `(project_id, equipment_type)` — one row per type per project.
 8. **`ANTHROPIC_API_KEY` must be a Supabase secret** — not an `.env` variable. It runs server-side in the edge function only.
 9. **`test_templates.fields` is an empty array `[]`** for most templates in the current seed. Forms rendering these should handle empty fields gracefully.
+10. **New users have `company_id = NULL` for a brief moment** — the `handle_new_user` trigger creates the profile row before the Edge Function sets `company_id`. During this window the user sees no data (safe default — `my_company_id()` returns NULL → all RLS checks fail).
+11. **`signUp()` and `signInWithGoogle()` are removed** from `AuthContext`. Do not re-add them. All user creation goes through the `create-user` Edge Function only.
+12. **`companies` table has no INSERT policy for regular users** — only service role (Edge Functions) can create companies. Add new clients via Supabase Dashboard SQL editor.
+13. **`vercel.json` at repo root** rewrites all paths to `/` for SPA routing. Wildcard subdomain (`*.testflow.io`) must be added in Vercel project settings and DNS.
 10. **`vite.config.ts` binds to `host: "::"`** — exposes dev server on all interfaces (useful for Docker/WSL; change to `localhost` for local-only dev).
 11. **Google OAuth needs Supabase Dashboard config** — code is implemented; paste Client ID + Secret in Auth → Providers → Google. See `EMAIL_RATE_LIMIT.md`.
 12. **`next-themes`** is installed but dark theme is not yet implemented in the app — planned in `FRONTEND_REVAMP.md`.

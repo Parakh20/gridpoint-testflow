@@ -162,37 +162,21 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
 
     setDeleting(true);
     try {
-      // Delete role assignment first (FK constraint)
-      if (user.role_id) {
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .delete()
-          .eq('id', user.role_id);
-        if (roleError) throw roleError;
-      }
-
-      // Delete profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', deleteUserId);
-      if (profileError) throw profileError;
-
-      // Log the deletion
-      await supabase.from('audit_logs').insert({
-        entity_type: 'user',
-        entity_id: deleteUserId,
-        action: 'DELETE',
-        actor_id: currentUserId,
-        before_data: { name: user.name, email: user.email, role: user.role },
-        after_data: null,
+      // Edge Function uses Admin API to fully delete the auth user,
+      // which cascades to profile and user_roles via ON DELETE CASCADE.
+      const { data: result, error } = await supabase.functions.invoke('delete-user', {
+        body: { user_id: deleteUserId },
       });
+
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
 
       toast.success(`${user.name} removed successfully`);
       queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
-    } catch (error: any) {
-      console.error('Error deleting user:', error);
-      toast.error('Failed to remove user', { description: error.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Error deleting user:', err);
+      toast.error('Failed to remove user', { description: message });
     } finally {
       setDeleting(false);
       setDeleteUserId(null);

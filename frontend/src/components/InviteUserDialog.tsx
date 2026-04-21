@@ -52,72 +52,40 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
 
   const form = useForm<InviteUserForm>({
     resolver: zodResolver(inviteUserSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      role: 'ENGINEER',
-      password: '',
-    },
+    defaultValues: { name: '', email: '', role: 'ENGINEER', password: '' },
   });
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%';
-    // Use crypto.getRandomValues for cryptographically secure password generation
     const bytes = new Uint8Array(12);
     crypto.getRandomValues(bytes);
-    const password = Array.from(bytes, b => chars[b % chars.length]).join('');
-    form.setValue('password', password);
+    form.setValue('password', Array.from(bytes, b => chars[b % chars.length]).join(''));
     setShowPassword(true);
   };
 
   const onSubmit = async (data: InviteUserForm) => {
     setIsLoading(true);
     try {
-      // Sign up the user
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            name: data.name,
-          },
-        },
+      // Use the server-side Edge Function — it uses the Admin API with the
+      // service role key so public signUp is never called from the browser.
+      const { data: result, error } = await supabase.functions.invoke('create-user', {
+        body: { name: data.name, email: data.email, password: data.password, role: data.role },
       });
 
-      if (signUpError) throw signUpError;
-      if (!authData.user) throw new Error('User creation failed');
-
-      // Assign role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: data.role as 'SUPERADMIN' | 'GM' | 'SUPERVISOR' | 'ENGINEER',
-        });
-
-      if (roleError) throw roleError;
-
-      // Log the action
-      await supabase.from('audit_logs').insert({
-        entity_type: 'user',
-        entity_id: authData.user.id,
-        action: 'CREATE',
-        actor_id: (await supabase.auth.getUser()).data.user?.id,
-        after_data: { name: data.name, email: data.email, role: data.role },
-      });
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
 
       toast.success('User created successfully', {
-        description: `${data.name} has been invited with ${data.role} role`,
+        description: `${data.name} has been added with ${data.role} role`,
       });
 
       form.reset();
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
-      console.error('Error creating user:', error);
-      toast.error('Failed to create user', {
-        description: error.message || 'Please try again',
-      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Please try again';
+      console.error('Error creating user:', err);
+      toast.error('Failed to create user', { description: message });
     } finally {
       setIsLoading(false);
     }
@@ -127,9 +95,9 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Invite New User</DialogTitle>
+          <DialogTitle>Add New User</DialogTitle>
           <DialogDescription>
-            Create a new user account and assign their role
+            Create a user account and assign their role. Share the credentials with them directly.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -139,10 +107,8 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" {...field} />
-                  </FormControl>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl><Input placeholder="John Doe" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -153,9 +119,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="john@example.com" {...field} />
-                  </FormControl>
+                  <FormControl><Input type="email" placeholder="john@company.com" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -168,9 +132,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
                   <FormLabel>Role</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a role" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="ENGINEER">Engineer</SelectItem>
