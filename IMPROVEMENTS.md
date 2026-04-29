@@ -1,6 +1,17 @@
 # Improvements & Known Issues
 
-Legend: 🔴 Security | 🔲 Pending | ⚠️ Partial
+Legend: 🔴 Security | 🔲 Pending | ⚠️ Partial | ✅ Fixed
+
+---
+
+## 2026-04-29 — Pre-sale security pass (✅ all fixed)
+
+- ✅ **Cross-tenant escalation via profiles.company_id** — `profiles_update_own` had no `WITH CHECK`, so any user could change their own `company_id` to another tenant's UUID. `my_company_id()` reads from profiles, so this would have given full read access to that other company's data. Fixed in migration `20260429000001` by adding a `WITH CHECK` that requires the new `company_id` equal the existing one.
+- ✅ **`generate-report` Edge Function had no auth** — anyone with the URL could pass any `project_id` and receive an AI-generated report on it (data leak + Anthropic-bill abuse). Now requires JWT, verifies caller role is GM/SUPERADMIN, and confirms the project belongs to the caller's company.
+- ✅ **CORS wildcard on Edge Functions** — switched `Access-Control-Allow-Origin: *` to an allow-list (`optimustesting.com`, `*.optimustesting.com`, localhost dev ports) via `_shared/cors.ts::buildCorsHeaders`.
+- ✅ **Missing `WITH CHECK` on SUPERADMIN profile/user_roles management and project UPDATE** — added so a SUPERADMIN can't move a row to another tenant.
+- ✅ **Password length minimum was 6 in Auth reset flow** — bumped to 8, matching `InviteUserDialog` zod schema and the new server-side check in `create-user`.
+- ✅ **`create-user` Edge Function lacked input validation** — added strict email regex + 8-char password floor server-side (defense in depth — UI validation is not a security boundary).
 
 ---
 

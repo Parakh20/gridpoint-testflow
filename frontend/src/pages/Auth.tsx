@@ -7,12 +7,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, Activity, FileCheck, Users } from 'lucide-react';
+import { Loader2, Zap, Activity, FileCheck, Users, ShieldCheck, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 const STATS = [
   { icon: Activity, value: '8', label: 'Equipment Types' },
   { icon: FileCheck, value: '46', label: 'Test Templates' },
   { icon: Users, value: '4', label: 'Role Levels' },
+];
+
+const FEATURES = [
+  'Tenant-isolated workspaces',
+  'Live test data sync',
+  'AI-generated reports',
+  'Excel + PDF export',
 ];
 
 export default function Auth() {
@@ -25,6 +32,7 @@ export default function Auth() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { signIn, resetPasswordForEmail, updatePassword } = useAuth();
   const { company } = useCompany();
   const { toast } = useToast();
@@ -64,8 +72,8 @@ export default function Auth() {
       toast({ variant: 'destructive', title: 'Passwords do not match' });
       return;
     }
-    if (newPassword.length < 6) {
-      toast({ variant: 'destructive', title: 'Password too short', description: 'Must be at least 6 characters.' });
+    if (newPassword.length < 8) {
+      toast({ variant: 'destructive', title: 'Password too short', description: 'Must be at least 8 characters.' });
       return;
     }
     setResetLoading(true);
@@ -97,11 +105,11 @@ export default function Auth() {
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="new-password">New Password</Label>
-                <Input id="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={6} />
+                <Input id="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={8} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm Password</Label>
-                <Input id="confirm-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={6} />
+                <Input id="confirm-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={8} />
               </div>
               <Button type="submit" className="w-full" disabled={resetLoading}>
                 {resetLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -115,111 +123,196 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-background" style={{ display: 'grid', gridTemplateColumns: '1fr 480px' }}>
+    <div className="relative min-h-screen w-full overflow-hidden bg-background">
+      {/* Background layers */}
       <div className="tf-bg-grid" />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(60rem 40rem at 18% 20%, hsl(var(--primary)/0.18), transparent 60%),' +
+            'radial-gradient(50rem 36rem at 90% 90%, hsl(var(--accent)/0.16), transparent 65%)',
+        }}
+      />
 
-      {/* ── Left panel ── */}
-      <div className="relative flex flex-col justify-between p-12 overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{ background: 'radial-gradient(ellipse 70% 60% at 40% 55%, hsl(var(--primary)/0.12) 0%, transparent 70%)' }}
-        />
-
-        <div className="relative z-10 flex items-center gap-3 animate-fade-up">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary shadow-glow-blue">
-            <Zap className="h-6 w-6 text-primary-foreground" />
+      <div className="relative z-10 mx-auto grid min-h-screen w-full max-w-7xl items-stretch lg:grid-cols-[1.1fr_0.9fr]">
+        {/* ── Hero panel ─────────────────────────────────────────────────── */}
+        <div className="relative hidden flex-col justify-between p-10 lg:flex xl:p-14">
+          {/* logo */}
+          <div className="flex items-center gap-3 animate-fade-up">
+            <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-primary shadow-glow-blue">
+              <Zap className="h-6 w-6 text-primary-foreground" />
+              <span className="absolute -inset-1 rounded-xl bg-primary/30 blur-md -z-10" />
+            </div>
+            <div>
+              <p className="text-lg font-bold tracking-tight text-foreground">TestFlow</p>
+              <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+                Grid Control · v1.0
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-lg font-bold tracking-tight text-foreground">TestFlow</p>
-            <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">Grid Control</p>
+
+          {/* headline */}
+          <div className="space-y-6 animate-fade-up" style={{ animationDelay: '80ms' }}>
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1 backdrop-blur">
+              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Live · Multi-tenant SaaS
+              </span>
+            </div>
+
+            <h2 className="text-5xl font-bold tracking-tight text-foreground leading-[1.05] xl:text-6xl">
+              From test sheet
+              <br />
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                to energized bus.
+              </span>
+            </h2>
+
+            <p className="max-w-md text-base leading-relaxed text-muted-foreground">
+              Field teams capture commissioning data, supervisors approve results, and GMs ship reports —
+              all from one workspace per company.
+            </p>
+
+            <ul className="space-y-2 pt-2">
+              {FEATURES.map(f => (
+                <li key={f} className="flex items-center gap-2 text-sm text-foreground/90">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  {f}
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
 
-        <div className="relative z-10 space-y-4 animate-fade-up" style={{ animationDelay: '80ms' }}>
-          <h2 className="text-4xl font-bold tracking-tight text-foreground leading-tight">
-            From test sheet<br />to energized bus.
-          </h2>
-          <p className="text-base text-muted-foreground max-w-sm leading-relaxed">
-            Manage commissioning projects, record field measurements, and generate reports — all in one place.
-          </p>
-
-          <div className="flex gap-6 pt-4">
+          {/* stats */}
+          <div className="grid grid-cols-3 gap-3 animate-fade-up" style={{ animationDelay: '160ms' }}>
             {STATS.map(({ icon: Icon, value, label }) => (
-              <div key={label} className="flex items-center gap-2">
-                <Icon size={14} className="text-primary" />
-                <span className="font-mono text-sm font-semibold text-foreground">{value}</span>
-                <span className="text-xs text-muted-foreground">{label}</span>
+              <div
+                key={label}
+                className="rounded-xl border border-border bg-card/60 p-4 backdrop-blur transition hover:border-primary/40"
+              >
+                <Icon size={16} className="text-primary mb-2" />
+                <p className="font-mono text-2xl font-semibold leading-none text-foreground">{value}</p>
+                <p className="mt-1 text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="relative z-10 flex gap-2 animate-fade-up" style={{ animationDelay: '160ms' }}>
-          {['Power Systems', 'Field Testing', 'Commissioning'].map(tag => (
-            <span key={tag} className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded border border-border text-muted-foreground">
-              {tag}
-            </span>
-          ))}
-        </div>
-      </div>
+        {/* ── Form panel ────────────────────────────────────────────────── */}
+        <div className="flex items-center justify-center p-6 sm:p-10">
+          <div className="w-full max-w-md animate-fade-up" style={{ animationDelay: '120ms' }}>
+            {/* mobile logo */}
+            <div className="mb-8 flex items-center gap-3 lg:hidden">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-glow-blue">
+                <Zap className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <p className="text-lg font-bold tracking-tight text-foreground">TestFlow</p>
+            </div>
 
-      {/* ── Right panel — sign in form ── */}
-      <div className="relative z-10 flex items-center justify-center border-l border-border bg-card/60 backdrop-blur-sm p-10">
-        <div className="w-full max-w-sm">
-          <div className="mb-8">
-            {company ? (
-              <>
-                <p className="text-xs font-mono uppercase tracking-widest text-primary mb-1">{company.name}</p>
-                <h3 className="text-lg font-semibold text-foreground">Welcome back</h3>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Sign in with your company credentials
-                </p>
-              </>
-            ) : (
-              <>
-                <h3 className="text-lg font-semibold text-foreground">Welcome back</h3>
-                <p className="text-sm text-muted-foreground mt-0.5">Sign in to your account to continue</p>
-              </>
-            )}
+            <div className="rounded-2xl border border-border bg-card/80 p-8 shadow-2xl backdrop-blur-xl">
+              <div className="mb-6">
+                {company ? (
+                  <>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-primary">
+                      {company.name}
+                    </p>
+                    <h3 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
+                      Sign in
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Use your company credentials to continue.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-2xl font-semibold tracking-tight text-foreground">
+                      Welcome back
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Sign in to your account to continue.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                    className="h-11"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Password
+                    </Label>
+                    <button
+                      type="button"
+                      className="text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                      onClick={() => { setForgotEmail(email); setForgotOpen(true); }}
+                    >
+                      Forgot?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      required
+                      className="h-11 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(s => !s)}
+                      className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <Button type="submit" className="group h-11 w-full text-sm font-semibold" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing in…
+                    </>
+                  ) : (
+                    <>
+                      Sign In
+                      <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </>
+                  )}
+                </Button>
+              </form>
+
+              <div className="mt-6 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span>Encrypted in transit · tenant-isolated by RLS</span>
+              </div>
+            </div>
+
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              Need access? Contact your company administrator.
+            </p>
           </div>
-
-          <form onSubmit={handleSignIn} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="engineer@example.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Signing in…</> : 'Sign In'}
-            </Button>
-            <button
-              type="button"
-              className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => { setForgotEmail(email); setForgotOpen(true); }}
-            >
-              Forgot password?
-            </button>
-          </form>
-
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            Contact your administrator to create or reset your account.
-          </p>
         </div>
       </div>
 

@@ -1,32 +1,74 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { buildCorsHeaders } from '../_shared/cors.ts';
 
 Deno.serve(async (req) => {
+  const cors = buildCorsHeaders(req.headers.get('Origin'));
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: cors });
   }
 
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+
   try {
-    const { project_id } = await req.json();
-    if (!project_id) {
-      return new Response(JSON.stringify({ error: 'project_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // ── 1. Authenticate caller ────────────────────────────────────────────────
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) return json({ error: 'Missing authorization header' }, 401);
+
+    const callerClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user: caller }, error: authError } = await callerClient.auth.getUser();
+    if (authError || !caller) return json({ error: 'Unauthorized' }, 401);
+
+    // ── 2. Verify caller role: only GM or SUPERADMIN can generate reports ─────
+    const { data: roleRow } = await callerClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', caller.id)
+      .single();
+
+    if (!roleRow || !['GM', 'SUPERADMIN'].includes(roleRow.role)) {
+      return json({ error: 'Forbidden: only GM or SUPERADMIN can generate reports' }, 403);
     }
 
+    const { data: callerProfile } = await callerClient
+      .from('profiles')
+      .select('company_id')
+      .eq('id', caller.id)
+      .single();
+
+    if (!callerProfile?.company_id) return json({ error: 'Caller has no company assigned' }, 400);
+
+    // ── 3. Validate input ────────────────────────────────────────────────────
+    const { project_id } = await req.json();
+    if (!project_id || typeof project_id !== 'string') {
+      return json({ error: 'project_id is required' }, 400);
+    }
+
+    // ── 4. Verify project belongs to caller's company (tenant isolation) ─────
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Fetch all project data needed for the report
-    const [projectRes, scopeRes, instancesRes, tasksRes] = await Promise.all([
-      supabase.from('projects').select('*').eq('id', project_id).single(),
+    const projectRes = await supabase.from('projects').select('*').eq('id', project_id).single();
+    if (projectRes.error || !projectRes.data) return json({ error: 'Project not found' }, 404);
+    const project = projectRes.data;
+
+    if (project.company_id !== callerProfile.company_id) {
+      return json({ error: 'Forbidden: project belongs to another company' }, 403);
+    }
+
+    // ── 5. Fetch related data (still service-role since we already verified) ─
+    const [scopeRes, instancesRes, tasksRes] = await Promise.all([
       supabase.from('scope_items').select('equipment_type, quantity').eq('project_id', project_id),
       supabase
         .from('equipment_instances')
@@ -45,17 +87,13 @@ Deno.serve(async (req) => {
         .eq('equipment_instance.project_id', project_id),
     ]);
 
-    if (projectRes.error) throw projectRes.error;
-    const project = projectRes.data;
-
-    const totalTasks      = tasksRes.data?.length ?? 0;
-    const approvedTasks   = tasksRes.data?.filter(t => t.status === 'APPROVED').length ?? 0;
-    const failedTasks     = tasksRes.data?.filter(t =>
+    const totalTasks    = tasksRes.data?.length ?? 0;
+    const approvedTasks = tasksRes.data?.filter(t => t.status === 'APPROVED').length ?? 0;
+    const failedTasks   = tasksRes.data?.filter(t =>
       Array.isArray(t.test_records) && t.test_records.some((r: any) => r.pass_fail === 'FAIL')
     ).length ?? 0;
-    const pendingTasks    = tasksRes.data?.filter(t => t.status === 'DRAFT' || t.status === 'IN_PROGRESS').length ?? 0;
+    const pendingTasks  = tasksRes.data?.filter(t => t.status === 'DRAFT' || t.status === 'IN_PROGRESS').length ?? 0;
 
-    // Build a structured summary for Claude
     const scopeSummary = (scopeRes.data ?? [])
       .map(s => `  - ${s.equipment_type}: ${s.quantity} units`)
       .join('\n');
@@ -129,14 +167,9 @@ Use formal engineering language. Be concise but thorough. Do not fabricate speci
     const anthropicData = await anthropicRes.json();
     const reportText = anthropicData.content[0]?.text ?? '';
 
-    return new Response(JSON.stringify({ report: reportText }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ report: reportText });
   } catch (error) {
     console.error('generate-report error:', error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ error: (error as Error).message }, 500);
   }
 });

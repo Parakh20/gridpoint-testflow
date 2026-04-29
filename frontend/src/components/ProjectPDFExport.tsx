@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import type { Json, Tables } from '@/integrations/supabase/types';
+import { SectionTable, isV2Schema, type TemplateSchema } from '@/lib/testSectionTables';
 
 interface ProjectPDFExportProps {
   project: {
@@ -415,6 +416,7 @@ export function ProjectPDFExport({ project, onClose }: ProjectPDFExportProps) {
                       const fieldDefs = parsedFields?.properties || {};
                       const payload = task.record?.payload || {};
                       const readingSummary = formatReadingSummary(payload, fieldDefs);
+                      const v2Schema = isV2Schema(parsedFields) ? (parsedFields as TemplateSchema) : null;
 
                       return (
                         <React.Fragment key={task.id}>
@@ -428,8 +430,30 @@ export function ProjectPDFExport({ project, onClose }: ProjectPDFExportProps) {
                             <td className="border p-2"><PassFailCell value={task.record?.pass_fail || null} /></td>
                             <td className="border p-2">{task.status}</td>
                           </tr>
-                          {/* Readings row */}
-                          {task.record && Object.keys(payload).length > 0 && (
+                          {/* Full v2-section data — same content the Excel export produces */}
+                          {task.record && v2Schema && (
+                            <tr>
+                              <td colSpan={6} className="border p-2 bg-white">
+                                <div className="space-y-2">
+                                  {v2Schema.sections.map(section => (
+                                    <SectionTable
+                                      key={section.id}
+                                      section={section}
+                                      payload={payload as Record<string, any>}
+                                    />
+                                  ))}
+                                  {task.record?.remarks && (
+                                    <div className="text-xs" style={{ color: '#555', marginTop: 4 }}>
+                                      <span style={{ fontWeight: 600 }}>Remarks: </span>
+                                      {task.record.remarks}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          {/* v1 / raw payload fallback */}
+                          {task.record && !v2Schema && Object.keys(payload).length > 0 && (
                             <tr>
                               <td colSpan={6} className="border p-2 bg-gray-50">
                                 <div className="grid grid-cols-4 gap-2 text-xs">
