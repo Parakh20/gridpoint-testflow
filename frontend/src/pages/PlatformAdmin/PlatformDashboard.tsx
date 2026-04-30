@@ -36,6 +36,11 @@ import {
   Activity,
   LogOut,
   CheckSquare,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
+  AlertTriangle,
 } from 'lucide-react';
 
 const BASE_DOMAIN = 'optimustesting.com';
@@ -53,11 +58,15 @@ interface Stats {
   activeProjects: number;
 }
 
+interface CreatedTenant {
+  workspaceUrl: string;
+  adminEmail: string;
+  password: string;
+  slug: string;
+}
+
 const ONBOARDING_STEPS = [
-  'Create SUPERADMIN user: Supabase Dashboard → Auth → Users → Create user',
-  "Run SQL: UPDATE profiles SET company_id = '<id>' WHERE id = '<user_id>'",
-  "Run SQL: INSERT INTO user_roles (user_id, role, company_id) VALUES ('<uid>', 'SUPERADMIN', '<cid>')",
-  `Add https://{slug}.${BASE_DOMAIN} to supabase/functions/_shared/cors.ts → redeploy`,
+  `Add https://{slug}.${BASE_DOMAIN} to supabase/functions/_shared/cors.ts ALLOWED_ORIGINS → push to main (triggers CI deploy)`,
   'Send workspace URL + credentials to client',
 ];
 
@@ -69,14 +78,43 @@ function generateSlug(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="ml-1 inline-flex items-center rounded p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+      title="Copy"
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
 export default function PlatformDashboard() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [stats, setStats] = useState<Stats>({ companies: 0, users: 0, activeProjects: 0 });
   const [loadingData, setLoadingData] = useState(true);
+
+  // Form state
   const [companyName, setCompanyName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugManual, setSlugManual] = useState(false);
+  const [adminFullName, setAdminFullName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+
+  // Success card state — shown once after creation
+  const [createdTenant, setCreatedTenant] = useState<CreatedTenant | null>(null);
+
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -122,36 +160,62 @@ export default function PlatformDashboard() {
     setSlug(val.toLowerCase().replace(/[^a-z0-9-]/g, ''));
   };
 
-  const handleAddCompany = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!companyName.trim() || !slug.trim()) return;
+  const resetForm = () => {
+    setCompanyName('');
+    setSlug('');
+    setSlugManual(false);
+    setAdminFullName('');
+    setAdminEmail('');
+    setAdminPassword('');
+    setShowPassword(false);
+  };
 
-    const slugValid = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug) || /^[a-z0-9]$/.test(slug);
+  const slugValid = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug) || /^[a-z0-9]$/.test(slug);
+
+  const handleCreateTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+
     if (!slugValid) {
-      toast({ variant: 'destructive', title: 'Invalid slug', description: 'Slug must be lowercase alphanumeric with hyphens only.' });
+      toast({ variant: 'destructive', title: 'Invalid slug', description: 'Lowercase alphanumeric and hyphens only.' });
+      return;
+    }
+    if (adminPassword.length < 8) {
+      toast({ variant: 'destructive', title: 'Password too short', description: 'Minimum 8 characters required.' });
       return;
     }
 
     setAddLoading(true);
+    setCreatedTenant(null);
     try {
-      const { error } = await supabase
-        .from('companies')
-        .insert({ name: companyName.trim(), slug: slug.trim() });
+      const platformToken = import.meta.env.VITE_PLATFORM_ADMIN_TOKEN;
+      const { data, error } = await supabase.functions.invoke('create-tenant', {
+        body: {
+          name: companyName.trim(),
+          slug: slug.trim(),
+          email: adminEmail.trim(),
+          password: adminPassword,
+          full_name: adminFullName.trim(),
+        },
+        headers: { 'X-Platform-Token': platformToken ?? '' },
+      });
 
       if (error) throw error;
 
+      if (data?.error) {
+        let description = data.message ?? data.error;
+        if (data.error === 'slug_taken') description = `Slug "${slug}" is already in use. Choose a different one.`;
+        if (data.error === 'email_taken') description = `${adminEmail} is already registered. Use a different email.`;
+        toast({ variant: 'destructive', title: 'Creation failed', description });
+        return;
+      }
+
       const workspaceUrl = `https://${slug}.${BASE_DOMAIN}`;
-      toast({
-        title: 'Company created',
-        description: `Workspace: ${workspaceUrl}`,
-      });
-      setCompanyName('');
-      setSlug('');
-      setSlugManual(false);
+      setCreatedTenant({ workspaceUrl, adminEmail: adminEmail.trim(), password: adminPassword, slug: slug.trim() });
+      resetForm();
       await fetchAll();
     } catch (err: any) {
-      console.error('[PlatformDashboard] add company error:', err);
-      toast({ variant: 'destructive', title: 'Failed to create company', description: err.message });
+      console.error('[PlatformDashboard] create-tenant error:', err);
+      toast({ variant: 'destructive', title: 'Failed to create tenant', description: err.message });
     } finally {
       setAddLoading(false);
     }
@@ -231,7 +295,7 @@ export default function PlatformDashboard() {
           ))}
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+        <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
 
           {/* Companies table */}
           <div className="space-y-4">
@@ -243,7 +307,7 @@ export default function PlatformDashboard() {
                 </div>
               ) : companies.length === 0 ? (
                 <div className="py-16 text-center text-sm text-muted-foreground">
-                  No companies yet. Add one below.
+                  No companies yet. Create one below.
                 </div>
               ) : (
                 <Table>
@@ -336,58 +400,181 @@ export default function PlatformDashboard() {
             </div>
           </div>
 
-          {/* Right column: Add company + Onboarding checklist */}
+          {/* Right column */}
           <div className="space-y-6">
 
-            {/* Add company form */}
+            {/* Success card — shown once after creation */}
+            {createdTenant && (
+              <Card className="border-green-500/40 bg-green-500/5">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 text-green-400">
+                    <Check className="h-4 w-4" />
+                    Tenant Created Successfully
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-2 rounded-lg border border-border bg-card/60 p-3 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">Workspace</span>
+                      <div className="flex items-center gap-1">
+                        <a
+                          href={createdTenant.workspaceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-primary hover:underline"
+                        >
+                          {createdTenant.workspaceUrl}
+                        </a>
+                        <CopyButton text={createdTenant.workspaceUrl} />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">Admin Email</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-foreground">{createdTenant.adminEmail}</span>
+                        <CopyButton text={createdTenant.adminEmail} />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">Password</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-foreground">{createdTenant.password}</span>
+                        <CopyButton text={createdTenant.password} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>Save these credentials — the password will not be shown again.</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => setCreatedTenant(null)}
+                  >
+                    Dismiss
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Create Company + Admin form */}
             <Card className="bg-card/60 backdrop-blur border-border">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Plus className="h-4 w-4 text-primary" />
-                  Add Company
+                  Create Company + Admin
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleAddCompany} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="company-name"
-                      className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
-                    >
-                      Company Name
-                    </Label>
-                    <Input
-                      id="company-name"
-                      placeholder="Acme Power Corp"
-                      value={companyName}
-                      onChange={e => handleNameChange(e.target.value)}
-                      required
-                    />
+                <form onSubmit={handleCreateTenant} className="space-y-5">
+
+                  {/* Section 1: Company Details */}
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                      Company Details
+                    </p>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="company-name" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Company Name
+                      </Label>
+                      <Input
+                        id="company-name"
+                        placeholder="Acme Power Corp"
+                        value={companyName}
+                        onChange={e => handleNameChange(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="company-slug" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Slug
+                      </Label>
+                      <Input
+                        id="company-slug"
+                        placeholder="acme-power"
+                        value={slug}
+                        onChange={e => handleSlugChange(e.target.value)}
+                        required
+                        className="font-mono text-sm"
+                      />
+                      {slug && (
+                        <p className={`text-[11px] font-mono truncate ${slugValid ? 'text-muted-foreground' : 'text-destructive'}`}>
+                          {slugValid
+                            ? `→ https://${slug}.${BASE_DOMAIN}`
+                            : 'Slug must start/end with alphanumeric and contain only a–z, 0–9, hyphens'}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="company-slug"
-                      className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
-                    >
-                      Slug
-                    </Label>
-                    <Input
-                      id="company-slug"
-                      placeholder="acme-power"
-                      value={slug}
-                      onChange={e => handleSlugChange(e.target.value)}
-                      required
-                      className="font-mono text-sm"
-                    />
-                    {slug && (
-                      <p className="text-[11px] text-muted-foreground font-mono truncate">
-                        → https://{slug}.{BASE_DOMAIN}
-                      </p>
-                    )}
+
+                  <div className="border-t border-border" />
+
+                  {/* Section 2: SUPERADMIN Account */}
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                      SUPERADMIN Account
+                    </p>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="admin-name" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Full Name
+                      </Label>
+                      <Input
+                        id="admin-name"
+                        placeholder="Jane Smith"
+                        value={adminFullName}
+                        onChange={e => setAdminFullName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="admin-email" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Email
+                      </Label>
+                      <Input
+                        id="admin-email"
+                        type="email"
+                        placeholder="admin@acmecorp.com"
+                        value={adminEmail}
+                        onChange={e => setAdminEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="admin-password" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Password
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="admin-password"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Min. 8 characters"
+                          value={adminPassword}
+                          onChange={e => setAdminPassword(e.target.value)}
+                          required
+                          minLength={8}
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(v => !v)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          tabIndex={-1}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <Button type="submit" className="w-full" disabled={addLoading || !companyName || !slug}>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={addLoading || !companyName || !slug || !slugValid || !adminFullName || !adminEmail || adminPassword.length < 8}
+                  >
                     {addLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    {addLoading ? 'Creating…' : 'Create Company'}
+                    {addLoading ? 'Creating…' : 'Create Company + Admin'}
                   </Button>
                 </form>
               </CardContent>
@@ -403,7 +590,7 @@ export default function PlatformDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Manual steps required after adding a company:
+                  Manual steps required after creating a company:
                 </p>
                 <ol className="space-y-2.5">
                   {ONBOARDING_STEPS.map((step, i) => (

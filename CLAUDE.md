@@ -311,6 +311,8 @@ Edge Function verifies target user is in the same company, then calls `admin.del
 | `VITE_SUPABASE_PROJECT_ID` | Optional convenience | Project ref |
 | `SUPABASE_PROJECT_ID` | GitHub Actions CI | Project ref for `supabase link` |
 | `ANTHROPIC_API_KEY` | Edge Function (server) | Claude API key — set via `supabase secrets set`, never in `.env` |
+| `PLATFORM_ADMIN_TOKEN` | Edge Function (server) | Token for `create-tenant` — set via `supabase secrets set PLATFORM_ADMIN_TOKEN=<value>` |
+| `VITE_PLATFORM_ADMIN_TOKEN` | Browser (platform panel only) | Must exactly match `PLATFORM_ADMIN_TOKEN` Supabase secret |
 | `SUPABASE_ACCESS_TOKEN` | GitHub Actions CI | Supabase personal access token |
 | `SUPABASE_DB_PASSWORD` | GitHub Actions CI | DB password for `supabase db push` |
 
@@ -379,10 +381,11 @@ Add these in: repo → Settings → Secrets and variables → Actions
 `my_company_id()` — `SECURITY DEFINER` function that returns `auth.uid()`'s company_id from profiles. Used in every RLS policy. Returning NULL means user has no company → they see nothing.
 
 ### Onboarding a new client (GridPoint internal)
-1. `INSERT INTO companies (name, slug) VALUES ('Acme Corp', 'acme');` — run in Supabase Dashboard
-2. Create their SUPERADMIN user via Supabase Dashboard → Auth → Users → Create user
-3. Run SQL to set profile `company_id` and insert `user_roles` row for that user
-4. Hand them `https://acme.testflow.io` + credentials — they create their own team from there
+Use the Platform Admin panel at `optimustesting.com/admin` → **Create Company + Admin** form. The form creates the company row, the SUPERADMIN auth user, their profile, and the role assignment in one call to the `create-tenant` Edge Function.
+
+Only remaining manual step:
+1. Add `https://{slug}.optimustesting.com` to `supabase/functions/_shared/cors.ts` `ALLOWED_ORIGINS` → push to `main` (CI deploys automatically)
+2. Send workspace URL + credentials to client
 
 ### Edge Functions
 | Function | Purpose |
@@ -390,6 +393,7 @@ Add these in: repo → Settings → Secrets and variables → Actions
 | `create-user` | Admin-only user creation via `auth.admin.createUser()` — sets `company_id`, assigns role |
 | `delete-user` | Admin-only user deletion via `auth.admin.deleteUser()` — cascades to profile/roles |
 | `generate-report` | AI report generation via Anthropic API |
+| `create-tenant` | Platform-level: creates company + SUPERADMIN user atomically; guarded by `X-Platform-Token` header |
 
 All functions share CORS headers from `supabase/functions/_shared/cors.ts`.
 
@@ -415,8 +419,8 @@ The platform owner (Parakh) manages all tenant companies at `optimustesting.com`
 ### Features
 - **Stats bar**: total companies, total users (profiles), active projects
 - **Companies table**: name, slug, workspace URL, created date; Open ↗ and Delete actions
-- **Add Company form**: name + auto-generated slug (editable); on success shows the new workspace URL
-- **Post-creation checklist**: static reminder of the 5 manual onboarding steps
+- **Create Company + Admin form**: two-section form — Company Details (name + auto-slug) + SUPERADMIN Account (name, email, password with show/hide). Single submit calls the `create-tenant` Edge Function. On success shows a dismissable credential card (workspace URL, email, password with copy buttons — shown once only).
+- **Post-creation checklist**: 2-step reminder (CORS entry + send credentials)
 
 ### Files
 | File | Purpose |
@@ -424,9 +428,16 @@ The platform owner (Parakh) manages all tenant companies at `optimustesting.com`
 | `frontend/src/pages/PlatformAdmin/PlatformLogin.tsx` | Password gate page |
 | `frontend/src/pages/PlatformAdmin/PlatformDashboard.tsx` | Main admin panel |
 | `frontend/src/pages/PlatformAdmin/index.ts` | Barrel export |
+| `supabase/functions/create-tenant/index.ts` | Platform Edge Function — atomic company + SUPERADMIN creation |
 
-### Environment variable
+### Environment variables
 `VITE_PLATFORM_ADMIN_PASSWORD` — set in `frontend/.env` and in Vercel → Environment Variables → Production (scope: Production only is recommended so preview deployments don't expose the panel).
+
+`VITE_PLATFORM_ADMIN_TOKEN` — must exactly match the `PLATFORM_ADMIN_TOKEN` Supabase secret. Set both together:
+```
+supabase secrets set PLATFORM_ADMIN_TOKEN=<strong-random-value>
+# then set VITE_PLATFORM_ADMIN_TOKEN=<same-value> in Vercel → Env Vars → Production
+```
 
 ### RLS notes
 - `companies` SELECT: already `USING (TRUE)` (all roles including anon can read — needed by `CompanyContext`)
@@ -458,3 +469,4 @@ The platform owner (Parakh) manages all tenant companies at `optimustesting.com`
 15. **PDF + Excel exports share section rendering logic.** `frontend/src/lib/testSectionTables.tsx` (`SectionTable` component) and `frontend/src/lib/projectExcelExport.ts` (`renderSection` function) MUST stay in lock-step — both consume the same v2 template schema and the same payload key convention from `TestFormV2`. Change one, change the other.
 16. **Company-scoped login guard in `AuthContext`** — after session resolves, `fetchUserRole` fetches `profiles.company_id` and compares it against the subdomain's `company.id` from `CompanyContext`. If they differ and `company !== null` (i.e. not localhost/dev), the session is immediately signed out and `companyMismatch = true` is set before any role data is exposed. `Auth.tsx` shows a "Wrong workspace" message; `ProtectedRoute` redirects to `/auth?error=wrong_company`. On localhost `company` is null so the check is skipped entirely — dev mode is unaffected.
 16. **Demo tenants `companya` / `companyb` / `companyc`** are seeded by migration `20260429000001` with admins `admin@companya.com` / `admin@companyb.com` / `admin@companyc.com`. Demo passwords live in the migration file (rotate via User Management before exposing to a real prospect).
+17. **`PLATFORM_ADMIN_TOKEN` must match exactly** between the `VITE_PLATFORM_ADMIN_TOKEN` Vercel env var and the `PLATFORM_ADMIN_TOKEN` Supabase secret — any mismatch causes 401 on all `create-tenant` calls. Set both from the same value at the same time.
