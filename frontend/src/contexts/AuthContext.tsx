@@ -2,12 +2,14 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   userRole: string | null;
   loading: boolean;
+  companyMismatch: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<{ error: any }>;
@@ -21,7 +23,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [companyMismatch, setCompanyMismatch] = useState(false);
   const navigate = useNavigate();
+  const { company } = useCompany();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -59,13 +63,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserRole = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .single();
+      const [roleResult, profileResult] = await Promise.all([
+        supabase.from('user_roles').select('role').eq('user_id', userId).single(),
+        supabase.from('profiles').select('company_id').eq('id', userId).single(),
+      ]);
 
-      setUserRole(data && !error ? data.role : null);
+      const userCompanyId = profileResult.data?.company_id ?? null;
+
+      // Company-scoped login guard: if a subdomain company is resolved (not localhost/dev)
+      // and the user's profile company_id does not match, reject the session immediately.
+      if (company !== null && userCompanyId !== company.id) {
+        console.error('[AuthContext] Company mismatch — user does not belong to this workspace. Signing out.');
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
+        setUserRole(null);
+        setCompanyMismatch(true);
+        navigate('/auth?error=wrong_company');
+        return;
+      }
+
+      setUserRole(roleResult.data && !roleResult.error ? roleResult.data.role : null);
     } catch {
       setUserRole(null);
     } finally {
@@ -97,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, signIn, signOut, resetPasswordForEmail, updatePassword }}>
+    <AuthContext.Provider value={{ user, session, userRole, loading, companyMismatch, signIn, signOut, resetPasswordForEmail, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

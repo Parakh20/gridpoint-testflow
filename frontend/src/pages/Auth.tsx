@@ -33,7 +33,7 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn, resetPasswordForEmail, updatePassword } = useAuth();
+  const { signIn, resetPasswordForEmail, updatePassword, companyMismatch } = useAuth();
   const { company } = useCompany();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -211,6 +211,22 @@ export default function Auth() {
             </div>
 
             <div className="rounded-2xl border border-border bg-card/80 p-8 shadow-2xl backdrop-blur-xl">
+              {companyMismatch ? (
+                <div className="flex flex-col items-center gap-4 py-4 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+                    <ShieldCheck className="h-6 w-6 text-destructive" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Wrong workspace</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      This account does not belong to this workspace.
+                      <br />
+                      Please visit your company's login page.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+              <>
               <div className="mb-6">
                 {company ? (
                   <>
@@ -307,6 +323,8 @@ export default function Auth() {
                 <ShieldCheck className="h-3.5 w-3.5" />
                 <span>Encrypted in transit · tenant-isolated by RLS</span>
               </div>
+              </>
+              )}
             </div>
 
             <p className="mt-6 text-center text-xs text-muted-foreground">

@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { user, userRole, loading } = useAuth();
+  const { user, userRole, loading, companyMismatch } = useAuth();
 
   if (loading) {
     return (
@@ -17,6 +17,10 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (companyMismatch) {
+    return <Navigate to="/auth?error=wrong_company" replace />;
   }
 
   if (!user) {
