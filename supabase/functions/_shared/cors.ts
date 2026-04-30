@@ -8,11 +8,13 @@ const ALLOWED_ORIGINS = [
 ];
 
 export function buildCorsHeaders(origin: string | null): Record<string, string> {
-  const allowed = origin && (ALLOWED_ORIGINS.includes(origin) || /\.optimustesting\.com$/.test(new URL(origin).hostname))
-    ? origin
-    : ALLOWED_ORIGINS[0];
+  const isAllowed = origin && (
+    ALLOWED_ORIGINS.includes(origin) ||
+    /^https:\/\/[a-z0-9-]+\.optimustesting\.com$/.test(origin)
+  );
+  const allowOrigin = isAllowed ? origin : ALLOWED_ORIGINS[0];
   return {
-    'Access-Control-Allow-Origin': allowed,
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-platform-token',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Vary': 'Origin',
