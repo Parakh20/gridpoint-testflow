@@ -1,46 +1,57 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 
-Deno.serve(async (req) => {
-  const cors = buildCorsHeaders(req.headers.get('Origin'));
+serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req.headers.get('Origin'));
 
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: cors });
+    return new Response('ok', { headers: corsHeaders });
   }
 
-  const json = (body: unknown, status = 200) =>
+  const respond = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { ...cors, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
+  // Auth check
+  const token = req.headers.get('X-Platform-Token');
+  const expected = Deno.env.get('PLATFORM_ADMIN_TOKEN');
+  if (!token || token !== expected) {
+    return respond({ error: 'Unauthorized' }, 401);
+  }
+
+  // Service role client — bypasses RLS
+  const adminClient = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+
+  let action: string;
+  let payload: Record<string, unknown> | undefined;
+
   try {
-    // Validate platform token
-    const platformToken = req.headers.get('X-Platform-Token');
-    const expectedToken = Deno.env.get('PLATFORM_ADMIN_TOKEN');
-    if (!platformToken || !expectedToken || platformToken !== expectedToken) {
-      return json({ error: 'Unauthorized' }, 401);
-    }
+    const body = await req.json();
+    action = body.action;
+    payload = body.payload;
+  } catch {
+    return respond({ error: 'Invalid JSON body' }, 400);
+  }
 
-    const { action, payload } = await req.json();
-    if (!action) return json({ error: 'action is required' }, 400);
+  if (!action) return respond({ error: 'action is required' }, 400);
 
-    const adminClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
+  try {
     if (action === 'get_stats') {
-      const [companiesRes, usersRes, projectsRes] = await Promise.all([
-        adminClient.from('companies').select('id', { count: 'exact', head: true }),
-        adminClient.from('profiles').select('id', { count: 'exact', head: true }),
-        adminClient.from('projects').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+      const [companies, users, projects] = await Promise.all([
+        adminClient.from('companies').select('*', { count: 'exact', head: true }),
+        adminClient.from('profiles').select('*', { count: 'exact', head: true }),
+        adminClient.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
       ]);
-
-      return json({
-        total_companies: companiesRes.count ?? 0,
-        total_users: usersRes.count ?? 0,
-        active_projects: projectsRes.count ?? 0,
+      return respond({
+        total_companies: companies.count ?? 0,
+        total_users: users.count ?? 0,
+        active_projects: projects.count ?? 0,
       });
     }
 
@@ -49,14 +60,13 @@ Deno.serve(async (req) => {
         .from('companies')
         .select('id, name, slug, created_at')
         .order('created_at', { ascending: false });
-
-      if (error) return json({ error: error.message }, 500);
-      return json(data ?? []);
+      if (error) throw error;
+      return respond({ companies: data ?? [] });
     }
 
     if (action === 'get_company_detail') {
-      const company_id = payload?.company_id;
-      if (!company_id) return json({ error: 'payload.company_id is required' }, 400);
+      const company_id = payload?.company_id as string | undefined;
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
 
       const [profilesRes, rolesRes, projectsRes] = await Promise.all([
         adminClient
@@ -74,8 +84,8 @@ Deno.serve(async (req) => {
           .order('created_at', { ascending: false }),
       ]);
 
-      if (profilesRes.error) return json({ error: profilesRes.error.message }, 500);
-      if (projectsRes.error) return json({ error: projectsRes.error.message }, 500);
+      if (profilesRes.error) throw profilesRes.error;
+      if (projectsRes.error) throw projectsRes.error;
 
       const roleMap = new Map(
         (rolesRes.data ?? []).map((r: { user_id: string; role: string }) => [r.user_id, r.role])
@@ -88,12 +98,12 @@ Deno.serve(async (req) => {
         role: roleMap.get(p.id) ?? 'UNASSIGNED',
       }));
 
-      return json({ users, projects: projectsRes.data ?? [] });
+      return respond({ users, projects: projectsRes.data ?? [] });
     }
 
-    return json({ error: `Unknown action: ${action}` }, 400);
+    return respond({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return json({ error: message }, 500);
+    return respond({ error: message }, 500);
   }
 });

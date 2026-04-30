@@ -141,9 +141,11 @@ function CopyButton({ text }: { text: string }) {
 
 // ─── Secure platform data fetcher ────────────────────────────────────────────
 const platformFetch = async (action: string, payload?: object) => {
+  const token = import.meta.env.VITE_PLATFORM_ADMIN_TOKEN;
+  if (!token) throw new Error('VITE_PLATFORM_ADMIN_TOKEN is not configured');
   const { data, error } = await supabase.functions.invoke('platform-admin-data', {
     body: { action, payload },
-    headers: { 'X-Platform-Token': import.meta.env.VITE_PLATFORM_ADMIN_TOKEN ?? '' },
+    headers: { 'X-Platform-Token': token },
   });
   if (error) throw error;
   return data;
@@ -153,6 +155,7 @@ export default function PlatformDashboard() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [stats, setStats] = useState<Stats>({ companies: 0, users: 0, activeProjects: 0 });
   const [loadingData, setLoadingData] = useState(true);
+  const tokenMissing = !import.meta.env.VITE_PLATFORM_ADMIN_TOKEN;
 
   // Expandable row state
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -180,6 +183,11 @@ export default function PlatformDashboard() {
       navigate('/', { replace: true });
       return;
     }
+    if (!import.meta.env.VITE_PLATFORM_ADMIN_TOKEN) {
+      console.error('[PlatformDashboard] VITE_PLATFORM_ADMIN_TOKEN is not set — data fetching skipped');
+      setLoadingData(false);
+      return;
+    }
     fetchAll();
   }, [navigate]);
 
@@ -195,7 +203,7 @@ export default function PlatformDashboard() {
         users: statsData.total_users ?? 0,
         activeProjects: statsData.active_projects ?? 0,
       });
-      setCompanies(companiesData ?? []);
+      setCompanies(companiesData?.companies ?? []);
     } catch (err: any) {
       console.error('[PlatformDashboard] fetch error:', err);
       toast({ variant: 'destructive', title: 'Failed to load data', description: err.message });
@@ -216,8 +224,12 @@ export default function PlatformDashboard() {
 
     setLoadingDetailId(company.id);
     try {
-      const detail = await platformFetch('get_company_detail', { company_id: company.id });
-      detailCache.current.set(company.id, detail as CompanyDetail);
+      const raw = await platformFetch('get_company_detail', { company_id: company.id });
+      const detail: CompanyDetail = {
+        users: Array.isArray(raw?.users) ? raw.users : [],
+        projects: Array.isArray(raw?.projects) ? raw.projects : [],
+      };
+      detailCache.current.set(company.id, detail);
     } catch (err: any) {
       console.error('[PlatformDashboard] detail fetch error:', err);
       toast({ variant: 'destructive', title: 'Failed to load company details', description: err.message });
@@ -351,6 +363,19 @@ export default function PlatformDashboard() {
       </header>
 
       <main className="relative z-10 mx-auto max-w-7xl px-6 py-8 space-y-8">
+
+        {/* Env configuration banner */}
+        {tokenMissing && (
+          <div className="flex items-start gap-3 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold">VITE_PLATFORM_ADMIN_TOKEN is not configured</p>
+              <p className="mt-0.5 text-xs text-yellow-400/80">
+                Add it to <code className="font-mono">frontend/.env</code> (local) and Vercel → Environment Variables → Production, then redeploy. Stats and company data will show zeros until this is set.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Stats bar */}
         <div className="grid grid-cols-3 gap-4">
@@ -506,9 +531,9 @@ export default function PlatformDashboard() {
                                     {/* Users sub-table */}
                                     <div>
                                       <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                                        <Users className="h-3 w-3" /> Users ({detail.users.length})
+                                        <Users className="h-3 w-3" /> Users ({(detail.users ?? []).length})
                                       </p>
-                                      {detail.users.length === 0 ? (
+                                      {(detail.users ?? []).length === 0 ? (
                                         <p className="text-xs text-muted-foreground italic">No users yet</p>
                                       ) : (
                                         <table className="w-full text-xs">
@@ -520,7 +545,7 @@ export default function PlatformDashboard() {
                                             </tr>
                                           </thead>
                                           <tbody>
-                                            {detail.users.map(u => (
+                                            {(detail.users ?? []).map(u => (
                                               <tr key={u.id} className="border-b border-border/50 last:border-0">
                                                 <td className="py-1.5 text-foreground">{u.full_name || '—'}</td>
                                                 <td className="py-1.5 text-muted-foreground font-mono">{u.email}</td>
@@ -535,9 +560,9 @@ export default function PlatformDashboard() {
                                     {/* Projects sub-table */}
                                     <div>
                                       <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                                        <Activity className="h-3 w-3" /> Projects ({detail.projects.length})
+                                        <Activity className="h-3 w-3" /> Projects ({(detail.projects ?? []).length})
                                       </p>
-                                      {detail.projects.length === 0 ? (
+                                      {(detail.projects ?? []).length === 0 ? (
                                         <p className="text-xs text-muted-foreground italic">No projects yet</p>
                                       ) : (
                                         <table className="w-full text-xs">
@@ -550,7 +575,7 @@ export default function PlatformDashboard() {
                                             </tr>
                                           </thead>
                                           <tbody>
-                                            {detail.projects.map(p => (
+                                            {(detail.projects ?? []).map(p => (
                                               <tr key={p.id} className="border-b border-border/50 last:border-0">
                                                 <td className="py-1.5 font-mono text-foreground">{p.project_number}</td>
                                                 <td className="py-1.5 text-foreground">{p.site_name}</td>
