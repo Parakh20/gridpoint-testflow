@@ -140,7 +140,7 @@ BEGIN
         v_user_id,
         'authenticated', 'authenticated',
         v_email,
-        crypt(v_pass, gen_salt('bf')),
+        extensions.crypt(v_pass, extensions.gen_salt('bf')),
         NOW(), NOW(), NOW(),
         '{"provider":"email","providers":["email"]}'::jsonb,
         jsonb_build_object('name', v_company.name || ' Admin'),
