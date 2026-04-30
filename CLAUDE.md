@@ -395,6 +395,45 @@ All functions share CORS headers from `supabase/functions/_shared/cors.ts`.
 
 ---
 
+## Platform Admin Panel
+
+The platform owner (Parakh) manages all tenant companies at `optimustesting.com` (root domain).
+
+### How it works
+- `App.tsx` checks `window.location.hostname` at startup. If it matches `optimustesting.com` or `www.optimustesting.com`, the normal tenant router (CompanyProvider + AuthProvider + tenant routes) is **not rendered**. Instead a minimal 2-route platform router is rendered.
+- **No Supabase Auth involved.** The panel is gated purely by a hardcoded platform password stored in `VITE_PLATFORM_ADMIN_PASSWORD`. On success, `sessionStorage.setItem('platform_authed', 'true')` is set and the user is navigated to `/admin`.
+- Each page checks `sessionStorage.getItem('platform_authed')` on mount; mismatches redirect to `/`.
+- The panel uses the standard anon Supabase client (`@/integrations/supabase/client`).
+
+### Routes (root domain only)
+| Path | Component | Description |
+|---|---|---|
+| `/` | `PlatformLogin` | Password entry screen |
+| `/admin` | `PlatformDashboard` | Full admin panel |
+| `*` | Redirect → `/` | Catch-all |
+
+### Features
+- **Stats bar**: total companies, total users (profiles), active projects
+- **Companies table**: name, slug, workspace URL, created date; Open ↗ and Delete actions
+- **Add Company form**: name + auto-generated slug (editable); on success shows the new workspace URL
+- **Post-creation checklist**: static reminder of the 5 manual onboarding steps
+
+### Files
+| File | Purpose |
+|---|---|
+| `frontend/src/pages/PlatformAdmin/PlatformLogin.tsx` | Password gate page |
+| `frontend/src/pages/PlatformAdmin/PlatformDashboard.tsx` | Main admin panel |
+| `frontend/src/pages/PlatformAdmin/index.ts` | Barrel export |
+
+### Environment variable
+`VITE_PLATFORM_ADMIN_PASSWORD` — set in `frontend/.env` and in Vercel → Environment Variables → Production (scope: Production only is recommended so preview deployments don't expose the panel).
+
+### RLS notes
+- `companies` SELECT: already `USING (TRUE)` (all roles including anon can read — needed by `CompanyContext`)
+- `companies` INSERT / DELETE for anon: added in migration `20260430000002` — allows the platform admin panel to create/remove companies using the anon key. The `companies` table holds only metadata (id, name, slug); actual sensitive data is in other tables protected by separate RLS policies. FK constraints prevent deleting a company that still has associated profiles or projects.
+
+---
+
 ## Common Gotchas
 
 1. **`AuthContext` uses `setTimeout(..., 0)`** to defer role fetching — avoids Supabase deadlock inside `onAuthStateChange`. Do not remove.
