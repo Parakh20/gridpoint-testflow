@@ -25,6 +25,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
   Loader2,
@@ -44,6 +53,8 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  KeyRound,
+  LogIn,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -87,6 +98,21 @@ interface CreatedTenant {
   adminEmail: string;
   password: string;
   slug: string;
+}
+
+interface GlobalUser {
+  id: string;
+  full_name: string;
+  email: string;
+  company_id: string | null;
+  company_name: string | null;
+  company_slug: string | null;
+  role: string;
+}
+
+interface ResetLinkInfo {
+  email: string;
+  link: string;
 }
 
 const ONBOARDING_STEPS = [
@@ -174,6 +200,20 @@ export default function PlatformDashboard() {
 
   // Success card — shown once after creation
   const [createdTenant, setCreatedTenant] = useState<CreatedTenant | null>(null);
+
+  // All Users tab
+  const [activeTab, setActiveTab] = useState('companies');
+  const [allUsers, setAllUsers] = useState<GlobalUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const usersLoaded = useRef(false);
+
+  // Reset password dialog
+  const [resetLinkInfo, setResetLinkInfo] = useState<ResetLinkInfo | null>(null);
+  const [resettingEmail, setResettingEmail] = useState<string | null>(null);
+
+  // Enter as Admin dialog
+  const [enterConfirmCompany, setEnterConfirmCompany] = useState<Company | null>(null);
+  const [enteringCompanyId, setEnteringCompanyId] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -331,6 +371,67 @@ export default function PlatformDashboard() {
     }
   };
 
+  const fetchAllUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const data = await platformFetch('get_all_users');
+      setAllUsers(Array.isArray(data?.users) ? data.users : []);
+      usersLoaded.current = true;
+    } catch (err: any) {
+      console.error('[PlatformDashboard] fetch users error:', err);
+      toast({ variant: 'destructive', title: 'Failed to load users', description: err.message });
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    if (tab === 'users' && !usersLoaded.current) {
+      fetchAllUsers();
+    }
+  };
+
+  const handleResetPassword = async (email: string) => {
+    setResettingEmail(email);
+    try {
+      const data = await platformFetch('reset_user_password', { email });
+      if (data?.error) throw new Error(data.message ?? data.error);
+      setResetLinkInfo({ email, link: data.link });
+      toast({ title: 'Reset link generated', description: `Password reset link created for ${email}` });
+    } catch (err: any) {
+      console.error('[PlatformDashboard] reset password error:', err);
+      toast({ variant: 'destructive', title: 'Failed to generate reset link', description: err.message });
+    } finally {
+      setResettingEmail(null);
+    }
+  };
+
+  const handleEnterAsAdmin = async (company: Company) => {
+    setEnteringCompanyId(company.id);
+    try {
+      const data = await platformFetch('get_company_magic_link', {
+        company_id: company.id,
+        slug: company.slug,
+      });
+      if (data?.error) {
+        const description = data.error === 'no_superadmin'
+          ? 'No SUPERADMIN found for this company. Create one using the Create Company + Admin form.'
+          : (data.message ?? data.error);
+        toast({ variant: 'destructive', title: 'Cannot enter workspace', description });
+        return;
+      }
+      window.open(data.magic_link, '_blank');
+      toast({ title: `Opening ${company.name} workspace…`, description: `Logged in as ${data.email}` });
+    } catch (err: any) {
+      console.error('[PlatformDashboard] enter as admin error:', err);
+      toast({ variant: 'destructive', title: 'Failed to enter workspace', description: err.message });
+    } finally {
+      setEnteringCompanyId(null);
+      setEnterConfirmCompany(null);
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem('platform_authed');
     navigate('/', { replace: true });
@@ -402,6 +503,18 @@ export default function PlatformDashboard() {
           ))}
         </div>
 
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="companies" className="gap-2">
+              <Building2 className="h-3.5 w-3.5" /> Companies
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-2">
+              <Users className="h-3.5 w-3.5" /> All Users
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ── Companies tab ─────────────────────────────────────────────── */}
+          <TabsContent value="companies">
         <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
 
           {/* Companies table */}
@@ -482,6 +595,15 @@ export default function PlatformDashboard() {
                                   <a href={workspaceUrl} target="_blank" rel="noopener noreferrer">
                                     Open <ExternalLink className="h-3 w-3" />
                                   </a>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+                                  onClick={() => setEnterConfirmCompany(company)}
+                                >
+                                  <LogIn className="h-3 w-3" />
+                                  Enter as Admin
                                 </Button>
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
@@ -813,6 +935,137 @@ export default function PlatformDashboard() {
 
           </div>
         </div>
+          </TabsContent>
+
+          {/* ── All Users tab ──────────────────────────────────────────────── */}
+          <TabsContent value="users">
+            <div className="rounded-xl border border-border bg-card/60 backdrop-blur overflow-hidden">
+              {loadingUsers ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : allUsers.length === 0 ? (
+                <div className="py-16 text-center text-sm text-muted-foreground">
+                  No users found.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead className="text-muted-foreground">Full Name</TableHead>
+                      <TableHead className="text-muted-foreground">Email</TableHead>
+                      <TableHead className="text-muted-foreground">Company</TableHead>
+                      <TableHead className="text-muted-foreground">Role</TableHead>
+                      <TableHead className="text-right text-muted-foreground">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allUsers.map(user => (
+                      <TableRow key={user.id} className="border-border">
+                        <TableCell className="font-medium text-foreground">
+                          {user.full_name || <span className="text-muted-foreground italic">—</span>}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{user.email}</TableCell>
+                        <TableCell>
+                          {user.company_slug ? (
+                            <a
+                              href={`https://${user.company_slug}.${BASE_DOMAIN}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              {user.company_name}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">No company</span>
+                          )}
+                        </TableCell>
+                        <TableCell><RoleBadge role={user.role} /></TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1.5 text-xs"
+                            disabled={resettingEmail === user.email}
+                            onClick={() => handleResetPassword(user.email)}
+                          >
+                            {resettingEmail === user.email
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <KeyRound className="h-3.5 w-3.5" />
+                            }
+                            Reset Password
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </TabsContent>
+
+        </Tabs>
+
+        {/* ── Reset Password link dialog ──────────────────────────────────── */}
+        <Dialog open={!!resetLinkInfo} onOpenChange={open => !open && setResetLinkInfo(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Password Reset Link</DialogTitle>
+              <DialogDescription>
+                Send this link to <span className="font-mono text-foreground">{resetLinkInfo?.email}</span>.
+                It is single-use and expires after 1 hour.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+              <span className="flex-1 break-all font-mono text-foreground">{resetLinkInfo?.link}</span>
+              {resetLinkInfo && <CopyButton text={resetLinkInfo.link} />}
+            </div>
+            <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>This link is shown once. Copy it before closing.</span>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setResetLinkInfo(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Enter as Admin confirmation dialog ─────────────────────────── */}
+        <Dialog open={!!enterConfirmCompany} onOpenChange={open => !open && !enteringCompanyId && setEnterConfirmCompany(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Enter {enterConfirmCompany?.name} Workspace?</DialogTitle>
+              <DialogDescription>
+                You are about to enter the <span className="font-semibold text-foreground">{enterConfirmCompany?.name}</span> workspace
+                as their SUPERADMIN. This will open the workspace in a new tab with a temporary session.
+                The session expires after 1 hour.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEnterConfirmCompany(null)}
+                disabled={!!enteringCompanyId}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-indigo-600 hover:bg-indigo-500 text-white gap-2"
+                disabled={!!enteringCompanyId}
+                onClick={() => enterConfirmCompany && handleEnterAsAdmin(enterConfirmCompany)}
+              >
+                {enteringCompanyId ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LogIn className="h-4 w-4" />
+                )}
+                {enteringCompanyId ? 'Opening…' : 'Enter Workspace →'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </main>
     </div>
   );

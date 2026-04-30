@@ -394,7 +394,7 @@ Only remaining manual step:
 | `delete-user` | Admin-only user deletion via `auth.admin.deleteUser()` — cascades to profile/roles |
 | `generate-report` | AI report generation via Anthropic API |
 | `create-tenant` | Platform-level: creates company + SUPERADMIN user atomically; guarded by `X-Platform-Token` header |
-| `platform-admin-data` | Platform-level: RLS-bypassing data proxy for the admin panel; actions: `get_stats`, `get_all_companies`, `get_company_detail`; guarded by `X-Platform-Token` |
+| `platform-admin-data` | Platform-level: RLS-bypassing data proxy for the admin panel; actions: `get_stats`, `get_all_companies`, `get_company_detail`, `get_all_users`, `reset_user_password`, `get_company_magic_link`; guarded by `X-Platform-Token` |
 
 All functions share CORS headers from `supabase/functions/_shared/cors.ts`.
 
