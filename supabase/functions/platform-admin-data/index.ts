@@ -214,10 +214,20 @@ serve(async (req) => {
 
         if (linkError) throw linkError;
 
+        // Supabase may override redirect_to with the configured Site URL when the
+        // subdomain is not in the Auth allowlist. Force the correct tenant subdomain
+        // by rewriting the redirect_to param directly on the verify URL.
+        const rawLink = linkData.properties.action_link;
+        const url = new URL(rawLink);
+        url.searchParams.set('redirect_to', `https://${slug}.optimustesting.com`);
+        const fixedLink = url.toString();
+
         console.log(`[PLATFORM ADMIN ACCESS] company_id=${company_id} slug=${slug} email=${email} at=${new Date().toISOString()}`);
+        console.log('Step 5: raw redirect_to =', new URL(rawLink).searchParams.get('redirect_to'));
+        console.log('Step 5: fixed link =', fixedLink);
 
         return respond({
-          magic_link: linkData.properties.action_link,
+          magic_link: fixedLink,
           email,
           slug,
         });
