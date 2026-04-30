@@ -394,6 +394,7 @@ Only remaining manual step:
 | `delete-user` | Admin-only user deletion via `auth.admin.deleteUser()` — cascades to profile/roles |
 | `generate-report` | AI report generation via Anthropic API |
 | `create-tenant` | Platform-level: creates company + SUPERADMIN user atomically; guarded by `X-Platform-Token` header |
+| `platform-admin-data` | Platform-level: RLS-bypassing data proxy for the admin panel; actions: `get_stats`, `get_all_companies`, `get_company_detail`; guarded by `X-Platform-Token` |
 
 All functions share CORS headers from `supabase/functions/_shared/cors.ts`.
 
@@ -469,4 +470,5 @@ supabase secrets set PLATFORM_ADMIN_TOKEN=<strong-random-value>
 15. **PDF + Excel exports share section rendering logic.** `frontend/src/lib/testSectionTables.tsx` (`SectionTable` component) and `frontend/src/lib/projectExcelExport.ts` (`renderSection` function) MUST stay in lock-step — both consume the same v2 template schema and the same payload key convention from `TestFormV2`. Change one, change the other.
 16. **Company-scoped login guard in `AuthContext`** — after session resolves, `fetchUserRole` fetches `profiles.company_id` and compares it against the subdomain's `company.id` from `CompanyContext`. If they differ and `company !== null` (i.e. not localhost/dev), the session is immediately signed out and `companyMismatch = true` is set before any role data is exposed. `Auth.tsx` shows a "Wrong workspace" message; `ProtectedRoute` redirects to `/auth?error=wrong_company`. On localhost `company` is null so the check is skipped entirely — dev mode is unaffected.
 16. **Demo tenants `companya` / `companyb` / `companyc`** are seeded by migration `20260429000001` with admins `admin@companya.com` / `admin@companyb.com` / `admin@companyc.com`. Demo passwords live in the migration file (rotate via User Management before exposing to a real prospect).
-17. **`PLATFORM_ADMIN_TOKEN` must match exactly** between the `VITE_PLATFORM_ADMIN_TOKEN` Vercel env var and the `PLATFORM_ADMIN_TOKEN` Supabase secret — any mismatch causes 401 on all `create-tenant` calls. Set both from the same value at the same time.
+17. **`PLATFORM_ADMIN_TOKEN` must match exactly** between the `VITE_PLATFORM_ADMIN_TOKEN` Vercel env var and the `PLATFORM_ADMIN_TOKEN` Supabase secret — any mismatch causes 401 on all `create-tenant` and `platform-admin-data` calls. Set both from the same value at the same time.
+18. **Platform admin data queries bypass RLS** via the `platform-admin-data` Edge Function using the service role key. The service role key lives only in the Edge Function's environment — it is never exposed to the browser. The browser only sends the `VITE_PLATFORM_ADMIN_TOKEN` to authenticate the call.

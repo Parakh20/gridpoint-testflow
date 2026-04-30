@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { StatusBadge } from '@/components/StatusBadge';
 import {
   Loader2,
   Zap,
@@ -41,7 +42,10 @@ import {
   Copy,
   Check,
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const BASE_DOMAIN = 'optimustesting.com';
 
@@ -58,6 +62,26 @@ interface Stats {
   activeProjects: number;
 }
 
+interface TenantUser {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+}
+
+interface TenantProject {
+  id: string;
+  project_number: string;
+  site_name: string;
+  status: string;
+  created_at: string;
+}
+
+interface CompanyDetail {
+  users: TenantUser[];
+  projects: TenantProject[];
+}
+
 interface CreatedTenant {
   workspaceUrl: string;
   adminEmail: string;
@@ -69,6 +93,24 @@ const ONBOARDING_STEPS = [
   `Add https://{slug}.${BASE_DOMAIN} to supabase/functions/_shared/cors.ts ALLOWED_ORIGINS → push to main (triggers CI deploy)`,
   'Send workspace URL + credentials to client',
 ];
+
+const ROLE_BADGE: Record<string, string> = {
+  SUPERADMIN: 'bg-red-500/15 text-red-400 border-red-500/30',
+  GM:         'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  SUPERVISOR: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
+  ENGINEER:   'bg-green-500/15 text-green-400 border-green-500/30',
+};
+
+function RoleBadge({ role }: { role: string }) {
+  return (
+    <span className={cn(
+      'inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide font-semibold',
+      ROLE_BADGE[role] ?? 'bg-muted text-muted-foreground border-border'
+    )}>
+      {role}
+    </span>
+  );
+}
 
 function generateSlug(name: string): string {
   return name
@@ -97,10 +139,25 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+// ─── Secure platform data fetcher ────────────────────────────────────────────
+const platformFetch = async (action: string, payload?: object) => {
+  const { data, error } = await supabase.functions.invoke('platform-admin-data', {
+    body: { action, payload },
+    headers: { 'X-Platform-Token': import.meta.env.VITE_PLATFORM_ADMIN_TOKEN ?? '' },
+  });
+  if (error) throw error;
+  return data;
+};
+
 export default function PlatformDashboard() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [stats, setStats] = useState<Stats>({ companies: 0, users: 0, activeProjects: 0 });
   const [loadingData, setLoadingData] = useState(true);
+
+  // Expandable row state
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
+  const detailCache = useRef<Map<string, CompanyDetail>>(new Map());
 
   // Form state
   const [companyName, setCompanyName] = useState('');
@@ -112,7 +169,7 @@ export default function PlatformDashboard() {
   const [showPassword, setShowPassword] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
 
-  // Success card state — shown once after creation
+  // Success card — shown once after creation
   const [createdTenant, setCreatedTenant] = useState<CreatedTenant | null>(null);
 
   const navigate = useNavigate();
@@ -129,24 +186,44 @@ export default function PlatformDashboard() {
   const fetchAll = async () => {
     setLoadingData(true);
     try {
-      const [companiesRes, usersRes, projectsRes] = await Promise.all([
-        supabase.from('companies').select('id, name, slug, created_at').order('created_at', { ascending: false }),
-        supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('projects').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+      const [statsData, companiesData] = await Promise.all([
+        platformFetch('get_stats'),
+        platformFetch('get_all_companies'),
       ]);
-
-      if (companiesRes.error) throw companiesRes.error;
-      setCompanies(companiesRes.data ?? []);
       setStats({
-        companies: companiesRes.data?.length ?? 0,
-        users: usersRes.count ?? 0,
-        activeProjects: projectsRes.count ?? 0,
+        companies: statsData.total_companies ?? 0,
+        users: statsData.total_users ?? 0,
+        activeProjects: statsData.active_projects ?? 0,
       });
+      setCompanies(companiesData ?? []);
     } catch (err: any) {
       console.error('[PlatformDashboard] fetch error:', err);
       toast({ variant: 'destructive', title: 'Failed to load data', description: err.message });
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  const handleToggleExpand = async (company: Company) => {
+    if (expandedId === company.id) {
+      setExpandedId(null);
+      return;
+    }
+
+    setExpandedId(company.id);
+
+    if (detailCache.current.has(company.id)) return;
+
+    setLoadingDetailId(company.id);
+    try {
+      const detail = await platformFetch('get_company_detail', { company_id: company.id });
+      detailCache.current.set(company.id, detail as CompanyDetail);
+    } catch (err: any) {
+      console.error('[PlatformDashboard] detail fetch error:', err);
+      toast({ variant: 'destructive', title: 'Failed to load company details', description: err.message });
+      setExpandedId(null);
+    } finally {
+      setLoadingDetailId(null);
     }
   };
 
@@ -212,6 +289,7 @@ export default function PlatformDashboard() {
       const workspaceUrl = `https://${slug}.${BASE_DOMAIN}`;
       setCreatedTenant({ workspaceUrl, adminEmail: adminEmail.trim(), password: adminPassword, slug: slug.trim() });
       resetForm();
+      detailCache.current.clear();
       await fetchAll();
     } catch (err: any) {
       console.error('[PlatformDashboard] create-tenant error:', err);
@@ -225,6 +303,8 @@ export default function PlatformDashboard() {
     try {
       const { error } = await supabase.from('companies').delete().eq('id', company.id);
       if (error) throw error;
+      detailCache.current.delete(company.id);
+      if (expandedId === company.id) setExpandedId(null);
       toast({ title: 'Company deleted', description: `${company.name} has been removed.` });
       await fetchAll();
     } catch (err: any) {
@@ -276,8 +356,8 @@ export default function PlatformDashboard() {
         <div className="grid grid-cols-3 gap-4">
           {[
             { icon: Building2, label: 'Total Companies', value: stats.companies },
-            { icon: Users, label: 'Total Users', value: stats.users },
-            { icon: Activity, label: 'Active Projects', value: stats.activeProjects },
+            { icon: Users,     label: 'Total Users',     value: stats.users },
+            { icon: Activity,  label: 'Active Projects', value: stats.activeProjects },
           ].map(({ icon: Icon, label, value }) => (
             <Card key={label} className="bg-card/60 backdrop-blur border-border">
               <CardContent className="flex items-center gap-4 p-5">
@@ -286,7 +366,9 @@ export default function PlatformDashboard() {
                 </div>
                 <div>
                   <p className="font-mono text-2xl font-semibold text-foreground leading-none">
-                    {loadingData ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : value}
+                    {loadingData
+                      ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      : value}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
                 </div>
@@ -313,6 +395,7 @@ export default function PlatformDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border hover:bg-transparent">
+                      <TableHead className="w-8" />
                       <TableHead className="text-muted-foreground">Name</TableHead>
                       <TableHead className="text-muted-foreground">Slug</TableHead>
                       <TableHead className="text-muted-foreground">Workspace URL</TableHead>
@@ -323,75 +406,173 @@ export default function PlatformDashboard() {
                   <TableBody>
                     {companies.map(company => {
                       const workspaceUrl = `https://${company.slug}.${BASE_DOMAIN}`;
+                      const isExpanded = expandedId === company.id;
+                      const isLoadingDetail = loadingDetailId === company.id;
+                      const detail = detailCache.current.get(company.id);
+
                       return (
-                        <TableRow key={company.id} className="border-border">
-                          <TableCell className="font-medium text-foreground">{company.name}</TableCell>
-                          <TableCell>
-                            <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                              {company.slug}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <a
-                              href={workspaceUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-xs text-primary hover:underline"
-                            >
-                              {workspaceUrl}
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {new Date(company.created_at).toLocaleDateString('en-GB', {
-                              day: '2-digit', month: 'short', year: 'numeric',
-                            })}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 gap-1.5 text-xs"
-                                asChild
+                        <>
+                          <TableRow key={company.id} className="border-border">
+                            {/* Expand toggle */}
+                            <TableCell className="pl-3 pr-0">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleExpand(company)}
+                                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                aria-label={isExpanded ? 'Collapse' : 'Expand'}
                               >
-                                <a href={workspaceUrl} target="_blank" rel="noopener noreferrer">
-                                  Open <ExternalLink className="h-3 w-3" />
-                                </a>
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete {company.name}?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This permanently removes the company record. All associated users and
-                                      projects must be deleted first — otherwise this will fail with a
-                                      foreign key error.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDelete(company)}
-                                      className="bg-destructive hover:bg-destructive/90"
+                                {isLoadingDetail
+                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  : isExpanded
+                                    ? <ChevronDown className="h-3.5 w-3.5" />
+                                    : <ChevronRight className="h-3.5 w-3.5" />
+                                }
+                              </button>
+                            </TableCell>
+                            <TableCell className="font-medium text-foreground">{company.name}</TableCell>
+                            <TableCell>
+                              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                {company.slug}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <a
+                                href={workspaceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-primary hover:underline"
+                              >
+                                {workspaceUrl}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {new Date(company.created_at).toLocaleDateString('en-GB', {
+                                day: '2-digit', month: 'short', year: 'numeric',
+                              })}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" asChild>
+                                  <a href={workspaceUrl} target="_blank" rel="noopener noreferrer">
+                                    Open <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                                     >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete {company.name}?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This permanently removes the company record. All associated users
+                                        and projects must be deleted first — otherwise this will fail with
+                                        a foreign key error.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDelete(company)}
+                                        className="bg-destructive hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+
+                          {/* Expanded detail row */}
+                          {isExpanded && (
+                            <TableRow key={`${company.id}-detail`} className="border-border bg-muted/20 hover:bg-muted/20">
+                              <TableCell colSpan={6} className="p-0">
+                                {isLoadingDetail || !detail ? (
+                                  <div className="flex items-center justify-center py-8">
+                                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                  </div>
+                                ) : (
+                                  <div className="px-8 py-4 space-y-5">
+
+                                    {/* Users sub-table */}
+                                    <div>
+                                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                                        <Users className="h-3 w-3" /> Users ({detail.users.length})
+                                      </p>
+                                      {detail.users.length === 0 ? (
+                                        <p className="text-xs text-muted-foreground italic">No users yet</p>
+                                      ) : (
+                                        <table className="w-full text-xs">
+                                          <thead>
+                                            <tr className="border-b border-border text-muted-foreground">
+                                              <th className="pb-1.5 text-left font-medium">Full Name</th>
+                                              <th className="pb-1.5 text-left font-medium">Email</th>
+                                              <th className="pb-1.5 text-left font-medium">Role</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {detail.users.map(u => (
+                                              <tr key={u.id} className="border-b border-border/50 last:border-0">
+                                                <td className="py-1.5 text-foreground">{u.full_name || '—'}</td>
+                                                <td className="py-1.5 text-muted-foreground font-mono">{u.email}</td>
+                                                <td className="py-1.5"><RoleBadge role={u.role} /></td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      )}
+                                    </div>
+
+                                    {/* Projects sub-table */}
+                                    <div>
+                                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                                        <Activity className="h-3 w-3" /> Projects ({detail.projects.length})
+                                      </p>
+                                      {detail.projects.length === 0 ? (
+                                        <p className="text-xs text-muted-foreground italic">No projects yet</p>
+                                      ) : (
+                                        <table className="w-full text-xs">
+                                          <thead>
+                                            <tr className="border-b border-border text-muted-foreground">
+                                              <th className="pb-1.5 text-left font-medium">Project #</th>
+                                              <th className="pb-1.5 text-left font-medium">Site Name</th>
+                                              <th className="pb-1.5 text-left font-medium">Status</th>
+                                              <th className="pb-1.5 text-left font-medium">Created</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {detail.projects.map(p => (
+                                              <tr key={p.id} className="border-b border-border/50 last:border-0">
+                                                <td className="py-1.5 font-mono text-foreground">{p.project_number}</td>
+                                                <td className="py-1.5 text-foreground">{p.site_name}</td>
+                                                <td className="py-1.5"><StatusBadge status={p.status} /></td>
+                                                <td className="py-1.5 text-muted-foreground">
+                                                  {new Date(p.created_at).toLocaleDateString('en-GB', {
+                                                    day: '2-digit', month: 'short', year: 'numeric',
+                                                  })}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      )}
+                                    </div>
+
+                                  </div>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
                       );
                     })}
                   </TableBody>
