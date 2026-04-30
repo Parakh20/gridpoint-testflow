@@ -170,49 +170,65 @@ serve(async (req) => {
         return respond({ error: 'payload.company_id and payload.slug are required' }, 400);
       }
 
-      // Find SUPERADMIN for this company
-      const { data: roleData, error: roleError } = await adminClient
-        .from('user_roles')
-        .select('user_id, profiles(email)')
-        .eq('company_id', company_id)
-        .eq('role', 'SUPERADMIN')
-        .limit(1)
-        .maybeSingle();
+      try {
+        console.log('Step 1: finding SUPERADMIN for', company_id);
 
-      if (roleError) throw roleError;
-      if (!roleData) {
+        const { data: roleData, error: roleError } = await adminClient
+          .from('user_roles')
+          .select('user_id')
+          .eq('company_id', company_id)
+          .eq('role', 'SUPERADMIN')
+          .limit(1)
+          .single();
+
+        console.log('Step 2: roleData =', JSON.stringify(roleData));
+
+        if (roleError || !roleData) {
+          return respond({
+            error: 'no_superadmin',
+            message: 'No SUPERADMIN found for this company. Create one first via the Create Company + Admin form.',
+          }, 404);
+        }
+
+        const { data: profileData, error: profileError } = await adminClient
+          .from('profiles')
+          .select('email')
+          .eq('id', roleData.user_id)
+          .single();
+
+        if (profileError || !profileData?.email) {
+          return respond({ error: 'Could not resolve SUPERADMIN email' }, 500);
+        }
+
+        const email = profileData.email;
+        console.log('Step 3: email =', email);
+        console.log('Step 4: generating magic link for', email);
+
+        const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+          type: 'magiclink',
+          email,
+          options: {
+            redirectTo: `https://${slug}.optimustesting.com`,
+          },
+        });
+
+        if (linkError) throw linkError;
+
+        console.log(`[PLATFORM ADMIN ACCESS] company_id=${company_id} slug=${slug} email=${email} at=${new Date().toISOString()}`);
+
         return respond({
-          error: 'no_superadmin',
-          message: 'No SUPERADMIN found for this company. Create one first via the Create Company + Admin form.',
-        }, 404);
+          magic_link: linkData.properties.action_link,
+          email,
+          slug,
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('get_company_magic_link error:', message, err);
+        return new Response(
+          JSON.stringify({ error: message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
-
-      const adminEmail = (roleData.profiles as unknown as { email: string })?.email;
-      if (!adminEmail) {
-        return respond({ error: 'Could not resolve SUPERADMIN email' }, 500);
-      }
-
-      // Generate magic link — redirects to the tenant workspace
-      const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-        type: 'magiclink',
-        email: adminEmail,
-        options: {
-          redirectTo: `https://${slug}.optimustesting.com`,
-        },
-      });
-
-      if (linkError) return respond({ error: linkError.message }, 500);
-
-      // Audit trail in Edge Function logs
-      console.log(
-        `[PLATFORM ADMIN ACCESS] company_id=${company_id} slug=${slug} email=${adminEmail} at=${new Date().toISOString()}`
-      );
-
-      return respond({
-        magic_link: linkData.properties.action_link,
-        email: adminEmail,
-        slug,
-      });
     }
 
     return respond({ error: `Unknown action: ${action}` }, 400);

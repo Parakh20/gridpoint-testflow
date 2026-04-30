@@ -70,9 +70,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const userCompanyId = profileResult.data?.company_id ?? null;
 
+      // When a magic link is being processed, the session may not yet be fully
+      // established. Give Supabase a moment to complete the token exchange before
+      // running the mismatch check, so the correct user is evaluated.
+      const isMagicLinkCallback =
+        window.location.hash.includes('access_token') ||
+        window.location.search.includes('token_hash');
+      if (isMagicLinkCallback) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
       // Company-scoped login guard: if a subdomain company is resolved (not localhost/dev)
       // and the user's profile company_id does not match, reject the session immediately.
-      if (company !== null && userCompanyId !== company.id) {
+      // Skip the check when userCompanyId is null — that user has no company yet and is
+      // handled by the "role pending" flow rather than a mismatch rejection.
+      if (company !== null && userCompanyId !== null && userCompanyId !== company.id) {
         console.error('[AuthContext] Company mismatch — user does not belong to this workspace. Signing out.');
         await supabase.auth.signOut();
         setUser(null);
