@@ -115,8 +115,14 @@ interface ResetLinkInfo {
   link: string;
 }
 
+interface MagicLinkInfo {
+  email: string;
+  link: string;
+  companyName: string;
+  slug: string;
+}
+
 const ONBOARDING_STEPS = [
-  `Add https://{slug}.${BASE_DOMAIN} to supabase/functions/_shared/cors.ts ALLOWED_ORIGINS → push to main (triggers CI deploy)`,
   'Send workspace URL + credentials to client',
 ];
 
@@ -214,6 +220,7 @@ export default function PlatformDashboard() {
   // Enter as Admin dialog
   const [enterConfirmCompany, setEnterConfirmCompany] = useState<Company | null>(null);
   const [enteringCompanyId, setEnteringCompanyId] = useState<string | null>(null);
+  const [magicLinkInfo, setMagicLinkInfo] = useState<MagicLinkInfo | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -421,8 +428,12 @@ export default function PlatformDashboard() {
         toast({ variant: 'destructive', title: 'Cannot enter workspace', description });
         return;
       }
-      window.open(data.magic_link, '_blank');
-      toast({ title: `Opening ${company.name} workspace…`, description: `Logged in as ${data.email}` });
+      setMagicLinkInfo({
+        email: data.email,
+        link: data.magic_link,
+        companyName: company.name,
+        slug: company.slug,
+      });
     } catch (err: any) {
       console.error('[PlatformDashboard] enter as admin error:', err);
       toast({ variant: 'destructive', title: 'Failed to enter workspace', description: err.message });
@@ -1037,9 +1048,9 @@ export default function PlatformDashboard() {
             <DialogHeader>
               <DialogTitle>Enter {enterConfirmCompany?.name} Workspace?</DialogTitle>
               <DialogDescription>
-                You are about to enter the <span className="font-semibold text-foreground">{enterConfirmCompany?.name}</span> workspace
-                as their SUPERADMIN. This will open the workspace in a new tab with a temporary session.
-                The session expires after 1 hour.
+                This generates a one-time magic login link for the SUPERADMIN of{' '}
+                <span className="font-semibold text-foreground">{enterConfirmCompany?.name}</span>.
+                The link expires after 1 hour.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -1060,7 +1071,57 @@ export default function PlatformDashboard() {
                 ) : (
                   <LogIn className="h-4 w-4" />
                 )}
-                {enteringCompanyId ? 'Opening…' : 'Enter Workspace →'}
+                {enteringCompanyId ? 'Generating link…' : 'Generate Login Link →'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Magic link result dialog ────────────────────────────────────── */}
+        <Dialog open={!!magicLinkInfo} onOpenChange={open => !open && setMagicLinkInfo(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <LogIn className="h-4 w-4 text-indigo-400" />
+                Login Link — {magicLinkInfo?.companyName}
+              </DialogTitle>
+              <DialogDescription>
+                One-time magic link for{' '}
+                <span className="font-mono text-foreground">{magicLinkInfo?.email}</span>.
+                Copy it and open in a new tab, or click Open below.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs">
+                <span className="flex-1 break-all font-mono text-foreground leading-relaxed">
+                  {magicLinkInfo?.link}
+                </span>
+                {magicLinkInfo && <CopyButton text={magicLinkInfo.link} />}
+              </div>
+
+              <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>
+                  Single-use, expires in 1 hour. After clicking, you will land on the{' '}
+                  <span className="font-mono">{magicLinkInfo?.slug}.optimustesting.com</span> workspace.
+                </span>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" size="sm" onClick={() => setMagicLinkInfo(null)}>
+                Close
+              </Button>
+              <Button
+                size="sm"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white gap-2"
+                onClick={() => {
+                  if (magicLinkInfo) window.open(magicLinkInfo.link, '_blank');
+                }}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open in New Tab
               </Button>
             </DialogFooter>
           </DialogContent>

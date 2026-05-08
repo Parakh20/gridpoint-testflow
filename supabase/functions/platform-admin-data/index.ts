@@ -71,14 +71,10 @@ serve(async (req) => {
       const company_id = payload?.company_id as string | undefined;
       if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
 
-      const [profilesRes, rolesRes, projectsRes] = await Promise.all([
+      const [profilesRes, projectsRes] = await Promise.all([
         adminClient
           .from('profiles')
           .select('id, name, email')
-          .eq('company_id', company_id),
-        adminClient
-          .from('user_roles')
-          .select('user_id, role')
           .eq('company_id', company_id),
         adminClient
           .from('projects')
@@ -90,9 +86,28 @@ serve(async (req) => {
       if (profilesRes.error) throw profilesRes.error;
       if (projectsRes.error) throw projectsRes.error;
 
-      const roleMap = new Map(
-        (rolesRes.data ?? []).map((r: { user_id: string; role: string }) => [r.user_id, r.role])
-      );
+      const profileIds = (profilesRes.data ?? []).map((p: { id: string }) => p.id);
+
+      // Fetch roles: first by company_id, then fallback to user_id IN for older tenants
+      let rolesData: { user_id: string; role: string }[] = [];
+      if (profileIds.length > 0) {
+        const { data: byCompany } = await adminClient
+          .from('user_roles')
+          .select('user_id, role')
+          .eq('company_id', company_id);
+
+        if (byCompany && byCompany.length > 0) {
+          rolesData = byCompany;
+        } else {
+          const { data: byUserId } = await adminClient
+            .from('user_roles')
+            .select('user_id, role')
+            .in('user_id', profileIds);
+          rolesData = byUserId ?? [];
+        }
+      }
+
+      const roleMap = new Map(rolesData.map((r) => [r.user_id, r.role]));
 
       const users = (profilesRes.data ?? []).map((p: { id: string; name: string; email: string }) => ({
         id: p.id,
@@ -173,27 +188,52 @@ serve(async (req) => {
       try {
         console.log('Step 1: finding SUPERADMIN for', company_id);
 
+        // First try matching by user_roles.company_id (set for tenants created via create-tenant)
+        let superadminUserId: string | null = null;
+
         const { data: roleData, error: roleError } = await adminClient
           .from('user_roles')
           .select('user_id')
           .eq('company_id', company_id)
           .eq('role', 'SUPERADMIN')
           .limit(1)
-          .single();
+          .maybeSingle();
 
         console.log('Step 2: roleData =', JSON.stringify(roleData));
 
-        if (roleError || !roleData) {
+        if (!roleError && roleData) {
+          superadminUserId = roleData.user_id;
+        } else {
+          // Fallback: find users in this company via profiles.company_id, then check role
+          const { data: profileIds } = await adminClient
+            .from('profiles')
+            .select('id')
+            .eq('company_id', company_id);
+
+          if (profileIds && profileIds.length > 0) {
+            const ids = profileIds.map((p: { id: string }) => p.id);
+            const { data: fallbackRole } = await adminClient
+              .from('user_roles')
+              .select('user_id')
+              .in('user_id', ids)
+              .eq('role', 'SUPERADMIN')
+              .limit(1)
+              .maybeSingle();
+            if (fallbackRole) superadminUserId = fallbackRole.user_id;
+          }
+        }
+
+        if (!superadminUserId) {
           return respond({
             error: 'no_superadmin',
             message: 'No SUPERADMIN found for this company. Create one first via the Create Company + Admin form.',
-          }, 404);
+          });
         }
 
         const { data: profileData, error: profileError } = await adminClient
           .from('profiles')
           .select('email')
-          .eq('id', roleData.user_id)
+          .eq('id', superadminUserId)
           .single();
 
         if (profileError || !profileData?.email) {
@@ -214,16 +254,15 @@ serve(async (req) => {
 
         if (linkError) throw linkError;
 
-        // Supabase may override redirect_to with the configured Site URL when the
-        // subdomain is not in the Auth allowlist. Force the correct tenant subdomain
-        // by rewriting the redirect_to param directly on the verify URL.
+        console.log(`[PLATFORM ADMIN ACCESS] company_id=${company_id} slug=${slug} email=${email} at=${new Date().toISOString()}`);
+
+        // Manually override redirect_to since Supabase ignores it
         const rawLink = linkData.properties.action_link;
         const url = new URL(rawLink);
         url.searchParams.set('redirect_to', `https://${slug}.optimustesting.com`);
         const fixedLink = url.toString();
 
-        console.log(`[PLATFORM ADMIN ACCESS] company_id=${company_id} slug=${slug} email=${email} at=${new Date().toISOString()}`);
-        console.log('Step 5: raw redirect_to =', new URL(rawLink).searchParams.get('redirect_to'));
+        console.log('Step 5: raw redirect_to =', linkData.properties.action_link);
         console.log('Step 5: fixed link =', fixedLink);
 
         return respond({
