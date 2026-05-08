@@ -84,10 +84,10 @@ Deno.serve(async (req) => {
 
     const user_id = newUserData.user.id;
 
-    // 6. Set company_id and full_name on the auto-created profile
+    // 6. Set company_id and name on the auto-created profile
     const { error: profileError } = await adminClient
       .from('profiles')
-      .update({ company_id, full_name: full_name.trim() })
+      .update({ company_id, name: full_name.trim() })
       .eq('id', user_id);
 
     if (profileError) {
