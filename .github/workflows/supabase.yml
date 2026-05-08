@@ -11,8 +11,55 @@ on:
       - '.github/workflows/supabase.yml'
 
 jobs:
-  deploy:
-    name: Apply migrations & deploy edge functions
+  # ── Edge functions deploy (only needs access token + project ID) ────────────
+  deploy-functions:
+    name: Deploy edge functions
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Check required secrets
+        id: secret_check
+        shell: bash
+        run: |
+          missing=()
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || missing+=("SUPABASE_ACCESS_TOKEN")
+          [ -n "$PROJECT_ID" ] || missing+=("SUPABASE_PROJECT_ID")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Missing secrets: ${missing[*]} - skipping function deploy"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Supabase CLI
+        if: steps.secret_check.outputs.ready == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy edge functions
+        if: steps.secret_check.outputs.ready == 'true'
+        run: |
+          for fn in supabase/functions/*/; do
+            [ -d "$fn" ] || continue
+            name="$(basename "$fn")"
+            [ "$name" = "_shared" ] && continue
+            echo "Deploying $name"
+            supabase functions deploy "$name" \
+              --project-ref "$PROJECT_ID" \
+              --no-verify-jwt \
+              --use-api
+          done
+
+  # ── Database migrations (also needs DB password) ────────────────────────────
+  run-migrations:
+    name: Apply database migrations
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -23,50 +70,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Check required Supabase secrets
+      - name: Check required secrets
         id: secret_check
         shell: bash
         run: |
           missing=()
-
           [ -n "$SUPABASE_ACCESS_TOKEN" ] || missing+=("SUPABASE_ACCESS_TOKEN")
           [ -n "$PROJECT_ID" ] || missing+=("SUPABASE_PROJECT_ID")
           [ -n "$SUPABASE_DB_PASSWORD" ] || missing+=("SUPABASE_DB_PASSWORD")
-
           if [ ${#missing[@]} -gt 0 ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Missing required GitHub Actions secrets: ${missing[*]}"
+            echo "Missing secrets: ${missing[*]} - skipping migrations"
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Skip deploy when secrets are missing
-        if: ${{ steps.secret_check.outputs.ready != 'true' }}
-        run: |
-          echo "Skipping Supabase deploy because required secrets are not configured."
-          exit 0
-
       - name: Set up Supabase CLI
-        if: ${{ steps.secret_check.outputs.ready == 'true' }}
+        if: steps.secret_check.outputs.ready == 'true'
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
       - name: Link Supabase project
-        if: ${{ steps.secret_check.outputs.ready == 'true' }}
+        if: steps.secret_check.outputs.ready == 'true'
         run: supabase link --project-ref "$PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
 
       - name: Apply database migrations
-        if: ${{ steps.secret_check.outputs.ready == 'true' }}
+        if: steps.secret_check.outputs.ready == 'true'
         run: supabase db push --password "$SUPABASE_DB_PASSWORD"
-
-      - name: Deploy edge functions
-        if: ${{ steps.secret_check.outputs.ready == 'true' }}
-        run: |
-          for fn in supabase/functions/*; do
-            [ -d "$fn" ] || continue
-            supabase functions deploy "$(basename "$fn")" \
-              --project-ref "$PROJECT_ID" \
-              --no-verify-jwt \
-              --use-api
-          done
