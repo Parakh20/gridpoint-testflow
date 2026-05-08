@@ -43,3 +43,4 @@ admin.env
 *.njsproj
 *.sln
 *.sw?
+.vercel
