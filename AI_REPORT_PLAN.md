@@ -22,7 +22,7 @@ Supabase Edge Function: generate-report
 Frontend displays report in a modal / exports as PDF
 ```
 
-**Why a Supabase Edge Function?**
+**Why a Supabase Edge  Function?**
 - `ANTHROPIC_API_KEY` stays server-side — never exposed in the browser bundle
 - Runs close to the database (same Supabase region) — fast data fetching
 - No separate backend to maintain
