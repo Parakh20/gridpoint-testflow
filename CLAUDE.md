@@ -384,8 +384,9 @@ Add these in: repo → Settings → Secrets and variables → Actions
 Use the Platform Admin panel at `optimustesting.com/admin` → **Create Company + Admin** form. The form creates the company row, the SUPERADMIN auth user, their profile, and the role assignment in one call to the `create-tenant` Edge Function.
 
 Only remaining manual step:
-1. Add `https://{slug}.optimustesting.com` to `supabase/functions/_shared/cors.ts` `ALLOWED_ORIGINS` → push to `main` (CI deploys automatically)
-2. Send workspace URL + credentials to client
+1. Send workspace URL + credentials to client
+
+> Note: `buildCorsHeaders` already allows all `*.optimustesting.com` subdomains via regex — no manual CORS entry needed per tenant.
 
 ### Edge Functions
 | Function | Purpose |
@@ -473,3 +474,4 @@ supabase secrets set PLATFORM_ADMIN_TOKEN=<strong-random-value>
 17. **`PLATFORM_ADMIN_TOKEN` must match exactly** between the `VITE_PLATFORM_ADMIN_TOKEN` Vercel env var and the `PLATFORM_ADMIN_TOKEN` Supabase secret — any mismatch causes 401 on all `create-tenant` and `platform-admin-data` calls. Set both from the same value at the same time.
 18. **Platform admin data queries bypass RLS** via the `platform-admin-data` Edge Function using the service role key. The service role key lives only in the Edge Function's environment — it is never exposed to the browser. The browser only sends the `VITE_PLATFORM_ADMIN_TOKEN` to authenticate the call.
 19. **Magic links require `https://*.optimustesting.com/**` in Supabase Auth → URL Configuration → Redirect URLs.** Without this entry, Supabase ignores the `redirectTo` parameter in `admin.generateLink()` and falls back to the configured Site URL (`optimustesting.com`), sending the user to the root domain instead of their tenant subdomain. The `platform-admin-data` Edge Function works around this by rewriting the `redirect_to` query param on the returned `action_link` URL after generation — but the Supabase dashboard setting is still required for the Supabase auth flow to honour the rewritten URL.
+20. **Magic link `redirectTo` is ignored by Supabase unless the URL is manually rewritten after generation.** `admin.generateLink({ options: { redirectTo } })` has no effect — Supabase always uses the configured Site URL. Workaround: after calling `generateLink`, take `linkData.properties.action_link`, parse it as a URL, call `url.searchParams.set('redirect_to', targetUrl)`, and use the rewritten URL. See `get_company_magic_link` in `supabase/functions/platform-admin-data/index.ts`.
