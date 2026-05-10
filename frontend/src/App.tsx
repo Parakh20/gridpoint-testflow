@@ -25,7 +25,7 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 // Platform admin panel renders at the root domain; all other hostnames are tenant subdomains.
-const isRootDomain = ['optimustesting.com', 'www.optimustesting.com'].includes(window.location.hostname);
+const isRootDomain = ['optimustesting.com', 'www.optimustesting.com', 'localhost', '127.0.0.1'].includes(window.location.hostname);
 
 const App = () => (
   <ErrorBoundary>
