@@ -84,20 +84,17 @@ serve(async (req) => {
       const company_id = payload?.company_id as string | undefined;
       const is_active = payload?.is_active as boolean | undefined;
       if (!company_id || typeof is_active !== 'boolean') {
-        // Use 200 + error body so the client always receives the real error message
         return respond({ error: 'payload.company_id and payload.is_active (boolean) are required' });
       }
 
-      // Use raw SQL via the admin client to avoid any PostgREST schema-cache
-      // or grant issues — service_role always has full DB access.
-      const { error } = await adminClient.rpc('set_company_active', {
-        p_company_id: company_id,
-        p_is_active: is_active,
-      });
+      // service_role bypasses RLS and all grant checks — direct update is fine.
+      const { error } = await adminClient
+        .from('companies')
+        .update({ is_active })
+        .eq('id', company_id);
 
       if (error) {
         console.error('toggle_company_status error:', JSON.stringify(error));
-        // Return 200 so the client receives the real message (non-2xx would swallow it)
         return respond({ error: error.message ?? 'Failed to update company status' });
       }
       return respond({ success: true, is_active });
