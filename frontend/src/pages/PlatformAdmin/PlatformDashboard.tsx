@@ -182,7 +182,10 @@ const platformFetch = async (action: string, payload?: object) => {
     body: { action, payload },
     headers: { 'X-Platform-Token': token },
   });
+  // Non-2xx: the Supabase client swallows the body — throw the SDK error directly.
   if (error) throw error;
+  // 200 with an error field: the function returned a structured error — surface it.
+  if (data?.error) throw new Error(data.error);
   return data;
 };
 
@@ -366,8 +369,7 @@ export default function PlatformDashboard() {
 
   const handleDelete = async (company: Company) => {
     try {
-      const result = await platformFetch('delete_company', { company_id: company.id });
-      if (result?.error) throw new Error(result.message ?? result.error);
+      await platformFetch('delete_company', { company_id: company.id });
       detailCache.current.delete(company.id);
       if (expandedId === company.id) setExpandedId(null);
       toast({
@@ -385,11 +387,10 @@ export default function PlatformDashboard() {
     setTogglingId(company.id);
     try {
       const newStatus = !company.is_active;
-      const result = await platformFetch('toggle_company_status', {
+      await platformFetch('toggle_company_status', {
         company_id: company.id,
         is_active: newStatus,
       });
-      if (result?.error) throw new Error(result.message ?? result.error);
       setCompanies(prev =>
         prev.map(c => c.id === company.id ? { ...c, is_active: newStatus } : c)
       );
