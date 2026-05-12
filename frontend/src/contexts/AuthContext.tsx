@@ -10,6 +10,7 @@ interface AuthContextType {
   userRole: string | null;
   loading: boolean;
   companyMismatch: boolean;
+  accountDisabled: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<{ error: any }>;
@@ -24,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [companyMismatch, setCompanyMismatch] = useState(false);
+  const [accountDisabled, setAccountDisabled] = useState(false);
   const navigate = useNavigate();
   const { company } = useCompany();
 
@@ -65,10 +67,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const [roleResult, profileResult] = await Promise.all([
         supabase.from('user_roles').select('role').eq('user_id', userId).single(),
-        supabase.from('profiles').select('company_id').eq('id', userId).single(),
+        supabase.from('profiles').select('company_id, is_active').eq('id', userId).single(),
       ]);
 
       const userCompanyId = profileResult.data?.company_id ?? null;
+
+      // Block disabled accounts before anything else
+      if (profileResult.data?.is_active === false) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
+        setUserRole(null);
+        setAccountDisabled(true);
+        navigate('/auth');
+        return;
+      }
 
       // When a magic link is being processed, the session may not yet be fully
       // established. Give Supabase a moment to complete the token exchange before
@@ -130,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, companyMismatch, signIn, signOut, resetPasswordForEmail, updatePassword }}>
+    <AuthContext.Provider value={{ user, session, userRole, loading, companyMismatch, accountDisabled, signIn, signOut, resetPasswordForEmail, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

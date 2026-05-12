@@ -33,7 +33,7 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn, resetPasswordForEmail, updatePassword, companyMismatch } = useAuth();
+  const { signIn, resetPasswordForEmail, updatePassword, companyMismatch, accountDisabled } = useAuth();
   const { company } = useCompany();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -211,7 +211,21 @@ export default function Auth() {
             </div>
 
             <div className="rounded-2xl border border-border bg-card/80 p-8 shadow-2xl backdrop-blur-xl">
-              {companyMismatch ? (
+              {accountDisabled ? (
+                <div className="flex flex-col items-center gap-4 py-4 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+                    <ShieldCheck className="h-6 w-6 text-destructive" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Account deactivated</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Your account has been deactivated by an administrator.
+                      <br />
+                      Contact your company admin to regain access.
+                    </p>
+                  </div>
+                </div>
+              ) : companyMismatch ? (
                 <div className="flex flex-col items-center gap-4 py-4 text-center">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
                     <ShieldCheck className="h-6 w-6 text-destructive" />
