@@ -357,6 +357,51 @@ serve(async (req) => {
       }
     }
 
+    // ── create_user_for_company ───────────────────────────────────────────────
+    if (action === 'create_user_for_company') {
+      const company_id = payload?.company_id as string | undefined;
+      const name = payload?.name as string | undefined;
+      const email = payload?.email as string | undefined;
+      const password = payload?.password as string | undefined;
+      const role = payload?.role as string | undefined;
+
+      if (!company_id || !name || !email || !password || !role) {
+        return respond({ error: 'payload.company_id, name, email, password, and role are required' }, 400);
+      }
+      const validRoles = ['SUPERADMIN', 'GM', 'SUPERVISOR', 'ENGINEER'];
+      if (!validRoles.includes(role)) {
+        return respond({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` }, 400);
+      }
+
+      const { data: newUserData, error: createError } = await adminClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { name },
+      });
+      if (createError) return respond({ error: createError.message }, 400);
+      const newUserId = newUserData.user.id;
+
+      const { error: profileError } = await adminClient
+        .from('profiles')
+        .update({ company_id, name })
+        .eq('id', newUserId);
+      if (profileError) {
+        await adminClient.auth.admin.deleteUser(newUserId);
+        return respond({ error: `Profile update failed: ${profileError.message}` }, 500);
+      }
+
+      const { error: roleError } = await adminClient
+        .from('user_roles')
+        .insert({ user_id: newUserId, role, company_id });
+      if (roleError) {
+        await adminClient.auth.admin.deleteUser(newUserId);
+        return respond({ error: `Role assignment failed: ${roleError.message}` }, 500);
+      }
+
+      return respond({ user_id: newUserId, email, name, role });
+    }
+
     return respond({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
