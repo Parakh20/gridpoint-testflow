@@ -55,6 +55,8 @@ import {
   ChevronRight,
   KeyRound,
   LogIn,
+  PowerOff,
+  Power,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -65,6 +67,7 @@ interface Company {
   name: string;
   slug: string;
   created_at: string;
+  is_active: boolean;
 }
 
 interface Stats {
@@ -217,6 +220,9 @@ export default function PlatformDashboard() {
   const [resetLinkInfo, setResetLinkInfo] = useState<ResetLinkInfo | null>(null);
   const [resettingEmail, setResettingEmail] = useState<string | null>(null);
 
+  // Suspend/activate toggle loading state
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
   // Enter as Admin dialog
   const [enterConfirmCompany, setEnterConfirmCompany] = useState<Company | null>(null);
   const [enteringCompanyId, setEnteringCompanyId] = useState<string | null>(null);
@@ -360,21 +366,44 @@ export default function PlatformDashboard() {
 
   const handleDelete = async (company: Company) => {
     try {
-      const { error } = await supabase.from('companies').delete().eq('id', company.id);
-      if (error) throw error;
+      const result = await platformFetch('delete_company', { company_id: company.id });
+      if (result?.error) throw new Error(result.message ?? result.error);
       detailCache.current.delete(company.id);
       if (expandedId === company.id) setExpandedId(null);
-      toast({ title: 'Company deleted', description: `${company.name} has been removed.` });
+      toast({
+        title: 'Company deleted',
+        description: `${company.name} and all its users/projects have been permanently removed.`,
+      });
       await fetchAll();
     } catch (err: any) {
       console.error('[PlatformDashboard] delete error:', err);
-      toast({
-        variant: 'destructive',
-        title: 'Cannot delete company',
-        description: err.message.includes('foreign key') || err.message.includes('violates')
-          ? 'Remove all users and projects for this company first.'
-          : err.message,
+      toast({ variant: 'destructive', title: 'Failed to delete company', description: err.message });
+    }
+  };
+
+  const handleToggleStatus = async (company: Company) => {
+    setTogglingId(company.id);
+    try {
+      const newStatus = !company.is_active;
+      const result = await platformFetch('toggle_company_status', {
+        company_id: company.id,
+        is_active: newStatus,
       });
+      if (result?.error) throw new Error(result.message ?? result.error);
+      setCompanies(prev =>
+        prev.map(c => c.id === company.id ? { ...c, is_active: newStatus } : c)
+      );
+      toast({
+        title: newStatus ? 'Company activated' : 'Company suspended',
+        description: newStatus
+          ? `${company.name} is now active. Users can log in.`
+          : `${company.name} has been suspended. All users will be blocked from logging in.`,
+      });
+    } catch (err: any) {
+      console.error('[PlatformDashboard] toggle status error:', err);
+      toast({ variant: 'destructive', title: 'Failed to update status', description: err.message });
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -547,6 +576,7 @@ export default function PlatformDashboard() {
                       <TableHead className="w-8" />
                       <TableHead className="text-muted-foreground">Name</TableHead>
                       <TableHead className="text-muted-foreground">Slug</TableHead>
+                      <TableHead className="text-muted-foreground">Status</TableHead>
                       <TableHead className="text-muted-foreground">Workspace URL</TableHead>
                       <TableHead className="text-muted-foreground">Created</TableHead>
                       <TableHead className="text-right text-muted-foreground">Actions</TableHead>
@@ -585,6 +615,17 @@ export default function PlatformDashboard() {
                               </span>
                             </TableCell>
                             <TableCell>
+                              <span className={cn(
+                                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                company.is_active
+                                  ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                                  : 'border-red-500/30 bg-red-500/10 text-red-400'
+                              )}>
+                                <span className={cn('h-1.5 w-1.5 rounded-full', company.is_active ? 'bg-green-400' : 'bg-red-400')} />
+                                {company.is_active ? 'Active' : 'Suspended'}
+                              </span>
+                            </TableCell>
+                            <TableCell>
                               <a
                                 href={workspaceUrl}
                                 target="_blank"
@@ -616,6 +657,54 @@ export default function PlatformDashboard() {
                                   <LogIn className="h-3 w-3" />
                                   Enter as Admin
                                 </Button>
+                                {/* Suspend / Activate */}
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={togglingId === company.id}
+                                      className={cn(
+                                        'h-8 gap-1.5 text-xs',
+                                        company.is_active
+                                          ? 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10'
+                                          : 'text-green-400 hover:text-green-300 hover:bg-green-500/10'
+                                      )}
+                                    >
+                                      {togglingId === company.id
+                                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                                        : company.is_active
+                                          ? <PowerOff className="h-3 w-3" />
+                                          : <Power className="h-3 w-3" />
+                                      }
+                                      {company.is_active ? 'Suspend' : 'Activate'}
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        {company.is_active ? 'Suspend' : 'Activate'} {company.name}?
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        {company.is_active
+                                          ? 'All users will be immediately signed out and blocked from logging in. Use this when a client has payment issues.'
+                                          : 'This will restore access for all users of this company.'}
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleToggleStatus(company)}
+                                        className={company.is_active
+                                          ? 'bg-yellow-600 hover:bg-yellow-500 text-white'
+                                          : 'bg-green-600 hover:bg-green-500 text-white'}
+                                      >
+                                        {company.is_active ? 'Suspend' : 'Activate'}
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                                {/* Delete */}
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button
@@ -630,9 +719,8 @@ export default function PlatformDashboard() {
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Delete {company.name}?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        This permanently removes the company record. All associated users
-                                        and projects must be deleted first — otherwise this will fail with
-                                        a foreign key error.
+                                        This permanently deletes the company, all its users, all projects,
+                                        and all test data. This action cannot be undone.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -641,7 +729,7 @@ export default function PlatformDashboard() {
                                         onClick={() => handleDelete(company)}
                                         className="bg-destructive hover:bg-destructive/90"
                                       >
-                                        Delete
+                                        Delete Everything
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
@@ -653,7 +741,7 @@ export default function PlatformDashboard() {
                           {/* Expanded detail row */}
                           {isExpanded && (
                             <TableRow key={`${company.id}-detail`} className="border-border bg-muted/20 hover:bg-muted/20">
-                              <TableCell colSpan={6} className="p-0">
+                              <TableCell colSpan={7} className="p-0">
                                 {isLoadingDetail || !detail ? (
                                   <div className="flex items-center justify-center py-8">
                                     <Loader2 className="h-5 w-5 animate-spin text-primary" />

@@ -6,6 +6,7 @@ interface Company {
   id: string;
   name: string;
   slug: string;
+  is_active: boolean;
 }
 
 interface CompanyContextType {
@@ -31,25 +32,28 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [companySlug, setCompanySlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [suspended, setSuspended] = useState(false);
 
   useEffect(() => {
     const slug = getSubdomainSlug();
     setCompanySlug(slug);
 
     if (!slug) {
-      // localhost or bare domain — dev mode or landing page
       setLoading(false);
       return;
     }
 
     supabase
       .from('companies')
-      .select('id, name, slug')
+      .select('id, name, slug, is_active')
       .eq('slug', slug)
       .single()
       .then(({ data, error }) => {
         if (error || !data) {
           setNotFound(true);
+        } else if (!data.is_active) {
+          setSuspended(true);
+          supabase.auth.signOut();
         } else {
           setCompany(data);
         }
@@ -61,6 +65,27 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (suspended && companySlug) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="max-w-md w-full rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center space-y-4">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
+            <svg className="h-7 w-7 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Workspace Suspended</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Access to <span className="font-mono text-foreground">{companySlug}</span> has been
+              suspended. Please contact your administrator or TestFlow support to restore access.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

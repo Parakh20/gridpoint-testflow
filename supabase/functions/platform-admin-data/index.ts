@@ -60,10 +60,68 @@ serve(async (req) => {
     if (action === 'get_all_companies') {
       const { data, error } = await adminClient
         .from('companies')
-        .select('id, name, slug, created_at')
+        .select('id, name, slug, created_at, is_active')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return respond({ companies: data ?? [] });
+    }
+
+    // ── toggle_company_status ──────────────────────────────────────────────────
+    if (action === 'toggle_company_status') {
+      const company_id = payload?.company_id as string | undefined;
+      const is_active = payload?.is_active as boolean | undefined;
+      if (!company_id || typeof is_active !== 'boolean') {
+        return respond({ error: 'payload.company_id and payload.is_active (boolean) are required' }, 400);
+      }
+      const { error } = await adminClient
+        .from('companies')
+        .update({ is_active })
+        .eq('id', company_id);
+      if (error) throw error;
+      return respond({ success: true, is_active });
+    }
+
+    // ── delete_company ─────────────────────────────────────────────────────────
+    // Cascades: deletes all auth users (→ profiles, user_roles), then projects
+    // (→ scope_items, equipment_instances, test_tasks, test_records, etc.), then company.
+    if (action === 'delete_company') {
+      const company_id = payload?.company_id as string | undefined;
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+
+      // 1. Delete all auth users belonging to this company.
+      //    admin.deleteUser cascades to profiles + user_roles via FK ON DELETE CASCADE.
+      const { data: profileRows, error: profileErr } = await adminClient
+        .from('profiles')
+        .select('id')
+        .eq('company_id', company_id);
+      if (profileErr) throw profileErr;
+
+      const userIds = (profileRows ?? []).map((p: { id: string }) => p.id);
+      for (const uid of userIds) {
+        const { error: delErr } = await adminClient.auth.admin.deleteUser(uid);
+        if (delErr) throw new Error(`Failed to delete user ${uid}: ${delErr.message}`);
+      }
+
+      // 2. Delete projects (FK cascade handles scope_items, equipment_instances,
+      //    test_tasks, test_records, nameplate_records).
+      const { error: projErr } = await adminClient
+        .from('projects')
+        .delete()
+        .eq('company_id', company_id);
+      if (projErr) throw projErr;
+
+      // 3. Delete audit_logs and instruments that reference this company.
+      await adminClient.from('audit_logs').delete().eq('company_id', company_id);
+      await adminClient.from('instruments').delete().eq('company_id', company_id);
+
+      // 4. Delete the company row itself.
+      const { error: compErr } = await adminClient
+        .from('companies')
+        .delete()
+        .eq('id', company_id);
+      if (compErr) throw compErr;
+
+      return respond({ success: true, deleted_users: userIds.length });
     }
 
     // ── get_company_detail ─────────────────────────────────────────────────────
