@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 
 type EquipmentType = 'POWER_TRANSFORMER' | 'SF6_BREAKER' | 'VCB' | 'CT' | 'CVT' | 'LA' | 'ISOLATOR' | 'EARTH_PIT' | 'VT';
 
@@ -33,6 +34,7 @@ export default function NewProject() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { company } = useCompany();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -116,6 +118,7 @@ export default function NewProject() {
           start_date: formData.start_date || null,
           end_date: formData.end_date || null,
           created_by: user.id,
+          company_id: company?.id,
           status: 'DRAFT',
         })
         .select()
