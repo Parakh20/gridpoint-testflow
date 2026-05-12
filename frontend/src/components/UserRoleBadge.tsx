@@ -22,9 +22,16 @@ export function UserRoleBadge({ role, className }: UserRoleBadgeProps) {
     }
   };
 
+  const displayLabel: Record<string, string> = {
+    SUPERADMIN: 'SUPERADMIN',
+    GM: 'GM',
+    SUPERVISOR: 'MANAGER',
+    ENGINEER: 'ENGINEER',
+  };
+
   return (
     <Badge className={cn(getRoleColor(role), className)} variant="secondary">
-      {role}
+      {displayLabel[role] ?? role}
     </Badge>
   );
 }

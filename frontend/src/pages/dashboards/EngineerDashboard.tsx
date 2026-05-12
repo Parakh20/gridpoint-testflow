@@ -155,7 +155,7 @@ export default function EngineerDashboard() {
               <Wrench className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No assignments yet</p>
               <p className="text-sm text-muted-foreground mt-2">
-                Your supervisor will assign equipment instances to you
+                Your manager will assign equipment instances to you
               </p>
             </div>
           ) : (

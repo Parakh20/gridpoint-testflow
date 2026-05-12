@@ -142,7 +142,7 @@ function RoleBadge({ role }: { role: string }) {
       'inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide font-semibold',
       ROLE_BADGE[role] ?? 'bg-muted text-muted-foreground border-border'
     )}>
-      {role}
+      {role === 'SUPERVISOR' ? 'MANAGER' : role}
     </span>
   );
 }

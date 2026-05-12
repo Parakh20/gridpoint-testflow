@@ -17,7 +17,7 @@ interface SupervisorSelectorProps {
   required?: boolean;
 }
 
-export function SupervisorSelector({ value, onChange, label = "Assigned Supervisor", required = false }: SupervisorSelectorProps) {
+export function SupervisorSelector({ value, onChange, label = "Assigned Manager", required = false }: SupervisorSelectorProps) {
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -76,7 +76,7 @@ export function SupervisorSelector({ value, onChange, label = "Assigned Supervis
       </Label>
       <Select value={value || 'unassigned'} onValueChange={(val) => onChange(val === 'unassigned' ? null : val)}>
         <SelectTrigger>
-          <SelectValue placeholder="Select a supervisor" />
+          <SelectValue placeholder="Select a manager" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="unassigned">Unassigned</SelectItem>
@@ -88,7 +88,7 @@ export function SupervisorSelector({ value, onChange, label = "Assigned Supervis
         </SelectContent>
       </Select>
       {supervisors.length === 0 && (
-        <p className="text-xs text-muted-foreground">No active supervisors available</p>
+        <p className="text-xs text-muted-foreground">No active managers available</p>
       )}
     </div>
   );

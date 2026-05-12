@@ -46,7 +46,7 @@ export function AssignProjectDialog({
       toast({
         title: 'Assignment updated',
         description: selectedSupervisorId
-          ? `Project ${projectNumber} has been assigned to the supervisor`
+          ? `Project ${projectNumber} has been assigned to the manager`
           : `Project ${projectNumber} has been unassigned`,
       });
 
@@ -75,8 +75,8 @@ export function AssignProjectDialog({
           </DialogTitle>
           <DialogDescription>
             {currentAssignment
-              ? `Currently assigned to ${currentAssignment.name}. Select a new supervisor or unassign.`
-              : 'Select a supervisor to assign this project to.'}
+              ? `Currently assigned to ${currentAssignment.name}. Select a new manager or unassign.`
+              : 'Select a manager to assign this project to.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -88,7 +88,7 @@ export function AssignProjectDialog({
           <SupervisorSelector
             value={selectedSupervisorId || undefined}
             onChange={setSelectedSupervisorId}
-            label="Supervisor"
+            label="Manager"
           />
         </div>
 

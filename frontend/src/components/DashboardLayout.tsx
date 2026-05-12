@@ -66,7 +66,7 @@ function RolePill({ role }: { role: string | null }) {
   if (!role) return null;
   return (
     <span className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded border ${colors[role] ?? 'bg-muted text-muted-foreground border-border'}`}>
-      {role.toLowerCase()}
+      {role === 'SUPERVISOR' ? 'manager' : role.toLowerCase()}
     </span>
   );
 }
@@ -98,7 +98,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
         {userRole && (
           <div className="px-5 pt-4 pb-1">
             <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60">Workspace</p>
-            <p className="text-xs font-semibold text-foreground mt-0.5">{userRole.charAt(0) + userRole.slice(1).toLowerCase()} Portal</p>
+            <p className="text-xs font-semibold text-foreground mt-0.5">{userRole === 'SUPERVISOR' ? 'Manager' : userRole.charAt(0) + userRole.slice(1).toLowerCase()} Portal</p>
           </div>
         )}
 

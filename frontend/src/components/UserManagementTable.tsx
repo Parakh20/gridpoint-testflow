@@ -227,7 +227,7 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
                 <SelectItem value="all">All Roles</SelectItem>
                 <SelectItem value="SUPERADMIN">Superadmin</SelectItem>
                 <SelectItem value="GM">GM</SelectItem>
-                <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
+                <SelectItem value="SUPERVISOR">Manager</SelectItem>
                 <SelectItem value="ENGINEER">Engineer</SelectItem>
               </SelectContent>
             </Select>

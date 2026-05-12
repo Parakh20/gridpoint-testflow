@@ -136,7 +136,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="ENGINEER">Engineer</SelectItem>
-                      <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
+                      <SelectItem value="SUPERVISOR">Manager</SelectItem>
                       <SelectItem value="GM">GM</SelectItem>
                       <SelectItem value="SUPERADMIN">Superadmin</SelectItem>
                     </SelectContent>

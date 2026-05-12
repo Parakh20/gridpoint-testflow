@@ -29,7 +29,7 @@ function actionLabel(entry: AuditEntry): string {
         return `Status changed: ${entry.before_data.status} → ${entry.after_data.status}`;
       }
       if (changed.includes('assigned_to')) {
-        return `Supervisor assigned`;
+        return `Manager assigned`;
       }
       if (changed.length > 0) {
         return `Updated ${type} (${changed.join(', ')})`;

@@ -379,7 +379,7 @@ export default function EditProject() {
               <SupervisorSelector
                 value={formData.assigned_to || undefined}
                 onChange={(supervisorId) => setFormData({ ...formData, assigned_to: supervisorId })}
-                label="Assigned Supervisor"
+                label="Assigned Manager"
               />
             </CardContent>
           </Card>

@@ -170,7 +170,7 @@ export default function Auth() {
             </h2>
 
             <p className="max-w-md text-base leading-relaxed text-muted-foreground">
-              Field teams capture commissioning data, supervisors approve results, and GMs ship reports —
+              Field teams capture commissioning data, managers approve results, and GMs ship reports —
               all from one workspace per company.
             </p>
 

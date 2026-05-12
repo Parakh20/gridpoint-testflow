@@ -76,7 +76,7 @@ export function ProjectStatusActions({ project, onStatusChange, onOptimisticUpda
     if (!projectData?.assigned_to) {
       toast({
         title: 'Assignment Required',
-        description: 'Please assign this project to a supervisor before approving',
+        description: 'Please assign this project to a manager before approving',
         variant: 'destructive',
       });
       setShowDialog(false);

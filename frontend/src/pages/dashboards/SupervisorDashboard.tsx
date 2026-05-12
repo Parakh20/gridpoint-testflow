@@ -193,7 +193,7 @@ export default function SupervisorDashboard() {
   };
 
   return (
-    <DashboardLayout title="Supervisor Dashboard">
+    <DashboardLayout title="Manager Dashboard">
       <div className="grid gap-6 md:grid-cols-4">
         {[
           { label: 'Assigned Projects', value: stats.total,        icon: <FolderOpen className="h-4 w-4 text-muted-foreground" />,  color: 'text-foreground',    sub: 'Total projects assigned' },
