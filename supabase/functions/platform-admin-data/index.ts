@@ -58,10 +58,23 @@ serve(async (req) => {
 
     // ── get_all_companies ──────────────────────────────────────────────────────
     if (action === 'get_all_companies') {
-      const { data, error } = await adminClient
+      let { data, error } = await adminClient
         .from('companies')
         .select('id, name, slug, created_at, is_active')
         .order('created_at', { ascending: false });
+
+      // Fallback: if the is_active column doesn't exist yet (migration pending),
+      // re-query without it and default all companies to active.
+      if (error?.message?.includes('is_active') || error?.code === '42703') {
+        const fallback = await adminClient
+          .from('companies')
+          .select('id, name, slug, created_at')
+          .order('created_at', { ascending: false });
+        if (fallback.error) throw fallback.error;
+        data = (fallback.data ?? []).map((c: Record<string, unknown>) => ({ ...c, is_active: true }));
+        error = null;
+      }
+
       if (error) throw error;
       return respond({ companies: data ?? [] });
     }
@@ -77,6 +90,9 @@ serve(async (req) => {
         .from('companies')
         .update({ is_active })
         .eq('id', company_id);
+      if (error?.message?.includes('is_active') || error?.code === '42703') {
+        return respond({ error: 'Migration not applied yet — is_active column does not exist' }, 503);
+      }
       if (error) throw error;
       return respond({ success: true, is_active });
     }

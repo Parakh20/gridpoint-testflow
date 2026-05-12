@@ -11,9 +11,10 @@ on:
       - '.github/workflows/supabase.yml'
 
 jobs:
-  # ── Edge functions deploy (only needs access token + project ID) ────────────
+  # ── Edge functions deploy (runs AFTER migrations so schema is up to date) ────
   deploy-functions:
     name: Deploy edge functions
+    needs: [run-migrations]
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
