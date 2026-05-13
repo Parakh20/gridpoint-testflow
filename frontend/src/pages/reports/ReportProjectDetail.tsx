@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/StatusBadge';
-import { ArrowLeft, FileSpreadsheet, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet, Loader2, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -65,8 +65,6 @@ export default function ReportProjectDetail() {
   const navigate = useNavigate();
   const { userRole } = useAuth();
   const { toast } = useToast();
-  const reportRef = useRef<HTMLDivElement>(null);
-
   const [project, setProject] = useState<any>(null);
   const [manager, setManager] = useState<string | null>(null);
   const [tasks, setTasks] = useState<ReportTask[]>([]);
@@ -77,6 +75,7 @@ export default function ReportProjectDetail() {
   const [reworkDialogTask, setReworkDialogTask] = useState<ReportTask | null>(null);
   const [reworkReason, setReworkReason] = useState('');
   const [submittingRework, setSubmittingRework] = useState(false);
+  const [expandedEquipment, setExpandedEquipment] = useState<Set<string>>(new Set());
 
   const canReview = userRole === 'SUPERVISOR' || userRole === 'GM' || userRole === 'SUPERADMIN';
 
@@ -193,6 +192,20 @@ export default function ReportProjectDetail() {
     });
     return grouped;
   }, [tasks]);
+
+  // Auto-expand first equipment when data loads
+  useEffect(() => {
+    const first = tasksByEquipment.keys().next().value;
+    if (first) setExpandedEquipment(new Set([first]));
+  }, [tasksByEquipment.size]);
+
+  const toggleEquipment = useCallback((id: string) => {
+    setExpandedEquipment(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
 
   const pdfProps = useMemo((): ProjectReportPDFProps | null => {
     if (!project || !progressStats) return null;
@@ -355,8 +368,7 @@ export default function ReportProjectDetail() {
           </div>
         </div>
 
-        {/* Report body — referenced for PDF capture */}
-        <div ref={reportRef} className="space-y-6">
+        <div className="space-y-6">
 
           {/* Project details */}
           <Card>
@@ -429,7 +441,7 @@ export default function ReportProjectDetail() {
             </Card>
           )}
 
-          {/* Equipment sections */}
+          {/* Equipment sections — collapsible */}
           {tasksByEquipment.size === 0 ? (
             <Card>
               <CardContent className="text-center py-12 text-muted-foreground">
@@ -437,123 +449,136 @@ export default function ReportProjectDetail() {
               </CardContent>
             </Card>
           ) : (
-            Array.from(tasksByEquipment.entries()).map(([instanceId, { label, equipmentType, tasks: eqpTasks }]) => {
-              const approvedInGroup = eqpTasks.filter(t => t.status === 'APPROVED').length;
-              return (
-                <Card key={instanceId}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <span className="font-mono">{label}</span>
-                      <span className="text-sm font-normal text-muted-foreground">
-                        — {equipmentType.replace(/_/g, ' ')}
+            <div className="space-y-2">
+              {Array.from(tasksByEquipment.entries()).map(([instanceId, { label, equipmentType, tasks: eqpTasks }]) => {
+                const approvedInGroup = eqpTasks.filter(t => t.status === 'APPROVED').length;
+                const isOpen = expandedEquipment.has(instanceId);
+                const submittedCount = eqpTasks.filter(t => t.status === 'SUBMITTED').length;
+                return (
+                  <Card key={instanceId} className="overflow-hidden">
+                    {/* Accordion trigger */}
+                    <button
+                      type="button"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+                      onClick={() => toggleEquipment(instanceId)}
+                    >
+                      <span className={`shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </span>
-                      <span className="ml-auto text-sm font-normal text-muted-foreground tabular-nums">
-                        {approvedInGroup}/{eqpTasks.length} approved
+                      <span className="font-mono font-semibold text-sm">{label}</span>
+                      <span className="text-sm text-muted-foreground">— {equipmentType.replace(/_/g, ' ')}</span>
+                      <span className="ml-auto flex items-center gap-3 shrink-0">
+                        {submittedCount > 0 && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded px-2 py-0.5">
+                            {submittedCount} pending review
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {approvedInGroup}/{eqpTasks.length} approved
+                        </span>
                       </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Test Name</TableHead>
-                            <TableHead>Code</TableHead>
-                            <TableHead>Instrument ID</TableHead>
-                            <TableHead>Result</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Assigned Engineer</TableHead>
-                            {canReview && <TableHead className="w-[200px]" data-pdf-hide="">Review</TableHead>}
-                            <TableHead>Remarks</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {eqpTasks.map(task => {
-                            const engName = task.assigned_to ? (engineers.get(task.assigned_to) ?? 'Unknown') : null;
-                            const engColor = task.assigned_to
-                              ? (engineerColors.get(task.assigned_to) ?? '#6b7280')
-                              : '#4b5563';
-                            return (
-                              <TableRow key={task.id}>
-                                <TableCell className="font-medium text-sm">
-                                  {task.test_template?.test_name}
-                                </TableCell>
-                                <TableCell className="font-mono text-xs text-muted-foreground">
-                                  {task.test_template?.test_code}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  {task.record?.instrument_id || <span className="text-muted-foreground">—</span>}
-                                </TableCell>
-                                <TableCell>
-                                  <PassFailBadge value={task.record?.pass_fail ?? null} />
-                                </TableCell>
-                                <TableCell>
-                                  <div className="space-y-0.5">
-                                    <StatusBadge status={task.status} />
-                                    {task.rework_reason && (
-                                      <p className="text-[10px] text-orange-400 leading-tight max-w-[160px] truncate">
-                                        {task.rework_reason}
-                                      </p>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {engName ? (
-                                    <div className="flex items-center gap-1.5">
-                                      <div
-                                        className="w-2 h-2 rounded-full shrink-0"
-                                        style={{ backgroundColor: engColor }}
-                                      />
-                                      <span className="text-sm">{engName}</span>
+                    </button>
+
+                    {/* Collapsible content */}
+                    {isOpen && (
+                      <div className="border-t border-border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Test Name</TableHead>
+                              <TableHead>Code</TableHead>
+                              <TableHead>Instrument ID</TableHead>
+                              <TableHead>Result</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Assigned Engineer</TableHead>
+                              {canReview && <TableHead className="w-[200px]">Review</TableHead>}
+                              <TableHead>Remarks</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {eqpTasks.map(task => {
+                              const engName = task.assigned_to ? (engineers.get(task.assigned_to) ?? 'Unknown') : null;
+                              const engColor = task.assigned_to
+                                ? (engineerColors.get(task.assigned_to) ?? '#6b7280')
+                                : '#4b5563';
+                              return (
+                                <TableRow key={task.id}>
+                                  <TableCell className="font-medium text-sm">
+                                    {task.test_template?.test_name}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs text-muted-foreground">
+                                    {task.test_template?.test_code}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {task.record?.instrument_id || <span className="text-muted-foreground">—</span>}
+                                  </TableCell>
+                                  <TableCell>
+                                    <PassFailBadge value={task.record?.pass_fail ?? null} />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="space-y-0.5">
+                                      <StatusBadge status={task.status} />
+                                      {task.rework_reason && (
+                                        <p className="text-[10px] text-orange-400 leading-tight max-w-[160px] truncate">
+                                          {task.rework_reason}
+                                        </p>
+                                      )}
                                     </div>
-                                  ) : (
-                                    <span className="text-muted-foreground text-xs">Unassigned</span>
-                                  )}
-                                </TableCell>
-                                {canReview && (
-                                  <TableCell data-pdf-hide="">
-                                    {task.status === 'SUBMITTED' ? (
-                                      <div className="flex items-center gap-2">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          disabled={reviewingTaskId === task.id}
-                                          onClick={() => { setReworkDialogTask(task); setReworkReason(''); }}
-                                        >
-                                          {reviewingTaskId === task.id
-                                            ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                            : null}
-                                          Rework
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          disabled={reviewingTaskId === task.id}
-                                          onClick={() => handleTaskReview(task, 'APPROVED')}
-                                        >
-                                          {reviewingTaskId === task.id
-                                            ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                            : null}
-                                          Approve
-                                        </Button>
+                                  </TableCell>
+                                  <TableCell>
+                                    {engName ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <div
+                                          className="w-2 h-2 rounded-full shrink-0"
+                                          style={{ backgroundColor: engColor }}
+                                        />
+                                        <span className="text-sm">{engName}</span>
                                       </div>
                                     ) : (
-                                      <span className="text-xs text-muted-foreground">—</span>
+                                      <span className="text-muted-foreground text-xs">Unassigned</span>
                                     )}
                                   </TableCell>
-                                )}
-                                <TableCell className="text-xs text-muted-foreground max-w-[200px]">
-                                  <span className="line-clamp-2">{task.record?.remarks || '—'}</span>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
+                                  {canReview && (
+                                    <TableCell>
+                                      {task.status === 'SUBMITTED' ? (
+                                        <div className="flex items-center gap-2">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={reviewingTaskId === task.id}
+                                            onClick={() => { setReworkDialogTask(task); setReworkReason(''); }}
+                                          >
+                                            {reviewingTaskId === task.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                                            Rework
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            disabled={reviewingTaskId === task.id}
+                                            onClick={() => handleTaskReview(task, 'APPROVED')}
+                                          >
+                                            {reviewingTaskId === task.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                                            Approve
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">—</span>
+                                      )}
+                                    </TableCell>
+                                  )}
+                                  <TableCell className="text-xs text-muted-foreground max-w-[200px]">
+                                    <span className="line-clamp-2">{task.record?.remarks || '—'}</span>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>

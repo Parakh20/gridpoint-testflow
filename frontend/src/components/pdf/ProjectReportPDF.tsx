@@ -5,19 +5,9 @@ import {
   View,
   Text,
   StyleSheet,
-  Font,
 } from '@react-pdf/renderer';
 import { NAMEPLATE_FIELDS } from '@/lib/nameplateFields';
 import type { Section, TemplateSchema } from '@/lib/testSectionTables';
-
-Font.register({
-  family: 'Inter',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff', fontWeight: 400 },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZ9hiJ-Ek-_EeA.woff', fontWeight: 600 },
-    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZ9hiJ-Ek-_EeA.woff', fontWeight: 700 },
-  ],
-});
 
 const NAVY = '#1a2332';
 const BLUE = '#3b82f6';
@@ -26,11 +16,11 @@ const ROW_ALT = '#f7f8fa';
 const MUTED = '#64748b';
 
 const s = StyleSheet.create({
-  page: { fontFamily: 'Inter', fontSize: 9, color: '#0f172a', paddingBottom: 36 },
+  page: { fontFamily: 'Helvetica', fontSize: 9, color: '#0f172a', paddingBottom: 36 },
   // Page header bar
   pageHeader: { backgroundColor: NAVY, padding: '10 24 10 24', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   pageHeaderLeft: { flexDirection: 'column' },
-  pageHeaderTitle: { color: '#ffffff', fontSize: 11, fontWeight: 700, letterSpacing: 0.5 },
+  pageHeaderTitle: { color: '#ffffff', fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5 },
   pageHeaderSub: { color: '#94a3b8', fontSize: 7, marginTop: 1 },
   pageHeaderRight: { color: '#94a3b8', fontSize: 7, textAlign: 'right' },
   // Fixed footer
@@ -41,24 +31,24 @@ const s = StyleSheet.create({
   // Cover page
   coverBrand: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   coverBrandBox: { width: 28, height: 28, backgroundColor: BLUE, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
-  coverBrandBoxText: { color: '#fff', fontSize: 14, fontWeight: 700 },
-  coverBrandName: { fontSize: 16, fontWeight: 700, color: NAVY },
+  coverBrandBoxText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  coverBrandName: { fontSize: 16, fontWeight: 'bold', color: NAVY },
   coverBrandSub: { fontSize: 7, color: MUTED, letterSpacing: 1 },
   coverHero: { backgroundColor: NAVY, borderRadius: 4, padding: '20 20 16 20', marginBottom: 16 },
-  coverHeroNumber: { color: '#ffffff', fontSize: 22, fontWeight: 700, marginBottom: 4 },
+  coverHeroNumber: { color: '#ffffff', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   coverHeroSite: { color: '#94a3b8', fontSize: 11 },
   coverHeroStatus: { marginTop: 8, alignSelf: 'flex-start', backgroundColor: '#3b82f620', borderRadius: 3, padding: '2 6' },
-  coverHeroStatusText: { color: '#93c5fd', fontSize: 8, fontWeight: 600 },
+  coverHeroStatusText: { color: '#93c5fd', fontSize: 8, fontWeight: 'bold' },
   // Info grid
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 0, marginBottom: 12 },
   infoCell: { width: '50%', paddingVertical: 6, paddingRight: 8, borderBottomWidth: 1, borderBottomColor: BORDER },
   infoCellLabel: { fontSize: 7, color: MUTED, marginBottom: 2 },
-  infoCellValue: { fontSize: 9, fontWeight: 600 },
+  infoCellValue: { fontSize: 9, fontWeight: 'bold' },
   // Progress
   progressSection: { marginBottom: 4 },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   progressLabel: { fontSize: 8, color: MUTED },
-  progressValue: { fontSize: 8, fontWeight: 600 },
+  progressValue: { fontSize: 8, fontWeight: 'bold' },
   progressBarOuter: { height: 6, backgroundColor: '#e2e8f0', borderRadius: 3, marginBottom: 8 },
   progressBarInner: { height: 6, backgroundColor: BLUE, borderRadius: 3 },
   progressPills: { flexDirection: 'row', gap: 12 },
@@ -67,30 +57,30 @@ const s = StyleSheet.create({
   progressPillText: { fontSize: 7, color: MUTED },
   // Equipment section header
   equipHeader: { backgroundColor: NAVY, borderRadius: 4, padding: '8 12', marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  equipHeaderLabel: { color: '#ffffff', fontSize: 11, fontWeight: 700 },
+  equipHeaderLabel: { color: '#ffffff', fontSize: 11, fontWeight: 'bold' },
   equipHeaderType: { color: '#94a3b8', fontSize: 8 },
   // Sub-section label
-  subSectionTitle: { fontSize: 9, fontWeight: 700, color: NAVY, backgroundColor: '#f1f5f9', padding: '4 8', borderLeftWidth: 3, borderLeftColor: BLUE, marginBottom: 6 },
+  subSectionTitle: { fontSize: 9, fontWeight: 'bold', color: NAVY, backgroundColor: '#f1f5f9', padding: '4 8', borderLeftWidth: 3, borderLeftColor: BLUE, marginBottom: 6 },
   // Test block header
   testHeader: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: BORDER, padding: '5 8', marginBottom: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 0 },
-  testHeaderName: { fontSize: 9, fontWeight: 600 },
+  testHeaderName: { fontSize: 9, fontWeight: 'bold' },
   testHeaderCode: { fontSize: 7, color: MUTED },
   testMeta: { flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: BORDER, padding: '3 8', marginBottom: 6, backgroundColor: '#ffffff', borderTopWidth: 0 },
   testMetaItem: { flexDirection: 'row', gap: 3 },
   testMetaLabel: { fontSize: 7, color: MUTED },
-  testMetaValue: { fontSize: 7, fontWeight: 600 },
+  testMetaValue: { fontSize: 7, fontWeight: 'bold' },
   // Status badge
   badgeApproved: { backgroundColor: '#dcfce7', borderRadius: 2, padding: '1 4' },
   badgeSubmitted: { backgroundColor: '#fef3c7', borderRadius: 2, padding: '1 4' },
   badgeDraft: { backgroundColor: '#f1f5f9', borderRadius: 2, padding: '1 4' },
   badgeRework: { backgroundColor: '#fee2e2', borderRadius: 2, padding: '1 4' },
   badgeInProgress: { backgroundColor: '#dbeafe', borderRadius: 2, padding: '1 4' },
-  badgeText: { fontSize: 7, fontWeight: 600 },
+  badgeText: { fontSize: 7, fontWeight: 'bold' },
   // Table primitives
   table: { marginBottom: 10 },
   tableHeaderRow: { flexDirection: 'row', backgroundColor: NAVY },
   tableHeaderCell: { padding: '4 6', flex: 1 },
-  tableHeaderCellText: { color: '#ffffff', fontSize: 7, fontWeight: 700 },
+  tableHeaderCellText: { color: '#ffffff', fontSize: 7, fontWeight: 'bold' },
   tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER },
   tableRowAlt: { flexDirection: 'row', backgroundColor: ROW_ALT, borderBottomWidth: 1, borderBottomColor: BORDER },
   tableCell: { padding: '4 6', flex: 1 },
@@ -103,7 +93,7 @@ const s = StyleSheet.create({
   kvValue: { padding: '4 6', flex: 1, fontSize: 8 },
   // Separator
   divider: { height: 1, backgroundColor: BORDER, marginVertical: 10 },
-  sectionTitle: { fontSize: 8, fontWeight: 600, color: MUTED, marginBottom: 4 },
+  sectionTitle: { fontSize: 8, fontWeight: 'bold', color: MUTED, marginBottom: 4 },
   noData: { fontSize: 8, color: MUTED, fontStyle: 'italic', marginBottom: 8 },
 });
 
