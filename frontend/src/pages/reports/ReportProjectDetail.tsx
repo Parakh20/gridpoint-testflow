@@ -19,7 +19,7 @@ import { exportReportExcel, type ReportExportGroup } from '@/lib/reportsExcelExp
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import type { ProjectReportPDFProps, PDFEquipmentGroup, PDFTaskItem } from '@/components/pdf/ProjectReportPDF';
 import { TEMPLATE_FALLBACKS } from '@/lib/templateFallbacks';
-import { isV2Schema } from '@/lib/testSectionTables';
+import { isV2Schema, SectionTable } from '@/lib/testSectionTables';
 
 const ENGINEER_COLORS = [
   '#3b82f6', '#10b981', '#8b5cf6', '#f97316', '#f43f5e',
@@ -76,6 +76,7 @@ export default function ReportProjectDetail() {
   const [reworkReason, setReworkReason] = useState('');
   const [submittingRework, setSubmittingRework] = useState(false);
   const [expandedEquipment, setExpandedEquipment] = useState<Set<string>>(new Set());
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
   const canReview = userRole === 'SUPERVISOR' || userRole === 'GM' || userRole === 'SUPERADMIN';
 
@@ -201,6 +202,14 @@ export default function ReportProjectDetail() {
 
   const toggleEquipment = useCallback((id: string) => {
     setExpandedEquipment(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleTask = useCallback((id: string) => {
+    setExpandedTasks(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -501,74 +510,98 @@ export default function ReportProjectDetail() {
                               const engColor = task.assigned_to
                                 ? (engineerColors.get(task.assigned_to) ?? '#6b7280')
                                 : '#4b5563';
+                              const isTaskOpen = expandedTasks.has(task.id);
+                              const rawFields = task.test_template?.fields;
+                              const testCode = task.test_template?.test_code ?? '';
+                              const schema = isV2Schema(rawFields) ? rawFields : (TEMPLATE_FALLBACKS[testCode] ?? null);
+                              const hasParams = !!schema && !!task.record;
+                              const colSpan = canReview ? 8 : 7;
                               return (
-                                <TableRow key={task.id}>
-                                  <TableCell className="font-medium text-sm">
-                                    {task.test_template?.test_name}
-                                  </TableCell>
-                                  <TableCell className="font-mono text-xs text-muted-foreground">
-                                    {task.test_template?.test_code}
-                                  </TableCell>
-                                  <TableCell className="text-sm">
-                                    {task.record?.instrument_id || <span className="text-muted-foreground">—</span>}
-                                  </TableCell>
-                                  <TableCell>
-                                    <PassFailBadge value={task.record?.pass_fail ?? null} />
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="space-y-0.5">
-                                      <StatusBadge status={task.status} />
-                                      {task.rework_reason && (
-                                        <p className="text-[10px] text-orange-400 leading-tight max-w-[160px] truncate">
-                                          {task.rework_reason}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    {engName ? (
+                                <React.Fragment key={task.id}>
+                                  <TableRow
+                                    className={hasParams ? 'cursor-pointer hover:bg-muted/40' : ''}
+                                    onClick={hasParams ? () => toggleTask(task.id) : undefined}
+                                  >
+                                    <TableCell className="font-medium text-sm">
                                       <div className="flex items-center gap-1.5">
-                                        <div
-                                          className="w-2 h-2 rounded-full shrink-0"
-                                          style={{ backgroundColor: engColor }}
-                                        />
-                                        <span className="text-sm">{engName}</span>
+                                        {hasParams && (
+                                          <ChevronRight className={`h-3 w-3 text-muted-foreground shrink-0 transition-transform duration-150 ${isTaskOpen ? 'rotate-90' : ''}`} />
+                                        )}
+                                        {task.test_template?.test_name}
                                       </div>
-                                    ) : (
-                                      <span className="text-muted-foreground text-xs">Unassigned</span>
-                                    )}
-                                  </TableCell>
-                                  {canReview && (
+                                    </TableCell>
+                                    <TableCell className="font-mono text-xs text-muted-foreground">
+                                      {task.test_template?.test_code}
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                      {task.record?.instrument_id || <span className="text-muted-foreground">—</span>}
+                                    </TableCell>
                                     <TableCell>
-                                      {task.status === 'SUBMITTED' ? (
-                                        <div className="flex items-center gap-2">
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            disabled={reviewingTaskId === task.id}
-                                            onClick={() => { setReworkDialogTask(task); setReworkReason(''); }}
-                                          >
-                                            {reviewingTaskId === task.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                                            Rework
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            disabled={reviewingTaskId === task.id}
-                                            onClick={() => handleTaskReview(task, 'APPROVED')}
-                                          >
-                                            {reviewingTaskId === task.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                                            Approve
-                                          </Button>
+                                      <PassFailBadge value={task.record?.pass_fail ?? null} />
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="space-y-0.5">
+                                        <StatusBadge status={task.status} />
+                                        {task.rework_reason && (
+                                          <p className="text-[10px] text-orange-400 leading-tight max-w-[160px] truncate">
+                                            {task.rework_reason}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      {engName ? (
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: engColor }} />
+                                          <span className="text-sm">{engName}</span>
                                         </div>
                                       ) : (
-                                        <span className="text-xs text-muted-foreground">—</span>
+                                        <span className="text-muted-foreground text-xs">Unassigned</span>
                                       )}
                                     </TableCell>
+                                    {canReview && (
+                                      <TableCell onClick={e => e.stopPropagation()}>
+                                        {task.status === 'SUBMITTED' ? (
+                                          <div className="flex items-center gap-2">
+                                            <Button size="sm" variant="outline" disabled={reviewingTaskId === task.id}
+                                              onClick={() => { setReworkDialogTask(task); setReworkReason(''); }}>
+                                              {reviewingTaskId === task.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                                              Rework
+                                            </Button>
+                                            <Button size="sm" disabled={reviewingTaskId === task.id}
+                                              onClick={() => handleTaskReview(task, 'APPROVED')}>
+                                              {reviewingTaskId === task.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                                              Approve
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          <span className="text-xs text-muted-foreground">—</span>
+                                        )}
+                                      </TableCell>
+                                    )}
+                                    <TableCell className="text-xs text-muted-foreground max-w-[200px]">
+                                      <span className="line-clamp-2">{task.record?.remarks || '—'}</span>
+                                    </TableCell>
+                                  </TableRow>
+
+                                  {/* Expanded parameter data */}
+                                  {isTaskOpen && schema && task.record && (
+                                    <TableRow className="bg-muted/20 hover:bg-muted/20">
+                                      <TableCell colSpan={colSpan} className="py-4 px-6">
+                                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                                          Testing Parameters — {task.test_template?.test_name}
+                                        </div>
+                                        {schema.sections.map(section => (
+                                          <SectionTable
+                                            key={section.id}
+                                            section={section}
+                                            payload={task.record!.payload}
+                                          />
+                                        ))}
+                                      </TableCell>
+                                    </TableRow>
                                   )}
-                                  <TableCell className="text-xs text-muted-foreground max-w-[200px]">
-                                    <span className="line-clamp-2">{task.record?.remarks || '—'}</span>
-                                  </TableCell>
-                                </TableRow>
+                                </React.Fragment>
                               );
                             })}
                           </TableBody>
