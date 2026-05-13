@@ -8,13 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Progress } from '@/components/ui/progress';
 import { Loader2, ArrowLeft, Download, UserCheck, RefreshCw, FileText, Pencil, FileSpreadsheet } from 'lucide-react';
 import { exportProjectExcel, type ExportTask } from '@/lib/projectExcelExport';
 import { ProjectStatusActions } from '@/components/ProjectStatusActions';
 import { ProjectScopeTab } from '@/components/ProjectScopeTab';
 import { ProjectTestingScopeTab } from '@/components/ProjectTestingScopeTab';
 import { ProjectEquipmentTab } from '@/components/ProjectEquipmentTab';
-import { ProjectTestsTab } from '@/components/ProjectTestsTab';
 import { ProjectActivityTab } from '@/components/ProjectActivityTab';
 import { ProjectPDFExport } from '@/components/ProjectPDFExport';
 import { AssignProjectDialog } from '@/components/AssignProjectDialog';
@@ -41,6 +41,9 @@ export default function ProjectDetail() {
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportMarkdown, setReportMarkdown] = useState<string | null>(null);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [progressStats, setProgressStats] = useState<{
+    total: number; approved: number; submitted: number; inProgress: number; draft: number;
+  } | null>(null);
 
   const fetchProject = async (isRefetch = false) => {
     if (!id) return;
@@ -59,10 +62,25 @@ export default function ProjectDetail() {
       const { data: equipmentData } = await supabase
         .from('equipment_instances')
         .select('id')
-        .eq('project_id', id)
-        .limit(1);
+        .eq('project_id', id);
 
       setHasEquipment(!!equipmentData?.length);
+
+      if (equipmentData?.length) {
+        const { data: taskStatuses } = await supabase
+          .from('test_tasks')
+          .select('status')
+          .in('equipment_instance_id', equipmentData.map(e => e.id));
+        if (taskStatuses?.length) {
+          setProgressStats({
+            total: taskStatuses.length,
+            approved: taskStatuses.filter(t => t.status === 'APPROVED').length,
+            submitted: taskStatuses.filter(t => t.status === 'SUBMITTED').length,
+            inProgress: taskStatuses.filter(t => t.status === 'IN_PROGRESS').length,
+            draft: taskStatuses.filter(t => t.status === 'DRAFT').length,
+          });
+        }
+      }
 
       if (data.assigned_to) {
         const { data: supervisorData } = await supabase
@@ -275,20 +293,44 @@ export default function ProjectDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className={`grid w-full ${hasEquipment ? 'grid-cols-6' : 'grid-cols-4'}`}>
+          <TabsList className={`grid w-full ${hasEquipment ? 'grid-cols-5' : 'grid-cols-4'}`}>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="scope">Scope</TabsTrigger>
             <TabsTrigger value="testing-scope">Testing Scope</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
-            {hasEquipment && (
-              <>
-                <TabsTrigger value="equipment">Equipment</TabsTrigger>
-                <TabsTrigger value="tests">Tests</TabsTrigger>
-              </>
-            )}
+            {hasEquipment && <TabsTrigger value="equipment">Equipment</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
+            {progressStats && (
+              <Card>
+                <CardHeader><CardTitle>Project Progress</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Tests Approved</span>
+                    <span className="font-semibold tabular-nums">
+                      {progressStats.approved} / {progressStats.total}
+                      {progressStats.total > 0 && ` (${Math.round((progressStats.approved / progressStats.total) * 100)}%)`}
+                    </span>
+                  </div>
+                  <Progress value={progressStats.total > 0 ? Math.round((progressStats.approved / progressStats.total) * 100) : 0} />
+                  <div className="flex flex-wrap gap-5 text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+                      <span className="text-muted-foreground">{progressStats.submitted} pending review</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="text-muted-foreground">{progressStats.inProgress} in progress</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground/40" />
+                      <span className="text-muted-foreground">{progressStats.draft} not started</span>
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <Card>
               <CardHeader>
                 <CardTitle>Project Information</CardTitle>
@@ -349,24 +391,9 @@ export default function ProjectDetail() {
           </TabsContent>
 
           {hasEquipment && (
-            <>
-              <TabsContent value="equipment">
-                <ProjectEquipmentTab projectId={project.id} projectStatus={project.status} />
-              </TabsContent>
-              <TabsContent value="tests">
-                <ProjectTestsTab
-                  projectId={project.id}
-                  onAllApproved={() => {
-                    if ((userRole === 'GM' || userRole === 'SUPERADMIN') && project.status === 'ACTIVE') {
-                      toast({
-                        title: 'All tests approved!',
-                        description: 'Every test has been approved. You can now close the project.',
-                      });
-                    }
-                  }}
-                />
-              </TabsContent>
-            </>
+            <TabsContent value="equipment">
+              <ProjectEquipmentTab projectId={project.id} projectStatus={project.status} />
+            </TabsContent>
           )}
         </Tabs>
       </div>

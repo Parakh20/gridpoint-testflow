@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Users,
   UserCircle,
+  BarChart2,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -33,17 +34,20 @@ function getNavItems(role: string | null): NavItem[] {
         { label: 'Dashboard', href: '/superadmin', icon: <LayoutDashboard size={18} /> },
         { label: 'User Management', href: '/superadmin', icon: <Users size={18} /> },
         { label: 'Projects', href: '/gm', icon: <FolderOpen size={18} /> },
+        { label: 'Reports', href: '/reports', icon: <BarChart2 size={18} /> },
         { label: 'Profile', href: '/profile', icon: <UserCircle size={18} /> },
       ];
     case 'GM':
       return [
         { label: 'Projects', href: '/gm', icon: <FolderOpen size={18} /> },
         { label: 'New Project', href: '/projects/new', icon: <Plus size={18} /> },
+        { label: 'Reports', href: '/reports', icon: <BarChart2 size={18} /> },
         { label: 'Profile', href: '/profile', icon: <UserCircle size={18} /> },
       ];
     case 'SUPERVISOR':
       return [
         { label: 'Dashboard', href: '/supervisor', icon: <LayoutDashboard size={18} /> },
+        { label: 'Reports', href: '/reports', icon: <BarChart2 size={18} /> },
         { label: 'Profile', href: '/profile', icon: <UserCircle size={18} /> },
       ];
     case 'ENGINEER':
@@ -105,7 +109,8 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
           {navItems.map(item => {
-            const active = location.pathname === item.href;
+            const active = location.pathname === item.href ||
+            (item.href.length > 1 && location.pathname.startsWith(item.href + '/'));
             return (
               <button
                 key={item.href + item.label}

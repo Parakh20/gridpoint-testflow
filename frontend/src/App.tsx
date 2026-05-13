@@ -20,6 +20,8 @@ import NewProject from "@/pages/projects/NewProject";
 import ProjectDetail from "@/pages/projects/ProjectDetail";
 import EditProject from "@/pages/projects/EditProject";
 import Profile from "@/pages/Profile";
+import ReportsList from "@/pages/reports/ReportsList";
+import ReportProjectDetail from "@/pages/reports/ReportProjectDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +59,8 @@ const App = () => (
                 <Route path="/supervisor" element={<ProtectedRoute requiredRole="SUPERVISOR"><SupervisorDashboard /></ProtectedRoute>} />
                 <Route path="/engineer" element={<ProtectedRoute requiredRole="ENGINEER"><EngineerDashboard /></ProtectedRoute>} />
                 <Route path="/engineer/projects/:id" element={<ProtectedRoute requiredRole="ENGINEER"><EngineerProjectDetail /></ProtectedRoute>} />
+                <Route path="/reports" element={<ProtectedRoute requiredRole={['GM', 'SUPERADMIN', 'SUPERVISOR']}><ReportsList /></ProtectedRoute>} />
+                <Route path="/reports/:id" element={<ProtectedRoute requiredRole={['GM', 'SUPERADMIN', 'SUPERVISOR']}><ReportProjectDetail /></ProtectedRoute>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
