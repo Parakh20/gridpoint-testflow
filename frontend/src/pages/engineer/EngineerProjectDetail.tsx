@@ -182,16 +182,29 @@ export default function EngineerProjectDetail() {
         .single();
       setProject(projectData);
 
-      const { data: instances, error: instanceError } = await supabase
+      // test_tasks has no project_id — scope via equipment_instances first
+      const { data: allInstances, error: allInstError } = await supabase
         .from('equipment_instances')
         .select('id, label, equipment_type, assigned_to, nameplate')
-        .eq('project_id', projectId)
+        .eq('project_id', projectId);
+
+      if (allInstError) throw allInstError;
+      if (!allInstances?.length) { setLoading(false); return; }
+
+      const allInstanceIds = allInstances.map(i => i.id);
+
+      // Then find only the tasks assigned to this engineer within the project
+      const { data: myAssignedTasks, error: assignedErr } = await supabase
+        .from('test_tasks')
+        .select('id, equipment_instance_id')
+        .in('equipment_instance_id', allInstanceIds)
         .eq('assigned_to', user.id);
 
-      if (instanceError) throw instanceError;
-      if (!instances?.length) { setLoading(false); return; }
+      if (assignedErr) throw assignedErr;
+      if (!myAssignedTasks?.length) { setLoading(false); return; }
 
-      const instanceIds = instances.map(i => i.id);
+      const instanceIds = [...new Set(myAssignedTasks.map(t => t.equipment_instance_id))];
+      const instances = allInstances.filter(i => instanceIds.includes(i.id));
 
       const { data: taskData, error } = await supabase
         .from('test_tasks')
@@ -200,7 +213,7 @@ export default function EngineerProjectDetail() {
           equipment_instance:equipment_instances(id, label, equipment_type, assigned_to, nameplate),
           test_template:test_templates(id, test_name, test_code, fields)
         `)
-        .in('equipment_instance_id', instanceIds)
+        .in('id', myAssignedTasks.map(t => t.id))
         .order('created_at');
 
       if (error) throw error;
