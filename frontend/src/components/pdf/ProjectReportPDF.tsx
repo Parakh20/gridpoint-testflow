@@ -1,127 +1,409 @@
 import React from 'react';
-import {
-  Document,
-  Page,
-  View,
-  Text,
-  StyleSheet,
-} from '@react-pdf/renderer';
+import { Document, Page, View, Text, StyleSheet, Font } from '@react-pdf/renderer';
 import { NAMEPLATE_FIELDS } from '@/lib/nameplateFields';
 import type { Section, TemplateSchema } from '@/lib/testSectionTables';
 
-const NAVY = '#1a2332';
-const BLUE = '#3b82f6';
-const BORDER = '#e2e8f0';
-const ROW_ALT = '#f7f8fa';
-const MUTED = '#64748b';
+// ─── Font registration ────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 9, color: '#0f172a', paddingBottom: 36 },
-  // Page header bar
-  pageHeader: { backgroundColor: NAVY, padding: '10 24 10 24', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pageHeaderLeft: { flexDirection: 'column' },
-  pageHeaderTitle: { color: '#ffffff', fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5 },
-  pageHeaderSub: { color: '#94a3b8', fontSize: 7, marginTop: 1 },
-  pageHeaderRight: { color: '#94a3b8', fontSize: 7, textAlign: 'right' },
-  // Fixed footer
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: BORDER, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: '5 24', backgroundColor: '#ffffff' },
-  footerText: { fontSize: 7, color: MUTED },
-  // Content area
-  content: { padding: '16 24' },
-  // Cover page
-  coverBrand: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  coverBrandBox: { width: 28, height: 28, backgroundColor: BLUE, borderRadius: 4, justifyContent: 'center', alignItems: 'center' },
-  coverBrandBoxText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  coverBrandName: { fontSize: 16, fontWeight: 'bold', color: NAVY },
-  coverBrandSub: { fontSize: 7, color: MUTED, letterSpacing: 1 },
-  coverHero: { backgroundColor: NAVY, borderRadius: 4, padding: '20 20 16 20', marginBottom: 16 },
-  coverHeroNumber: { color: '#ffffff', fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
-  coverHeroSite: { color: '#94a3b8', fontSize: 11 },
-  coverHeroStatus: { marginTop: 8, alignSelf: 'flex-start', backgroundColor: '#3b82f620', borderRadius: 3, padding: '2 6' },
-  coverHeroStatusText: { color: '#93c5fd', fontSize: 8, fontWeight: 'bold' },
-  // Info grid
-  infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 0, marginBottom: 12 },
-  infoCell: { width: '50%', paddingVertical: 6, paddingRight: 8, borderBottomWidth: 1, borderBottomColor: BORDER },
-  infoCellLabel: { fontSize: 7, color: MUTED, marginBottom: 2 },
-  infoCellValue: { fontSize: 9, fontWeight: 'bold' },
-  // Progress
-  progressSection: { marginBottom: 4 },
-  progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  progressLabel: { fontSize: 8, color: MUTED },
-  progressValue: { fontSize: 8, fontWeight: 'bold' },
-  progressBarOuter: { height: 6, backgroundColor: '#e2e8f0', borderRadius: 3, marginBottom: 8 },
-  progressBarInner: { height: 6, backgroundColor: BLUE, borderRadius: 3 },
-  progressPills: { flexDirection: 'row', gap: 12 },
-  progressPill: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  progressDot: { width: 6, height: 6, borderRadius: 3 },
-  progressPillText: { fontSize: 7, color: MUTED },
-  // Equipment section header
-  equipHeader: { backgroundColor: NAVY, borderRadius: 4, padding: '8 12', marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  equipHeaderLabel: { color: '#ffffff', fontSize: 11, fontWeight: 'bold' },
-  equipHeaderType: { color: '#94a3b8', fontSize: 8 },
-  // Sub-section label
-  subSectionTitle: { fontSize: 9, fontWeight: 'bold', color: NAVY, backgroundColor: '#f1f5f9', padding: '4 8', borderLeftWidth: 3, borderLeftColor: BLUE, marginBottom: 6 },
-  // Test block header
-  testHeader: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: BORDER, padding: '5 8', marginBottom: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 0 },
-  testHeaderName: { fontSize: 9, fontWeight: 'bold' },
-  testHeaderCode: { fontSize: 7, color: MUTED },
-  testMeta: { flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: BORDER, padding: '3 8', marginBottom: 6, backgroundColor: '#ffffff', borderTopWidth: 0 },
-  testMetaItem: { flexDirection: 'row', gap: 3 },
-  testMetaLabel: { fontSize: 7, color: MUTED },
-  testMetaValue: { fontSize: 7, fontWeight: 'bold' },
-  // Status badge
-  badgeApproved: { backgroundColor: '#dcfce7', borderRadius: 2, padding: '1 4' },
-  badgeSubmitted: { backgroundColor: '#fef3c7', borderRadius: 2, padding: '1 4' },
-  badgeDraft: { backgroundColor: '#f1f5f9', borderRadius: 2, padding: '1 4' },
-  badgeRework: { backgroundColor: '#fee2e2', borderRadius: 2, padding: '1 4' },
-  badgeInProgress: { backgroundColor: '#dbeafe', borderRadius: 2, padding: '1 4' },
-  badgeText: { fontSize: 7, fontWeight: 'bold' },
-  // Table primitives
-  table: { marginBottom: 10 },
-  tableHeaderRow: { flexDirection: 'row', backgroundColor: NAVY },
-  tableHeaderCell: { padding: '4 6', flex: 1 },
-  tableHeaderCellText: { color: '#ffffff', fontSize: 7, fontWeight: 'bold' },
-  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER },
-  tableRowAlt: { flexDirection: 'row', backgroundColor: ROW_ALT, borderBottomWidth: 1, borderBottomColor: BORDER },
-  tableCell: { padding: '4 6', flex: 1 },
-  tableCellText: { fontSize: 8 },
-  tableCellTextMuted: { fontSize: 8, color: MUTED },
-  // KV table (nameplate)
-  kvRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER },
-  kvRowAlt: { flexDirection: 'row', backgroundColor: ROW_ALT, borderBottomWidth: 1, borderBottomColor: BORDER },
-  kvLabel: { padding: '4 6', width: '40%', fontSize: 8, color: MUTED },
-  kvValue: { padding: '4 6', flex: 1, fontSize: 8 },
-  // Separator
-  divider: { height: 1, backgroundColor: BORDER, marginVertical: 10 },
-  sectionTitle: { fontSize: 8, fontWeight: 'bold', color: MUTED, marginBottom: 4 },
-  noData: { fontSize: 8, color: MUTED, fontStyle: 'italic', marginBottom: 8 },
+Font.register({
+  family: 'Inter',
+  fonts: [
+    { src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter/files/inter-latin-400-normal.woff', fontWeight: 400 },
+    { src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter/files/inter-latin-600-normal.woff', fontWeight: 600 },
+    { src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter/files/inter-latin-700-normal.woff', fontWeight: 700 },
+  ],
 });
 
-const k = (...parts: (string | number)[]) => parts.join('__');
-const cell = (v: unknown): string => {
-  if (v === null || v === undefined || v === '') return '—';
-  return String(v);
+// ─── Equipment color map ──────────────────────────────────────────────────────
+
+const EQUIPMENT_COLORS: Record<string, { primary: string; light: string }> = {
+  POWER_TRANSFORMER: { primary: '#1d4ed8', light: '#dbeafe' },
+  CT:               { primary: '#065f46', light: '#d1fae5' },
+  CVT:              { primary: '#6b21a8', light: '#f3e8ff' },
+  LA:               { primary: '#b45309', light: '#fef3c7' },
+  SF6_BREAKER:      { primary: '#9f1239', light: '#ffe4e6' },
+  ISOLATOR:         { primary: '#0e7490', light: '#cffafe' },
+  VCB:              { primary: '#4d7c0f', light: '#ecfccb' },
+  EARTH_PIT:        { primary: '#92400e', light: '#fef9c3' },
+  VT:               { primary: '#1e3a5f', light: '#e0f2fe' },
 };
+const DEFAULT_EQ_COLOR = { primary: '#374151', light: '#f3f4f6' };
 
-// ─── Status badge ─────────────────────────────────────────────────────────────
-
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, [object, string]> = {
-    APPROVED: [s.badgeApproved, 'Approved'],
-    SUBMITTED: [s.badgeSubmitted, 'Submitted'],
-    IN_PROGRESS: [s.badgeInProgress, 'In Progress'],
-    DRAFT: [s.badgeDraft, 'Draft'],
-    REWORK: [s.badgeRework, 'Rework'],
-  };
-  const [style, label] = map[status] ?? [s.badgeDraft, status];
-  return <View style={style as any}><Text style={s.badgeText}>{label}</Text></View>;
+export function getEquipmentColor(equipmentType: string): { primary: string; light: string } {
+  return EQUIPMENT_COLORS[equipmentType] ?? DEFAULT_EQ_COLOR;
 }
 
-// ─── Section table (mirrors testSectionTables.tsx for react-pdf) ──────────────
+// ─── Status badge helper ──────────────────────────────────────────────────────
 
-function PDFSectionTable({ section, payload }: { section: Section; payload: Record<string, any> }) {
-  const TitleRow = section.title ? (
-    <Text style={s.sectionTitle}>{section.title}</Text>
+function getStatusStyle(status: string): { bg: string; text: string; label: string } {
+  switch (status) {
+    case 'DRAFT':       return { bg: '#e2e8f0', text: '#475569', label: 'Draft' };
+    case 'IN_PROGRESS': return { bg: '#dbeafe', text: '#1d4ed8', label: 'In Progress' };
+    case 'SUBMITTED':   return { bg: '#fef3c7', text: '#b45309', label: 'Pending Review' };
+    case 'APPROVED':    return { bg: '#d1fae5', text: '#065f46', label: 'Approved' };
+    case 'REWORK':      return { bg: '#ffe4e6', text: '#9f1239', label: 'Rework' };
+    default:            return { bg: '#f3f4f6', text: '#374151', label: status };
+  }
+}
+
+// ─── Landscape detection ──────────────────────────────────────────────────────
+
+function maxSectionColumns(schema: TemplateSchema | null): number {
+  if (!schema) return 0;
+  let max = 0;
+  for (const sec of schema.sections) {
+    let c = 2;
+    if (sec.type === 'phase_columns') c = 1 + (sec.phases?.length ?? 3);
+    else if (sec.type === 'phase_rows') c = 1 + (sec.columns?.length ?? 2);
+    else if (sec.type === 'tap_table') c = 1 + (sec.columns?.length ?? 2);
+    else if (sec.type === 'dynamic_table') c = 1 + (sec.columns?.length ?? 2);
+    else if (sec.type === 'core_table') c = 1 + (sec.columns?.length ?? 2);
+    else if (sec.type === 'ir_fixed') c = 1 + (sec.columns?.length ?? 2);
+    else if (sec.type === 'ir_fixed_phase') c = 4 + (sec.phases?.length ?? 3);
+    else if (sec.type === 'core_phase_table') c = 2 + (sec.columns?.length ?? 2);
+    if (c > max) max = c;
+  }
+  return max;
+}
+
+// ─── Color palette ────────────────────────────────────────────────────────────
+
+const C = {
+  navy:        '#0f172a',
+  warmWhite:   '#fafaf9',
+  warmOffWhite:'#f5f0eb',
+  warmGrey:    '#78716c',
+  slate:       '#1c1917',
+  amber:       '#d97706',
+  amberDark:   '#b45309',
+  amberLight:  '#fef3c7',
+  borderLight: '#e7e5e4',
+  mutedSlate:  '#94a3b8',
+  blue:        '#3b82f6',
+  green:       '#10b981',
+  red:         '#ef4444',
+};
+
+// ─── Static styles ────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  // ── Page
+  page: {
+    fontFamily: 'Inter',
+    fontSize: 8,
+    color: C.slate,
+    backgroundColor: C.warmWhite,
+    paddingBottom: 44,
+  },
+  pageLandscape: {
+    fontFamily: 'Inter',
+    fontSize: 8,
+    color: C.slate,
+    backgroundColor: C.warmWhite,
+    paddingBottom: 44,
+  },
+
+  // ── Footer (fixed)
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 32,
+    borderTopWidth: 2,
+    borderTopColor: C.amber,
+    backgroundColor: C.warmWhite,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 28,
+  },
+  footerText: { fontSize: 7, color: C.warmGrey },
+  footerCenter: { fontSize: 7, color: C.warmGrey, textAlign: 'center' },
+
+  // ── Cover — navy section
+  coverNavy: {
+    height: 310,
+    backgroundColor: C.navy,
+    paddingHorizontal: 36,
+    paddingTop: 30,
+  },
+  coverBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 2,
+    borderLeftColor: C.amber,
+    paddingLeft: 8,
+    marginBottom: 36,
+  },
+  coverBrandName: { color: '#ffffff', fontSize: 13, fontWeight: 700 },
+  coverBrandSub: { color: C.mutedSlate, fontSize: 7, marginTop: 2, letterSpacing: 1.5 },
+  coverTitle: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: 700,
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  coverDate: { color: C.mutedSlate, fontSize: 9 },
+
+  // ── Cover — diagonal overlay (absolute)
+  coverDiagonal: {
+    position: 'absolute',
+    top: 284,
+    left: -20,
+    width: 660,
+    height: 50,
+    backgroundColor: C.navy,
+    transform: 'rotate(-2.2deg)',
+  },
+
+  // ── Cover — warm white content
+  coverContent: { paddingHorizontal: 36, paddingTop: 20 },
+
+  // ── Info card
+  infoCard: {
+    borderWidth: 1,
+    borderColor: C.borderLight,
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
+    padding: 14,
+    marginBottom: 14,
+    flexDirection: 'row',
+  },
+  infoCol: { flex: 1, paddingRight: 10 },
+  infoLabel: { fontSize: 6.5, color: C.warmGrey, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
+  infoValue: { fontSize: 9.5, fontWeight: 700, color: C.slate, marginBottom: 10 },
+
+  // ── Progress section
+  progressSectionTitle: {
+    fontSize: 7.5,
+    color: C.warmGrey,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    borderLeftWidth: 3,
+    borderLeftColor: C.amber,
+    paddingLeft: 6,
+    marginBottom: 8,
+  },
+  progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
+  progressLabel: { fontSize: 7.5, color: C.warmGrey },
+  progressValue: { fontSize: 7.5, fontWeight: 700, color: C.slate },
+  progressBarOuter: {
+    height: 10,
+    backgroundColor: C.borderLight,
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  progressPills: { flexDirection: 'row', gap: 14 },
+  progressPill: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  progressDot: { width: 7, height: 7, borderRadius: 3.5 },
+  progressPillText: { fontSize: 7, color: C.warmGrey },
+
+  // ── Cover footer strip
+  coverFooterLine: {
+    height: 1,
+    backgroundColor: C.amber,
+    marginTop: 14,
+    marginHorizontal: 36,
+  },
+  coverFooterText: {
+    fontSize: 7,
+    color: C.warmGrey,
+    textAlign: 'center',
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+
+  // ── Equipment page header bar
+  eqHeaderBar: {
+    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+  },
+  eqHeaderBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  eqHeaderCode: { color: '#ffffff', fontSize: 14, fontWeight: 700 },
+  eqHeaderType: { color: 'rgba(255,255,255,0.75)', fontSize: 9 },
+  eqHeaderPill: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
+    borderRadius: 10,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  eqHeaderPillText: { color: '#ffffff', fontSize: 7.5, fontWeight: 600 },
+  eqHeaderStrip: { height: 3 },
+
+  // ── Equipment content
+  eqContent: { paddingHorizontal: 20, paddingTop: 12 },
+
+  // ── Sub-section headers
+  subSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  subSectionTitle: {
+    fontSize: 7,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  subSectionRule: { flex: 1, height: 1, marginLeft: 8 },
+
+  // ── KV table (nameplate)
+  kvTable: { borderLeftWidth: 3, marginBottom: 10 },
+  kvHeaderRow: { flexDirection: 'row' },
+  kvHeaderCell: { flex: 1, padding: '4 6' },
+  kvHeaderText: { color: '#ffffff', fontSize: 7, fontWeight: 700 },
+  kvRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: C.borderLight },
+  kvLabel: { width: '45%', padding: '3.5 6', fontSize: 7.5, color: C.warmGrey },
+  kvValue: { flex: 1, padding: '3.5 6', fontSize: 7.5, color: C.slate, fontWeight: 600 },
+
+  // ── Test block
+  testBlock: { marginBottom: 10 },
+  testHeaderStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '5 8',
+    borderBottomWidth: 1,
+    marginBottom: 0,
+  },
+  testHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  testBullet: { width: 5, height: 5 },
+  testName: { fontSize: 8.5, fontWeight: 700, color: C.slate },
+  testCode: { fontSize: 7, fontWeight: 600 },
+  testHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  testMetaBar: {
+    flexDirection: 'row',
+    gap: 14,
+    backgroundColor: '#ffffff',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.borderLight,
+    marginBottom: 4,
+  },
+  testMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  testMetaLabel: { fontSize: 6.5, color: C.warmGrey },
+  testMetaValue: { fontSize: 7, fontWeight: 600, color: C.slate },
+
+  // ── Parameter tables
+  paramTable: { marginBottom: 6 },
+  paramHeaderRow: { flexDirection: 'row' },
+  paramHeaderCell: { flex: 1, padding: '4 5' },
+  paramHeaderCellText: { color: '#ffffff', fontSize: 6.5, fontWeight: 700, textAlign: 'center' },
+  paramRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: C.borderLight },
+  paramCell: { flex: 1, padding: '3.5 5' },
+  paramCellText: { fontSize: 7, color: C.slate },
+  paramSectionSubHeader: {
+    padding: '3 6',
+    marginVertical: 2,
+  },
+  paramSectionSubHeaderText: { fontSize: 6.5, fontWeight: 700, color: '#ffffff' },
+  noDataText: { fontSize: 7, fontStyle: 'italic', textAlign: 'center', padding: '6 0' },
+
+  // ── Status badge
+  statusBadge: { borderRadius: 3, paddingVertical: 2, paddingHorizontal: 5 },
+  statusBadgeText: { fontSize: 6.5, fontWeight: 700 },
+
+  // ── Engineer dot
+  engRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  engDot: { width: 6, height: 6, borderRadius: 3 },
+  engName: { fontSize: 7, color: C.slate },
+
+  // ── Misc
+  divider: { height: 1, backgroundColor: C.borderLight, marginVertical: 8 },
+  gap4: { height: 4 },
+  gap8: { height: 8 },
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const k = (...parts: (string | number)[]) => parts.join('__');
+const cell = (v: unknown): string =>
+  v === null || v === undefined || v === '' ? '—' : String(v);
+
+// ─── Small components ─────────────────────────────────────────────────────────
+
+function StatusPill({ status }: { status: string }) {
+  const st = getStatusStyle(status);
+  return (
+    <View style={[s.statusBadge, { backgroundColor: st.bg }]}>
+      <Text style={[s.statusBadgeText, { color: st.text }]}>{st.label}</Text>
+    </View>
+  );
+}
+
+function EngineerTag({ color, name }: { color: string; name: string }) {
+  return (
+    <View style={s.engRow}>
+      <View style={[s.engDot, { backgroundColor: color }]} />
+      <Text style={s.engName}>{name}</Text>
+    </View>
+  );
+}
+
+function PageFooter({
+  projectNumber,
+  siteName,
+  generatedAt,
+}: {
+  projectNumber: string;
+  siteName: string;
+  generatedAt: string;
+}) {
+  return (
+    <View style={s.footer} fixed>
+      <Text style={s.footerText}>{projectNumber} · {siteName}</Text>
+      <Text style={s.footerCenter}>TestFlow Grid Control · {generatedAt}</Text>
+      <Text
+        style={s.footerText}
+        render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+      />
+    </View>
+  );
+}
+
+// ─── Section table ────────────────────────────────────────────────────────────
+
+function PDFSectionTable({
+  section,
+  payload,
+  eqColor,
+}: {
+  section: Section;
+  payload: Record<string, any>;
+  eqColor: { primary: string; light: string };
+}) {
+  const HeaderRow = ({ children }: { children: React.ReactNode }) => (
+    <View style={[s.paramHeaderRow, { backgroundColor: eqColor.primary }]}>{children}</View>
+  );
+  const HCell = ({ label, flex, maxWidth }: { label: string; flex?: number; maxWidth?: number }) => (
+    <View style={[s.paramHeaderCell, flex !== undefined ? { flex } : {}, maxWidth !== undefined ? { maxWidth } : {}]}>
+      <Text style={s.paramHeaderCellText}>{label}</Text>
+    </View>
+  );
+  const DataRow = ({ idx, children }: { idx: number; children: React.ReactNode }) => (
+    <View style={[s.paramRow, idx % 2 === 1 ? { backgroundColor: eqColor.light } : { backgroundColor: '#ffffff' }]}>
+      {children}
+    </View>
+  );
+  const DCell = ({ value, flex, maxWidth }: { value: unknown; flex?: number; maxWidth?: number }) => (
+    <View style={[s.paramCell, flex !== undefined ? { flex } : {}, maxWidth !== undefined ? { maxWidth } : {}]}>
+      <Text style={s.paramCellText}>{cell(value)}</Text>
+    </View>
+  );
+
+  const SectionTitle = section.title ? (
+    <View style={[s.paramSectionSubHeader, { backgroundColor: '#64748b' }]}>
+      <Text style={s.paramSectionSubHeaderText}>{section.title}</Text>
+    </View>
   ) : null;
 
   switch (section.type) {
@@ -129,13 +411,19 @@ function PDFSectionTable({ section, payload }: { section: Section; payload: Reco
       const fields = section.fields ?? [];
       if (!fields.length) return null;
       return (
-        <View style={s.table}>
-          {TitleRow}
+        <View style={s.paramTable}>
+          {SectionTitle}
           {fields.map((f, idx) => (
-            <View key={f.key} style={idx % 2 === 0 ? s.kvRow : s.kvRowAlt}>
-              <Text style={s.kvLabel}>{f.title}{f.unit ? ` (${f.unit})` : ''}</Text>
-              <Text style={s.kvValue}>{cell(payload[k(section.id, f.key)])}</Text>
-            </View>
+            <DataRow key={f.key} idx={idx}>
+              <View style={[s.paramCell, { flex: 2 }]}>
+                <Text style={[s.paramCellText, { color: C.warmGrey }]}>
+                  {f.title}{f.unit ? ` (${f.unit})` : ''}
+                </Text>
+              </View>
+              <View style={[s.paramCell, { flex: 3 }]}>
+                <Text style={[s.paramCellText, { fontWeight: 600 }]}>{cell(payload[k(section.id, f.key)])}</Text>
+              </View>
+            </DataRow>
           ))}
         </View>
       );
@@ -145,23 +433,17 @@ function PDFSectionTable({ section, payload }: { section: Section; payload: Reco
       const phases = section.phases ?? ['R', 'Y', 'B'];
       const fields = section.fields ?? [];
       return (
-        <View style={s.table}>
-          {TitleRow}
-          <View style={s.tableHeaderRow}>
-            <View style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>Parameter</Text></View>
-            {phases.map(p => (
-              <View key={p} style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>Phase {p}</Text></View>
-            ))}
-          </View>
+        <View style={s.paramTable}>
+          {SectionTitle}
+          <HeaderRow>
+            <HCell label="Parameter" flex={2} />
+            {phases.map(p => <HCell key={p} label={`Phase ${p}`} />)}
+          </HeaderRow>
           {fields.map((f, idx) => (
-            <View key={f.key} style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-              <View style={s.tableCell}><Text style={s.tableCellText}>{f.title}{f.unit ? ` (${f.unit})` : ''}</Text></View>
-              {phases.map(ph => (
-                <View key={ph} style={s.tableCell}>
-                  <Text style={s.tableCellText}>{cell(payload[k(section.id, ph, f.key)])}</Text>
-                </View>
-              ))}
-            </View>
+            <DataRow key={f.key} idx={idx}>
+              <DCell value={`${f.title}${f.unit ? ` (${f.unit})` : ''}`} flex={2} />
+              {phases.map(ph => <DCell key={ph} value={payload[k(section.id, ph, f.key)]} />)}
+            </DataRow>
           ))}
         </View>
       );
@@ -171,23 +453,17 @@ function PDFSectionTable({ section, payload }: { section: Section; payload: Reco
       const phases = section.phases ?? ['R', 'Y', 'B'];
       const cols = section.columns ?? [];
       return (
-        <View style={s.table}>
-          {TitleRow}
-          <View style={s.tableHeaderRow}>
-            <View style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>Phase</Text></View>
-            {cols.map(c => (
-              <View key={c.key} style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>{c.title}</Text></View>
-            ))}
-          </View>
+        <View style={s.paramTable}>
+          {SectionTitle}
+          <HeaderRow>
+            <HCell label="Phase" />
+            {cols.map(c => <HCell key={c.key} label={c.title} />)}
+          </HeaderRow>
           {phases.map((ph, idx) => (
-            <View key={ph} style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-              <View style={s.tableCell}><Text style={s.tableCellText}>{ph}</Text></View>
-              {cols.map(c => (
-                <View key={c.key} style={s.tableCell}>
-                  <Text style={s.tableCellText}>{cell(payload[k(section.id, ph, c.key)])}</Text>
-                </View>
-              ))}
-            </View>
+            <DataRow key={ph} idx={idx}>
+              <DCell value={ph} />
+              {cols.map(c => <DCell key={c.key} value={payload[k(section.id, ph, c.key)]} />)}
+            </DataRow>
           ))}
         </View>
       );
@@ -198,23 +474,17 @@ function PDFSectionTable({ section, payload }: { section: Section; payload: Reco
       const tapCount = (section.tap_count_default ?? 17) + extra;
       const cols = section.columns ?? [];
       return (
-        <View style={s.table}>
-          {TitleRow}
-          <View style={s.tableHeaderRow}>
-            <View style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>Tap No.</Text></View>
-            {cols.map(c => (
-              <View key={c.key} style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>{c.title}</Text></View>
-            ))}
-          </View>
+        <View style={s.paramTable}>
+          {SectionTitle}
+          <HeaderRow>
+            <HCell label="Tap No." maxWidth={30} />
+            {cols.map(c => <HCell key={c.key} label={c.title} />)}
+          </HeaderRow>
           {Array.from({ length: tapCount }, (_, i) => i + 1).map((n, idx) => (
-            <View key={n} style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-              <View style={s.tableCell}><Text style={s.tableCellText}>{n}</Text></View>
-              {cols.map(c => (
-                <View key={c.key} style={s.tableCell}>
-                  <Text style={s.tableCellText}>{cell(payload[k(section.id, `tap${n}`, c.key)])}</Text>
-                </View>
-              ))}
-            </View>
+            <DataRow key={n} idx={idx}>
+              <DCell value={n} maxWidth={30} />
+              {cols.map(c => <DCell key={c.key} value={payload[k(section.id, `tap${n}`, c.key)]} />)}
+            </DataRow>
           ))}
         </View>
       );
@@ -224,25 +494,24 @@ function PDFSectionTable({ section, payload }: { section: Section; payload: Reco
       const cols = section.columns ?? [];
       const rows: Record<string, any>[] = payload[k(section.id, 'rows')] ?? [];
       return (
-        <View style={s.table}>
-          {TitleRow}
-          <View style={s.tableHeaderRow}>
-            <View style={[s.tableHeaderCell, { maxWidth: 24 }]}><Text style={s.tableHeaderCellText}>Sr.</Text></View>
-            {cols.map(c => (
-              <View key={c.key} style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>{c.title}</Text></View>
-            ))}
-          </View>
-          {rows.length === 0
-            ? <View style={s.tableRow}><View style={s.tableCell}><Text style={s.tableCellTextMuted}>No rows</Text></View></View>
-            : rows.map((row, idx) => (
-              <View key={idx} style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-                <View style={[s.tableCell, { maxWidth: 24 }]}><Text style={s.tableCellText}>{idx + 1}</Text></View>
-                {cols.map(c => (
-                  <View key={c.key} style={s.tableCell}><Text style={s.tableCellText}>{cell(row[c.key])}</Text></View>
-                ))}
+        <View style={s.paramTable}>
+          {SectionTitle}
+          <HeaderRow>
+            <HCell label="Sr." maxWidth={24} />
+            {cols.map(c => <HCell key={c.key} label={c.title} />)}
+          </HeaderRow>
+          {rows.length === 0 ? (
+            <View style={[s.paramRow, { backgroundColor: '#ffffff' }]}>
+              <View style={s.paramCell}>
+                <Text style={[s.noDataText, { color: eqColor.primary }]}>No data recorded</Text>
               </View>
-            ))
-          }
+            </View>
+          ) : rows.map((row, idx) => (
+            <DataRow key={idx} idx={idx}>
+              <DCell value={idx + 1} maxWidth={24} />
+              {cols.map(c => <DCell key={c.key} value={row[c.key]} />)}
+            </DataRow>
+          ))}
         </View>
       );
     }
@@ -252,23 +521,17 @@ function PDFSectionTable({ section, payload }: { section: Section; payload: Reco
       const numCores = (section.num_cores_default ?? 4) + extra;
       const cols = section.columns ?? [];
       return (
-        <View style={s.table}>
-          {TitleRow}
-          <View style={s.tableHeaderRow}>
-            <View style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>Core No.</Text></View>
-            {cols.map(c => (
-              <View key={c.key} style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>{c.title}</Text></View>
-            ))}
-          </View>
+        <View style={s.paramTable}>
+          {SectionTitle}
+          <HeaderRow>
+            <HCell label="Core No." maxWidth={40} />
+            {cols.map(c => <HCell key={c.key} label={c.title} />)}
+          </HeaderRow>
           {Array.from({ length: numCores }, (_, i) => i + 1).map((n, idx) => (
-            <View key={n} style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-              <View style={s.tableCell}><Text style={s.tableCellText}>{n}</Text></View>
-              {cols.map(c => (
-                <View key={c.key} style={s.tableCell}>
-                  <Text style={s.tableCellText}>{cell(payload[k(section.id, `core${n}`, c.key)])}</Text>
-                </View>
-              ))}
-            </View>
+            <DataRow key={n} idx={idx}>
+              <DCell value={n} maxWidth={40} />
+              {cols.map(c => <DCell key={c.key} value={payload[k(section.id, `core${n}`, c.key)]} />)}
+            </DataRow>
           ))}
         </View>
       );
@@ -278,25 +541,22 @@ function PDFSectionTable({ section, payload }: { section: Section; payload: Reco
       const sectionRows = section.rows ?? [];
       const cols = section.columns ?? [];
       const extraRows: Array<{ id: string; label: string }> = payload[k(section.id, 'extra_rows')] ?? [];
-      const allRows = [...sectionRows.map(r => ({ id: r.id, label: r.label ?? r.insulation ?? r.parameter ?? '' })), ...extraRows];
+      const allRows = [
+        ...sectionRows.map(r => ({ id: r.id, label: r.label ?? r.insulation ?? r.parameter ?? '' })),
+        ...extraRows,
+      ];
       return (
-        <View style={s.table}>
-          {TitleRow}
-          <View style={s.tableHeaderRow}>
-            <View style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>{section.row_label_header ?? 'Measurement'}</Text></View>
-            {cols.map(c => (
-              <View key={c.key} style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>{c.title}</Text></View>
-            ))}
-          </View>
+        <View style={s.paramTable}>
+          {SectionTitle}
+          <HeaderRow>
+            <HCell label={section.row_label_header ?? 'Measurement'} flex={2} />
+            {cols.map(c => <HCell key={c.key} label={c.title} />)}
+          </HeaderRow>
           {allRows.map((row, idx) => (
-            <View key={row.id} style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-              <View style={s.tableCell}><Text style={s.tableCellText}>{row.label}</Text></View>
-              {cols.map(c => (
-                <View key={c.key} style={s.tableCell}>
-                  <Text style={s.tableCellText}>{cell(payload[k(section.id, row.id, c.key)])}</Text>
-                </View>
-              ))}
-            </View>
+            <DataRow key={row.id} idx={idx}>
+              <DCell value={row.label} flex={2} />
+              {cols.map(c => <DCell key={c.key} value={payload[k(section.id, row.id, c.key)]} />)}
+            </DataRow>
           ))}
         </View>
       );
@@ -308,42 +568,27 @@ function PDFSectionTable({ section, payload }: { section: Section; payload: Reco
       const extraRows: Array<{ id: string; insulation: string; voltage: string; unit: string }> =
         payload[k(section.id, 'extra_rows')] ?? [];
       return (
-        <View style={s.table}>
-          {TitleRow}
-          <View style={s.tableHeaderRow}>
-            <View style={[s.tableHeaderCell, { maxWidth: 20 }]}><Text style={s.tableHeaderCellText}>Sr.</Text></View>
-            <View style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>Insulation Tested</Text></View>
-            <View style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>Applied Voltage</Text></View>
-            <View style={[s.tableHeaderCell, { maxWidth: 28 }]}><Text style={s.tableHeaderCellText}>Unit</Text></View>
-            {phases.map(p => (
-              <View key={p} style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>{p} Phase</Text></View>
-            ))}
-          </View>
-          {sectionRows.map((row, idx) => (
-            <View key={row.id} style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-              <View style={[s.tableCell, { maxWidth: 20 }]}><Text style={s.tableCellText}>{row.sr ?? ''}</Text></View>
-              <View style={s.tableCell}><Text style={s.tableCellText}>{row.insulation ?? ''}</Text></View>
-              <View style={s.tableCell}><Text style={s.tableCellText}>{row.voltage ?? ''}</Text></View>
-              <View style={[s.tableCell, { maxWidth: 28 }]}><Text style={s.tableCellText}>{row.unit ?? ''}</Text></View>
-              {phases.map(ph => (
-                <View key={ph} style={s.tableCell}>
-                  <Text style={s.tableCellText}>{cell(payload[k(section.id, row.id, ph)])}</Text>
-                </View>
-              ))}
-            </View>
-          ))}
-          {extraRows.map((row, idx) => (
-            <View key={row.id} style={(sectionRows.length + idx) % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-              <View style={[s.tableCell, { maxWidth: 20 }]}><Text style={s.tableCellText}></Text></View>
-              <View style={s.tableCell}><Text style={s.tableCellText}>{row.insulation ?? ''}</Text></View>
-              <View style={s.tableCell}><Text style={s.tableCellText}>{row.voltage ?? ''}</Text></View>
-              <View style={[s.tableCell, { maxWidth: 28 }]}><Text style={s.tableCellText}>{row.unit ?? ''}</Text></View>
-              {phases.map(ph => (
-                <View key={ph} style={s.tableCell}>
-                  <Text style={s.tableCellText}>{cell(payload[k(section.id, row.id, ph)])}</Text>
-                </View>
-              ))}
-            </View>
+        <View style={s.paramTable}>
+          {SectionTitle}
+          <HeaderRow>
+            <HCell label="Sr." maxWidth={18} />
+            <HCell label="Insulation Tested" flex={2} />
+            <HCell label="Applied Voltage" />
+            <HCell label="Unit" maxWidth={26} />
+            {phases.map(p => <HCell key={p} label={`${p} Phase`} />)}
+          </HeaderRow>
+          {[...sectionRows.map(r => ({
+            id: r.id, sr: r.sr ?? '', ins: r.insulation ?? '', vol: r.voltage ?? '', unit: r.unit ?? '',
+          })), ...extraRows.map(r => ({
+            id: r.id, sr: '', ins: r.insulation ?? '', vol: r.voltage ?? '', unit: r.unit ?? '',
+          }))].map((row, idx) => (
+            <DataRow key={row.id} idx={idx}>
+              <DCell value={row.sr} maxWidth={18} />
+              <DCell value={row.ins} flex={2} />
+              <DCell value={row.vol} />
+              <DCell value={row.unit} maxWidth={26} />
+              {phases.map(ph => <DCell key={ph} value={payload[k(section.id, row.id, ph)]} />)}
+            </DataRow>
           ))}
         </View>
       );
@@ -354,36 +599,36 @@ function PDFSectionTable({ section, payload }: { section: Section; payload: Reco
       const phases = section.phases ?? ['R', 'Y', 'B'];
       const numCores = section.num_cores_default ?? 4;
       const allRows: Array<{ core: number; phase: string }> = [];
-      for (let n = 1; n <= numCores; n++) {
+      for (let n = 1; n <= numCores; n++)
         for (const ph of phases) allRows.push({ core: n, phase: ph });
-      }
       return (
-        <View style={s.table}>
-          {TitleRow}
-          <View style={s.tableHeaderRow}>
-            <View style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>Core</Text></View>
-            <View style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>Phase</Text></View>
-            {cols.map(c => (
-              <View key={c.key} style={s.tableHeaderCell}><Text style={s.tableHeaderCellText}>{c.title}</Text></View>
-            ))}
-          </View>
+        <View style={s.paramTable}>
+          {SectionTitle}
+          <HeaderRow>
+            <HCell label="Core" />
+            <HCell label="Phase" />
+            {cols.map(c => <HCell key={c.key} label={c.title} />)}
+          </HeaderRow>
           {allRows.map(({ core, phase }, idx) => (
-            <View key={`${core}-${phase}`} style={idx % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-              <View style={s.tableCell}><Text style={s.tableCellText}>Core {core}</Text></View>
-              <View style={s.tableCell}><Text style={s.tableCellText}>{phase}</Text></View>
-              {cols.map(c => (
-                <View key={c.key} style={s.tableCell}>
-                  <Text style={s.tableCellText}>{cell(payload[k(section.id, core, phase, c.key)])}</Text>
-                </View>
-              ))}
-            </View>
+            <DataRow key={`${core}-${phase}`} idx={idx}>
+              <DCell value={`Core ${core}`} />
+              <DCell value={phase} />
+              {cols.map(c => <DCell key={c.key} value={payload[k(section.id, core, phase, c.key)]} />)}
+            </DataRow>
           ))}
         </View>
       );
     }
 
     default:
-      return <Text style={s.noData}>{section.title ? `${section.title}: ` : ''}(section type "{section.type}" not rendered)</Text>;
+      return (
+        <View style={s.paramTable}>
+          {SectionTitle}
+          <Text style={[s.noDataText, { color: eqColor.primary }]}>
+            ({section.type} — not rendered)
+          </Text>
+        </View>
+      );
   }
 }
 
@@ -431,126 +676,166 @@ export interface ProjectReportPDFProps {
   generatedAt: string;
 }
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
-
-function PageFooter({ projectNumber, generatedAt }: { projectNumber: string; generatedAt: string }) {
-  return (
-    <View style={s.footer} fixed>
-      <Text style={s.footerText}>{projectNumber} — {generatedAt}</Text>
-      <Text style={s.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
-    </View>
-  );
-}
-
-// ─── Cover Page ───────────────────────────────────────────────────────────────
+// ─── Cover page ───────────────────────────────────────────────────────────────
 
 function CoverPage({ props }: { props: ProjectReportPDFProps }) {
   const { projectNumber, siteName, siteAddress, client, status, startDate, createdAt, managerName, progressStats, generatedAt } = props;
-  const approvedPct = progressStats.total > 0 ? Math.round((progressStats.approved / progressStats.total) * 100) : 0;
+  const { approved, total, submitted, inProgress, draft } = progressStats;
+  const pct = total > 0 ? Math.round((approved / total) * 100) : 0;
+  const barColor = pct >= 70 ? C.green : pct >= 30 ? C.amber : C.red;
+  const statusSt = getStatusStyle(status);
 
   return (
     <Page size="A4" style={s.page}>
-      <View style={s.pageHeader}>
-        <View style={s.pageHeaderLeft}>
-          <Text style={s.pageHeaderTitle}>TestFlow — Grid Control</Text>
-          <Text style={s.pageHeaderSub}>Project Test Report</Text>
+      {/* ── Navy top section */}
+      <View style={s.coverNavy}>
+        {/* Branding */}
+        <View style={s.coverBrand}>
+          <View>
+            <Text style={s.coverBrandName}>TestFlow</Text>
+            <Text style={s.coverBrandSub}>GRID CONTROL</Text>
+          </View>
         </View>
-        <Text style={s.pageHeaderRight}>{generatedAt}</Text>
+        {/* Title */}
+        <Text style={s.coverTitle}>PROJECT TEST{'\n'}REPORT</Text>
+        <Text style={s.coverDate}>{generatedAt}</Text>
       </View>
 
-      <View style={s.content}>
-        {/* Hero block */}
-        <View style={s.coverHero}>
-          <Text style={s.coverHeroNumber}>{projectNumber}</Text>
-          <Text style={s.coverHeroSite}>{siteName}</Text>
-          <View style={s.coverHeroStatus}>
-            <Text style={s.coverHeroStatusText}>{status}</Text>
+      {/* ── Diagonal overlay */}
+      <View style={s.coverDiagonal} />
+
+      {/* ── Warm white content */}
+      <View style={s.coverContent}>
+        {/* Project details card */}
+        <View style={s.infoCard}>
+          {/* Col 1 */}
+          <View style={s.infoCol}>
+            <Text style={s.infoLabel}>Project Number</Text>
+            <Text style={s.infoValue}>{projectNumber}</Text>
+            <Text style={s.infoLabel}>Site Name</Text>
+            <Text style={s.infoValue}>{siteName}</Text>
+            <Text style={s.infoLabel}>Site Address</Text>
+            <Text style={s.infoValue}>{siteAddress ?? '—'}</Text>
+          </View>
+          {/* Col 2 */}
+          <View style={s.infoCol}>
+            <Text style={s.infoLabel}>Client</Text>
+            <Text style={s.infoValue}>{client ?? '—'}</Text>
+            <Text style={s.infoLabel}>Manager</Text>
+            <Text style={s.infoValue}>{managerName ?? '—'}</Text>
+            <Text style={s.infoLabel}>Start Date</Text>
+            <Text style={s.infoValue}>{startDate ?? '—'}</Text>
+          </View>
+          {/* Col 3 */}
+          <View style={[s.infoCol, { paddingRight: 0 }]}>
+            <Text style={s.infoLabel}>Status</Text>
+            <View style={{ marginBottom: 10 }}>
+              <View style={[s.statusBadge, { backgroundColor: statusSt.bg, alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8 }]}>
+                <Text style={[s.statusBadgeText, { color: statusSt.text, fontSize: 9 }]}>{statusSt.label}</Text>
+              </View>
+            </View>
+            <Text style={s.infoLabel}>Created</Text>
+            <Text style={s.infoValue}>{createdAt}</Text>
           </View>
         </View>
 
-        {/* Project info grid */}
-        <View style={s.infoGrid}>
+        {/* Progress section */}
+        <Text style={s.progressSectionTitle}>TEST PROGRESS</Text>
+        <View style={s.progressRow}>
+          <Text style={s.progressLabel}>Tests Approved</Text>
+          <Text style={s.progressValue}>{approved} / {total} ({pct}%)</Text>
+        </View>
+        <View style={s.progressBarOuter}>
+          <View style={{ height: 10, width: `${pct}%` as any, backgroundColor: barColor, borderRadius: 5 }} />
+        </View>
+        <View style={s.progressPills}>
           {[
-            ['Site Name', siteName],
-            ['Client', client ?? '—'],
-            ['Site Address', siteAddress ?? '—'],
-            ['Manager', managerName ?? '—'],
-            ['Start Date', startDate ?? '—'],
-            ['Created', createdAt],
-          ].map(([label, value]) => (
-            <View key={label} style={s.infoCell}>
-              <Text style={s.infoCellLabel}>{label}</Text>
-              <Text style={s.infoCellValue}>{value}</Text>
+            { dot: C.amber, label: `${submitted} Pending Review` },
+            { dot: C.blue,  label: `${inProgress} In Progress` },
+            { dot: '#94a3b8', label: `${draft} Not Started` },
+            { dot: C.green, label: `${approved} Approved` },
+          ].map(({ dot, label }) => (
+            <View key={label} style={s.progressPill}>
+              <View style={[s.progressDot, { backgroundColor: dot }]} />
+              <Text style={s.progressPillText}>{label}</Text>
             </View>
           ))}
         </View>
-
-        <View style={s.divider} />
-
-        {/* Progress */}
-        <View style={s.progressSection}>
-          <View style={s.progressRow}>
-            <Text style={s.progressLabel}>Tests Approved</Text>
-            <Text style={s.progressValue}>{progressStats.approved} / {progressStats.total} ({approvedPct}%)</Text>
-          </View>
-          <View style={s.progressBarOuter}>
-            <View style={[s.progressBarInner, { width: `${approvedPct}%` as any }]} />
-          </View>
-          <View style={s.progressPills}>
-            <View style={s.progressPill}>
-              <View style={[s.progressDot, { backgroundColor: '#f59e0b' }]} />
-              <Text style={s.progressPillText}>{progressStats.submitted} pending review</Text>
-            </View>
-            <View style={s.progressPill}>
-              <View style={[s.progressDot, { backgroundColor: '#3b82f6' }]} />
-              <Text style={s.progressPillText}>{progressStats.inProgress} in progress</Text>
-            </View>
-            <View style={s.progressPill}>
-              <View style={[s.progressDot, { backgroundColor: '#cbd5e1' }]} />
-              <Text style={s.progressPillText}>{progressStats.draft} not started</Text>
-            </View>
-          </View>
-        </View>
       </View>
 
-      <PageFooter projectNumber={projectNumber} generatedAt={generatedAt} />
+      {/* ── Cover footer */}
+      <View style={s.coverFooterLine} />
+      <Text style={s.coverFooterText}>Confidential — For Internal Use Only</Text>
+
+      <PageFooter projectNumber={projectNumber} siteName={siteName} generatedAt={generatedAt} />
     </Page>
   );
 }
 
-// ─── Equipment Page ───────────────────────────────────────────────────────────
+// ─── Equipment page ───────────────────────────────────────────────────────────
 
-function EquipmentPage({ group, projectNumber, generatedAt }: { group: PDFEquipmentGroup; projectNumber: string; generatedAt: string }) {
-  const nameplateFields = NAMEPLATE_FIELDS[group.equipmentType] ?? [];
-  const hasNameplate = nameplateFields.some(f => group.nameplate?.[f.key] != null && group.nameplate[f.key] !== '');
+function EquipmentPage({
+  group,
+  projectNumber,
+  siteName,
+  generatedAt,
+}: {
+  group: PDFEquipmentGroup;
+  projectNumber: string;
+  siteName: string;
+  generatedAt: string;
+}) {
+  const eqColor = getEquipmentColor(group.equipmentType);
+  const npFields = NAMEPLATE_FIELDS[group.equipmentType] ?? [];
+  const approvedCount = group.tasks.filter(t => t.status === 'APPROVED').length;
+  const isLandscape = group.tasks.some(t => maxSectionColumns(t.schema) > 7);
+
+  const pageStyle = isLandscape
+    ? [s.pageLandscape, { paddingBottom: 44 }]
+    : s.page;
 
   return (
-    <Page size="A4" style={s.page} break>
-      <View style={s.pageHeader}>
-        <View style={s.pageHeaderLeft}>
-          <Text style={s.pageHeaderTitle}>{projectNumber} — {group.label}</Text>
-          <Text style={s.pageHeaderSub}>{group.equipmentType.replace(/_/g, ' ')}</Text>
+    <Page
+      size="A4"
+      orientation={isLandscape ? 'landscape' : 'portrait'}
+      style={pageStyle}
+      break
+    >
+      {/* ── Equipment header bar */}
+      <View style={[s.eqHeaderBar, { backgroundColor: eqColor.primary }]}>
+        <View style={s.eqHeaderBarLeft}>
+          <Text style={s.eqHeaderCode}>{group.label}</Text>
+          <Text style={s.eqHeaderType}>  —  {group.equipmentType.replace(/_/g, ' ')}</Text>
         </View>
-        <Text style={s.pageHeaderRight}>{generatedAt}</Text>
+        <View style={s.eqHeaderPill}>
+          <Text style={s.eqHeaderPillText}>{approvedCount}/{group.tasks.length} approved</Text>
+        </View>
       </View>
+      {/* Color accent strip below header */}
+      <View style={[s.eqHeaderStrip, { backgroundColor: eqColor.light }]} />
 
-      <View style={s.content}>
-        {/* Equipment header */}
-        <View style={s.equipHeader}>
-          <Text style={s.equipHeaderLabel}>{group.label}</Text>
-          <Text style={s.equipHeaderType}>{group.equipmentType.replace(/_/g, ' ')}</Text>
-        </View>
-
-        {/* Nameplate Details */}
-        {nameplateFields.length > 0 && (
-          <View style={{ marginBottom: 12 }}>
-            <Text style={s.subSectionTitle}>Nameplate Details</Text>
-            <View style={s.table}>
-              {nameplateFields.map((f, idx) => (
-                <View key={f.key} style={idx % 2 === 0 ? s.kvRow : s.kvRowAlt}>
+      <View style={s.eqContent}>
+        {/* ── Nameplate Details */}
+        {npFields.length > 0 && (
+          <View>
+            <View style={s.subSectionHeader}>
+              <Text style={[s.subSectionTitle, { color: eqColor.primary }]}>Nameplate Details</Text>
+              <View style={[s.subSectionRule, { backgroundColor: eqColor.primary }]} />
+            </View>
+            <View style={[s.kvTable, { borderLeftColor: eqColor.primary }]}>
+              {/* Header */}
+              <View style={[s.kvHeaderRow, { backgroundColor: eqColor.primary }]}>
+                <View style={[s.kvHeaderCell, { flex: 2 }]}><Text style={s.kvHeaderText}>Field</Text></View>
+                <View style={[s.kvHeaderCell, { flex: 3 }]}><Text style={s.kvHeaderText}>Value</Text></View>
+              </View>
+              {npFields.map((f, idx) => (
+                <View
+                  key={f.key}
+                  style={[s.kvRow, idx % 2 === 1 ? { backgroundColor: eqColor.light } : { backgroundColor: '#ffffff' }]}
+                >
                   <Text style={s.kvLabel}>{f.label}{f.unit ? ` (${f.unit})` : ''}</Text>
                   <Text style={s.kvValue}>
-                    {hasNameplate ? cell(group.nameplate?.[f.key]) : '—'}
+                    {cell(group.nameplate?.[f.key])}
                   </Text>
                 </View>
               ))}
@@ -558,35 +843,45 @@ function EquipmentPage({ group, projectNumber, generatedAt }: { group: PDFEquipm
           </View>
         )}
 
-        {/* Testing Parameters */}
-        <Text style={s.subSectionTitle}>Testing Parameters</Text>
+        {/* ── Testing Parameters */}
+        <View style={s.subSectionHeader}>
+          <Text style={[s.subSectionTitle, { color: eqColor.primary }]}>Testing Parameters</Text>
+          <View style={[s.subSectionRule, { backgroundColor: eqColor.primary }]} />
+        </View>
 
         {group.tasks.map(task => (
-          <View key={task.id} style={{ marginBottom: 10 }}>
-            {/* Test block header */}
-            <View style={s.testHeader}>
-              <Text style={s.testHeaderName}>{task.testName}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={s.testHeaderCode}>{task.testCode}</Text>
+          <View key={task.id} style={s.testBlock}>
+            {/* Test header strip */}
+            <View style={[s.testHeaderStrip, { backgroundColor: eqColor.light, borderBottomColor: eqColor.primary }]}>
+              <View style={s.testHeaderLeft}>
+                <View style={[s.testBullet, { backgroundColor: eqColor.primary }]} />
+                <Text style={s.testName}>{task.testName}</Text>
+                <Text style={[s.testCode, { color: eqColor.primary }]}> · {task.testCode}</Text>
+              </View>
+              <View style={s.testHeaderRight}>
                 <StatusPill status={task.status} />
+                <EngineerTag color={task.assignedEngineerColor} name={task.assignedEngineerName} />
               </View>
             </View>
 
-            {/* Test meta */}
-            <View style={s.testMeta}>
-              <View style={s.testMetaItem}>
-                <Text style={s.testMetaLabel}>Instrument:</Text>
-                <Text style={s.testMetaValue}>{task.instrumentId ?? '—'}</Text>
-              </View>
-              <View style={s.testMetaItem}>
-                <Text style={s.testMetaLabel}>Result:</Text>
-                <Text style={s.testMetaValue}>{task.passFail ?? '—'}</Text>
-              </View>
-              <View style={s.testMetaItem}>
-                <Text style={s.testMetaLabel}>Engineer:</Text>
-                <View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: task.assignedEngineerColor, marginTop: 1, marginRight: 2 }]} />
-                <Text style={s.testMetaValue}>{task.assignedEngineerName}</Text>
-              </View>
+            {/* Meta bar */}
+            <View style={s.testMetaBar}>
+              {task.instrumentId && (
+                <View style={s.testMetaItem}>
+                  <Text style={s.testMetaLabel}>Instrument:</Text>
+                  <Text style={s.testMetaValue}>{task.instrumentId}</Text>
+                </View>
+              )}
+              {task.passFail && (
+                <View style={s.testMetaItem}>
+                  <Text style={s.testMetaLabel}>Result:</Text>
+                  <Text style={[s.testMetaValue, {
+                    color: task.passFail === 'PASS' ? '#065f46' : task.passFail === 'FAIL' ? '#9f1239' : C.amberDark
+                  }]}>
+                    {task.passFail}
+                  </Text>
+                </View>
+              )}
               {task.remarks && (
                 <View style={s.testMetaItem}>
                   <Text style={s.testMetaLabel}>Remarks:</Text>
@@ -595,19 +890,20 @@ function EquipmentPage({ group, projectNumber, generatedAt }: { group: PDFEquipm
               )}
             </View>
 
-            {/* Sections */}
-            {task.schema && task.schema.sections.map(section => (
-              <PDFSectionTable key={section.id} section={section} payload={task.payload} />
+            {/* Section tables */}
+            {task.schema && task.schema.sections.map(sec => (
+              <PDFSectionTable key={sec.id} section={sec} payload={task.payload} eqColor={eqColor} />
             ))}
-
             {!task.schema && (
-              <Text style={s.noData}>No parameter schema available for this test.</Text>
+              <Text style={[s.noDataText, { color: eqColor.primary }]}>
+                No parameter schema available for this test.
+              </Text>
             )}
           </View>
         ))}
       </View>
 
-      <PageFooter projectNumber={projectNumber} generatedAt={generatedAt} />
+      <PageFooter projectNumber={projectNumber} siteName={siteName} generatedAt={generatedAt} />
     </Page>
   );
 }
@@ -615,8 +911,7 @@ function EquipmentPage({ group, projectNumber, generatedAt }: { group: PDFEquipm
 // ─── Main Document ────────────────────────────────────────────────────────────
 
 export function ProjectReportPDF(props: ProjectReportPDFProps) {
-  const { projectNumber, generatedAt, equipmentGroups } = props;
-
+  const { projectNumber, siteName, generatedAt, equipmentGroups } = props;
   return (
     <Document title={`${projectNumber} Test Report`} author="TestFlow">
       <CoverPage props={props} />
@@ -625,6 +920,7 @@ export function ProjectReportPDF(props: ProjectReportPDFProps) {
           key={group.id}
           group={group}
           projectNumber={projectNumber}
+          siteName={siteName}
           generatedAt={generatedAt}
         />
       ))}
