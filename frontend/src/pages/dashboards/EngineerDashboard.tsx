@@ -38,19 +38,28 @@ export default function EngineerDashboard() {
   const fetchAssignedProjects = async () => {
     if (!user) return;
     try {
-      const { data: instances, error: instanceError } = await supabase
-        .from('equipment_instances')
-        .select('id, project_id')
+      // Tasks are now assigned at scope level, not equipment level
+      const { data: myTasks, error: tasksError } = await supabase
+        .from('test_tasks')
+        .select('id, status, equipment_instance_id')
         .eq('assigned_to', user.id);
 
-      if (instanceError) throw instanceError;
-      if (!instances?.length) {
+      if (tasksError) throw tasksError;
+      if (!myTasks?.length) {
         setLoading(false);
         return;
       }
 
-      const instanceIds = instances.map(i => i.id);
-      const projectIds = [...new Set(instances.map(i => i.project_id))];
+      const instanceIds = [...new Set(myTasks.map(t => t.equipment_instance_id))];
+
+      const { data: instances, error: instanceError } = await supabase
+        .from('equipment_instances')
+        .select('id, project_id')
+        .in('id', instanceIds);
+
+      if (instanceError) throw instanceError;
+
+      const projectIds = [...new Set((instances || []).map(i => i.project_id))];
 
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
@@ -59,14 +68,9 @@ export default function EngineerDashboard() {
 
       if (projectError) throw projectError;
 
-      const { data: tasks } = await supabase
-        .from('test_tasks')
-        .select('id, status, equipment_instance_id')
-        .in('equipment_instance_id', instanceIds);
-
       const enriched = (projectData || []).map(p => {
-        const projectInstanceIds = instances.filter(i => i.project_id === p.id).map(i => i.id);
-        const projectTasks = (tasks || []).filter(t => projectInstanceIds.includes(t.equipment_instance_id));
+        const projectInstanceIds = (instances || []).filter(i => i.project_id === p.id).map(i => i.id);
+        const projectTasks = myTasks.filter(t => projectInstanceIds.includes(t.equipment_instance_id));
         return {
           ...p,
           equipmentCount: projectInstanceIds.length,
@@ -77,11 +81,10 @@ export default function EngineerDashboard() {
       });
 
       setProjects(enriched);
-      const allTasks = tasks || [];
       setStats({
-        total: allTasks.length,
-        inProgress: allTasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'SUBMITTED').length,
-        completed: allTasks.filter(t => t.status === 'APPROVED').length,
+        total: myTasks.length,
+        inProgress: myTasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'SUBMITTED').length,
+        completed: myTasks.filter(t => t.status === 'APPROVED').length,
       });
     } catch (error) {
       console.error('Error fetching assigned projects:', error);
@@ -155,7 +158,7 @@ export default function EngineerDashboard() {
               <Wrench className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No assignments yet</p>
               <p className="text-sm text-muted-foreground mt-2">
-                Your manager will assign equipment instances to you
+                Your manager will assign test scopes to you
               </p>
             </div>
           ) : (

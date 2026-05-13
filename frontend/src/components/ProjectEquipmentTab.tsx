@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +25,62 @@ interface ProjectEquipmentTabProps {
   projectStatus: string;
 }
 
+// 10 perceptually-distinct colors that work on both light and dark backgrounds
+const ENGINEER_COLORS = [
+  '#3b82f6', // blue
+  '#10b981', // emerald
+  '#8b5cf6', // violet
+  '#f97316', // orange
+  '#f43f5e', // rose
+  '#06b6d4', // cyan
+  '#f59e0b', // amber
+  '#ec4899', // pink
+  '#84cc16', // lime
+  '#14b8a6', // teal
+];
+
+const UNASSIGNED_COLOR = '#4b5563';
+
+interface StackedBarProps {
+  tasks: TestTaskRow[];
+  colorMap: Map<string, string>;
+  engineers: Engineer[];
+}
+
+function StackedBar({ tasks, colorMap, engineers }: StackedBarProps) {
+  if (tasks.length === 0) return null;
+
+  const assignedCount = tasks.filter(t => t.assigned_to).length;
+  const unassignedCount = tasks.length - assignedCount;
+
+  const segments: Array<{ color: string; pct: number }> = [];
+
+  if (unassignedCount > 0) {
+    segments.push({ color: UNASSIGNED_COLOR, pct: (unassignedCount / tasks.length) * 100 });
+  }
+
+  // Iterate in stable name-sorted order so segment order is predictable
+  engineers.forEach(eng => {
+    const count = tasks.filter(t => t.assigned_to === eng.id).length;
+    if (count > 0) {
+      segments.push({ color: colorMap.get(eng.id) ?? UNASSIGNED_COLOR, pct: (count / tasks.length) * 100 });
+    }
+  });
+
+  return (
+    <div className="flex items-center gap-2 mr-3 shrink-0">
+      <span className="text-xs text-muted-foreground tabular-nums">
+        {assignedCount}/{tasks.length}
+      </span>
+      <div className="flex h-1.5 w-20 rounded-full overflow-hidden gap-px bg-muted/30">
+        {segments.map((seg, i) => (
+          <div key={i} style={{ width: `${seg.pct}%`, backgroundColor: seg.color }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ProjectEquipmentTab({ projectId, projectStatus: _projectStatus }: ProjectEquipmentTabProps) {
   const [equipment, setEquipment] = useState<EquipmentInstance[]>([]);
   const [tasks, setTasks] = useState<TestTaskRow[]>([]);
@@ -36,6 +91,16 @@ export function ProjectEquipmentTab({ projectId, projectStatus: _projectStatus }
   const { userRole } = useAuth();
 
   const canAssign = userRole === 'SUPERVISOR' || userRole === 'GM' || userRole === 'SUPERADMIN';
+
+  // Color map keyed by engineer id. Sorted by id for stable color assignment across renders.
+  const engineerColors = useMemo(() => {
+    const sorted = [...engineers].sort((a, b) => a.id.localeCompare(b.id));
+    const map = new Map<string, string>();
+    sorted.forEach((eng, i) => {
+      map.set(eng.id, ENGINEER_COLORS[i % ENGINEER_COLORS.length]);
+    });
+    return map;
+  }, [engineers]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -144,8 +209,6 @@ export function ProjectEquipmentTab({ projectId, projectStatus: _projectStatus }
         <Accordion type="multiple" className="space-y-2">
           {equipment.map(item => {
             const itemTasks = tasksByEquipment[item.id] || [];
-            const assignedCount = itemTasks.filter(t => t.assigned_to).length;
-            const allAssigned = itemTasks.length > 0 && assignedCount === itemTasks.length;
 
             return (
               <AccordionItem key={item.id} value={item.id} className="border rounded-lg px-4">
@@ -155,59 +218,101 @@ export function ProjectEquipmentTab({ projectId, projectStatus: _projectStatus }
                     <span className="text-xs text-muted-foreground hidden sm:inline">
                       {item.equipment_type.replace(/_/g, ' ')}
                     </span>
-                    <Badge
-                      variant={allAssigned ? 'default' : 'secondary'}
-                      className="ml-auto mr-3 text-xs shrink-0"
-                    >
-                      {assignedCount}/{itemTasks.length} assigned
-                    </Badge>
+                    <div className="ml-auto">
+                      <StackedBar tasks={itemTasks} colorMap={engineerColors} engineers={engineers} />
+                    </div>
                   </div>
                 </AccordionTrigger>
 
-                <AccordionContent className="pb-3">
+                <AccordionContent className="pb-4">
                   {itemTasks.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-2">No tests configured for this equipment</p>
                   ) : (
-                    <div className="divide-y divide-border">
-                      {itemTasks.map(task => (
-                        <div key={task.id} className="flex items-center justify-between gap-4 py-2">
-                          <div className="min-w-0 flex-1">
-                            <span className="font-mono text-[11px] text-muted-foreground mr-2 uppercase">
-                              {task.test_templates?.test_code}
-                            </span>
-                            <span className="text-sm">{task.test_templates?.test_name}</span>
-                          </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                      {itemTasks.map(task => {
+                        const accentColor = task.assigned_to
+                          ? (engineerColors.get(task.assigned_to) ?? UNASSIGNED_COLOR)
+                          : UNASSIGNED_COLOR;
+                        const assignedEngineer = task.assigned_to
+                          ? engineers.find(e => e.id === task.assigned_to)
+                          : null;
 
-                          {canAssign ? (
-                            assigning === task.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
-                            ) : (
-                              <Select
-                                value={task.assigned_to ?? 'unassigned'}
-                                onValueChange={val =>
-                                  handleAssignTest(task.id, val === 'unassigned' ? null : val)
-                                }
-                              >
-                                <SelectTrigger className="h-8 text-xs w-[180px] shrink-0">
-                                  <SelectValue placeholder="Assign engineer" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                                  {engineers.map(eng => (
-                                    <SelectItem key={eng.id} value={eng.id}>
-                                      {eng.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )
-                          ) : (
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              {engineers.find(e => e.id === task.assigned_to)?.name ?? 'Unassigned'}
-                            </span>
-                          )}
-                        </div>
-                      ))}
+                        return (
+                          <div
+                            key={task.id}
+                            className="rounded-md border bg-card flex flex-col overflow-hidden transition-colors"
+                            style={{ borderLeftColor: accentColor, borderLeftWidth: '3px' }}
+                          >
+                            <div className="px-3 pt-2.5 pb-1 flex-1">
+                              <span className="font-mono text-[10px] tracking-wider text-muted-foreground uppercase block mb-1">
+                                {task.test_templates?.test_code}
+                              </span>
+                              <p className="text-sm font-medium leading-snug line-clamp-2">
+                                {task.test_templates?.test_name}
+                              </p>
+                            </div>
+
+                            <div className="px-3 pb-2.5 pt-1.5">
+                              {canAssign ? (
+                                assigning === task.id ? (
+                                  <div className="flex justify-center py-1">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                  </div>
+                                ) : (
+                                  <Select
+                                    value={task.assigned_to ?? 'unassigned'}
+                                    onValueChange={val =>
+                                      handleAssignTest(task.id, val === 'unassigned' ? null : val)
+                                    }
+                                  >
+                                    <SelectTrigger className="h-7 text-xs w-full">
+                                      {assignedEngineer ? (
+                                        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                                          <div
+                                            className="w-2 h-2 rounded-full shrink-0"
+                                            style={{ backgroundColor: accentColor }}
+                                          />
+                                          <span className="truncate">{assignedEngineer.name}</span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-muted-foreground">Unassigned</span>
+                                      )}
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="unassigned">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-2 h-2 rounded-full bg-muted-foreground/40 shrink-0" />
+                                          <span>Unassigned</span>
+                                        </div>
+                                      </SelectItem>
+                                      {engineers.map(eng => (
+                                        <SelectItem key={eng.id} value={eng.id}>
+                                          <div className="flex items-center gap-2">
+                                            <div
+                                              className="w-2 h-2 rounded-full shrink-0"
+                                              style={{ backgroundColor: engineerColors.get(eng.id) }}
+                                            />
+                                            <span>{eng.name}</span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )
+                              ) : (
+                                <span
+                                  className="text-xs"
+                                  style={{ color: assignedEngineer ? accentColor : undefined }}
+                                >
+                                  {assignedEngineer?.name ?? (
+                                    <span className="text-muted-foreground">Unassigned</span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </AccordionContent>
