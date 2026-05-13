@@ -1,18 +1,7 @@
 import React from 'react';
-import { Document, Page, View, Text, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { NAMEPLATE_FIELDS } from '@/lib/nameplateFields';
 import type { Section, TemplateSchema } from '@/lib/testSectionTables';
-
-// ─── Font registration ────────────────────────────────────────────────────────
-
-Font.register({
-  family: 'Inter',
-  fonts: [
-    { src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter/files/inter-latin-400-normal.woff', fontWeight: 400 },
-    { src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter/files/inter-latin-600-normal.woff', fontWeight: 600 },
-    { src: 'https://cdn.jsdelivr.net/npm/@fontsource/inter/files/inter-latin-700-normal.woff', fontWeight: 700 },
-  ],
-});
 
 // ─── Equipment color map ──────────────────────────────────────────────────────
 
@@ -89,14 +78,14 @@ const C = {
 const s = StyleSheet.create({
   // ── Page
   page: {
-    fontFamily: 'Inter',
+    fontFamily: 'Helvetica',
     fontSize: 8,
     color: C.slate,
     backgroundColor: C.warmWhite,
     paddingBottom: 44,
   },
   pageLandscape: {
-    fontFamily: 'Inter',
+    fontFamily: 'Helvetica',
     fontSize: 8,
     color: C.slate,
     backgroundColor: C.warmWhite,
@@ -136,12 +125,12 @@ const s = StyleSheet.create({
     paddingLeft: 8,
     marginBottom: 36,
   },
-  coverBrandName: { color: '#ffffff', fontSize: 13, fontWeight: 700 },
+  coverBrandName: { color: '#ffffff', fontSize: 13, fontWeight: 'bold' },
   coverBrandSub: { color: C.mutedSlate, fontSize: 7, marginTop: 2, letterSpacing: 1.5 },
   coverTitle: {
     color: '#ffffff',
     fontSize: 28,
-    fontWeight: 700,
+    fontWeight: 'bold',
     marginBottom: 6,
     letterSpacing: 0.5,
   },
@@ -173,13 +162,13 @@ const s = StyleSheet.create({
   },
   infoCol: { flex: 1, paddingRight: 10 },
   infoLabel: { fontSize: 6.5, color: C.warmGrey, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
-  infoValue: { fontSize: 9.5, fontWeight: 700, color: C.slate, marginBottom: 10 },
+  infoValue: { fontSize: 9.5, fontWeight: 'bold', color: C.slate, marginBottom: 10 },
 
   // ── Progress section
   progressSectionTitle: {
     fontSize: 7.5,
     color: C.warmGrey,
-    fontWeight: 700,
+    fontWeight: 'bold',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     borderLeftWidth: 3,
@@ -189,7 +178,7 @@ const s = StyleSheet.create({
   },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
   progressLabel: { fontSize: 7.5, color: C.warmGrey },
-  progressValue: { fontSize: 7.5, fontWeight: 700, color: C.slate },
+  progressValue: { fontSize: 7.5, fontWeight: 'bold', color: C.slate },
   progressBarOuter: {
     height: 10,
     backgroundColor: C.borderLight,
@@ -225,7 +214,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 18,
   },
   eqHeaderBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  eqHeaderCode: { color: '#ffffff', fontSize: 14, fontWeight: 700 },
+  eqHeaderCode: { color: '#ffffff', fontSize: 14, fontWeight: 'bold' },
   eqHeaderType: { color: 'rgba(255,255,255,0.75)', fontSize: 9 },
   eqHeaderPill: {
     borderWidth: 1,
@@ -234,7 +223,7 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     paddingHorizontal: 8,
   },
-  eqHeaderPillText: { color: '#ffffff', fontSize: 7.5, fontWeight: 600 },
+  eqHeaderPillText: { color: '#ffffff', fontSize: 7.5, fontWeight: 'bold' },
   eqHeaderStrip: { height: 3 },
 
   // ── Equipment content
@@ -249,7 +238,7 @@ const s = StyleSheet.create({
   },
   subSectionTitle: {
     fontSize: 7,
-    fontWeight: 700,
+    fontWeight: 'bold',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
@@ -259,10 +248,10 @@ const s = StyleSheet.create({
   kvTable: { borderLeftWidth: 3, marginBottom: 10 },
   kvHeaderRow: { flexDirection: 'row' },
   kvHeaderCell: { flex: 1, padding: '4 6' },
-  kvHeaderText: { color: '#ffffff', fontSize: 7, fontWeight: 700 },
+  kvHeaderText: { color: '#ffffff', fontSize: 7, fontWeight: 'bold' },
   kvRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: C.borderLight },
   kvLabel: { width: '45%', padding: '3.5 6', fontSize: 7.5, color: C.warmGrey },
-  kvValue: { flex: 1, padding: '3.5 6', fontSize: 7.5, color: C.slate, fontWeight: 600 },
+  kvValue: { flex: 1, padding: '3.5 6', fontSize: 7.5, color: C.slate, fontWeight: 'bold' },
 
   // ── Test block
   testBlock: { marginBottom: 10 },
@@ -276,8 +265,8 @@ const s = StyleSheet.create({
   },
   testHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   testBullet: { width: 5, height: 5 },
-  testName: { fontSize: 8.5, fontWeight: 700, color: C.slate },
-  testCode: { fontSize: 7, fontWeight: 600 },
+  testName: { fontSize: 8.5, fontWeight: 'bold', color: C.slate },
+  testCode: { fontSize: 7, fontWeight: 'bold' },
   testHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   testMetaBar: {
     flexDirection: 'row',
@@ -291,13 +280,13 @@ const s = StyleSheet.create({
   },
   testMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   testMetaLabel: { fontSize: 6.5, color: C.warmGrey },
-  testMetaValue: { fontSize: 7, fontWeight: 600, color: C.slate },
+  testMetaValue: { fontSize: 7, fontWeight: 'bold', color: C.slate },
 
   // ── Parameter tables
   paramTable: { marginBottom: 6 },
   paramHeaderRow: { flexDirection: 'row' },
   paramHeaderCell: { flex: 1, padding: '4 5' },
-  paramHeaderCellText: { color: '#ffffff', fontSize: 6.5, fontWeight: 700, textAlign: 'center' },
+  paramHeaderCellText: { color: '#ffffff', fontSize: 6.5, fontWeight: 'bold', textAlign: 'center' },
   paramRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: C.borderLight },
   paramCell: { flex: 1, padding: '3.5 5' },
   paramCellText: { fontSize: 7, color: C.slate },
@@ -305,12 +294,12 @@ const s = StyleSheet.create({
     padding: '3 6',
     marginVertical: 2,
   },
-  paramSectionSubHeaderText: { fontSize: 6.5, fontWeight: 700, color: '#ffffff' },
+  paramSectionSubHeaderText: { fontSize: 6.5, fontWeight: 'bold', color: '#ffffff' },
   noDataText: { fontSize: 7, fontStyle: 'italic', textAlign: 'center', padding: '6 0' },
 
   // ── Status badge
   statusBadge: { borderRadius: 3, paddingVertical: 2, paddingHorizontal: 5 },
-  statusBadgeText: { fontSize: 6.5, fontWeight: 700 },
+  statusBadgeText: { fontSize: 6.5, fontWeight: 'bold' },
 
   // ── Engineer dot
   engRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
@@ -421,7 +410,7 @@ function PDFSectionTable({
                 </Text>
               </View>
               <View style={[s.paramCell, { flex: 3 }]}>
-                <Text style={[s.paramCellText, { fontWeight: 600 }]}>{cell(payload[k(section.id, f.key)])}</Text>
+                <Text style={[s.paramCellText, { fontWeight: 'bold' }]}>{cell(payload[k(section.id, f.key)])}</Text>
               </View>
             </DataRow>
           ))}
