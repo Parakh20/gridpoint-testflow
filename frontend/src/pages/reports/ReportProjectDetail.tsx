@@ -10,12 +10,16 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/StatusBadge';
-import { ArrowLeft, FileSpreadsheet, Download, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/format';
 import { exportReportExcel, type ReportExportGroup } from '@/lib/reportsExcelExport';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
+import type { ProjectReportPDFProps, PDFEquipmentGroup, PDFTaskItem } from '@/components/pdf/ProjectReportPDF';
+import { TEMPLATE_FALLBACKS } from '@/lib/templateFallbacks';
+import { isV2Schema } from '@/lib/testSectionTables';
 
 const ENGINEER_COLORS = [
   '#3b82f6', '#10b981', '#8b5cf6', '#f97316', '#f43f5e',
@@ -27,7 +31,7 @@ interface ReportTask {
   status: string;
   rework_reason: string | null;
   assigned_to: string | null;
-  equipment_instance: { id: string; label: string; equipment_type: string } | null;
+  equipment_instance: { id: string; label: string; equipment_type: string; nameplate: Record<string, any> } | null;
   test_template: { test_name: string; test_code: string; fields: any } | null;
   record: {
     payload: Record<string, any>;
@@ -69,7 +73,6 @@ export default function ReportProjectDetail() {
   const [engineers, setEngineers] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [exportingExcel, setExportingExcel] = useState(false);
-  const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [reviewingTaskId, setReviewingTaskId] = useState<string | null>(null);
   const [reworkDialogTask, setReworkDialogTask] = useState<ReportTask | null>(null);
   const [reworkReason, setReworkReason] = useState('');
@@ -119,7 +122,7 @@ export default function ReportProjectDetail() {
           .from('test_tasks')
           .select(`
             id, status, rework_reason, assigned_to,
-            equipment_instance:equipment_instances(id, label, equipment_type),
+            equipment_instance:equipment_instances(id, label, equipment_type, nameplate),
             test_template:test_templates(test_name, test_code, fields)
           `)
           .in('equipment_instance_id', instanceIds)
@@ -174,17 +177,63 @@ export default function ReportProjectDetail() {
   }, [tasks]);
 
   const tasksByEquipment = useMemo(() => {
-    const grouped = new Map<string, { label: string; equipmentType: string; tasks: ReportTask[] }>();
+    const grouped = new Map<string, { label: string; equipmentType: string; nameplate: Record<string, any>; tasks: ReportTask[] }>();
     tasks.forEach(t => {
       if (!t.equipment_instance) return;
       const key = t.equipment_instance.id;
       if (!grouped.has(key)) {
-        grouped.set(key, { label: t.equipment_instance.label, equipmentType: t.equipment_instance.equipment_type, tasks: [] });
+        grouped.set(key, {
+          label: t.equipment_instance.label,
+          equipmentType: t.equipment_instance.equipment_type,
+          nameplate: (t.equipment_instance.nameplate as Record<string, any>) ?? {},
+          tasks: [],
+        });
       }
       grouped.get(key)!.tasks.push(t);
     });
     return grouped;
   }, [tasks]);
+
+  const pdfProps = useMemo((): ProjectReportPDFProps | null => {
+    if (!project || !progressStats) return null;
+    const equipmentGroups: PDFEquipmentGroup[] = [];
+    tasksByEquipment.forEach(({ label, equipmentType, nameplate, tasks: eqpTasks }, instanceId) => {
+      const pdfTasks: PDFTaskItem[] = eqpTasks.map(t => {
+        const rawFields = t.test_template?.fields;
+        const testCode = t.test_template?.test_code ?? '';
+        const schema = isV2Schema(rawFields) ? rawFields : (TEMPLATE_FALLBACKS[testCode] ?? null);
+        const engName = t.assigned_to ? (engineers.get(t.assigned_to) ?? 'Unknown') : 'Unassigned';
+        const engColor = t.assigned_to ? (engineerColors.get(t.assigned_to) ?? '#6b7280') : '#4b5563';
+        return {
+          id: t.id,
+          status: t.status,
+          testName: t.test_template?.test_name ?? '',
+          testCode,
+          schema,
+          payload: t.record?.payload ?? {},
+          instrumentId: t.record?.instrument_id ?? null,
+          passFail: t.record?.pass_fail ?? null,
+          remarks: t.record?.remarks ?? null,
+          assignedEngineerName: engName,
+          assignedEngineerColor: engColor,
+        };
+      });
+      equipmentGroups.push({ id: instanceId, label, equipmentType, nameplate, tasks: pdfTasks });
+    });
+    return {
+      projectNumber: project.project_number,
+      siteName: project.site_name,
+      siteAddress: project.site_address ?? null,
+      client: project.client ?? null,
+      status: project.status,
+      startDate: project.start_date ? formatDate(project.start_date) : null,
+      createdAt: formatDate(project.created_at),
+      managerName: manager,
+      progressStats,
+      equipmentGroups,
+      generatedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    };
+  }, [project, progressStats, tasksByEquipment, engineers, engineerColors, manager]);
 
   const handleTaskReview = async (task: ReportTask, nextStatus: 'APPROVED' | 'REWORK', reason?: string) => {
     setReviewingTaskId(task.id);
@@ -243,72 +292,6 @@ export default function ReportProjectDetail() {
     }
   };
 
-  const handleDownloadPDF = async () => {
-    if (!reportRef.current) return;
-    setDownloadingPDF(true);
-    let captureRoot: HTMLDivElement | null = null;
-    try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ]);
-
-      captureRoot = document.createElement('div');
-      Object.assign(captureRoot.style, {
-        position: 'absolute',
-        left: '0',
-        top: '0',
-        width: '1120px',
-        padding: '40px',
-        background: '#ffffff',
-        color: '#0f172a',
-        fontFamily: 'system-ui, sans-serif',
-        visibility: 'hidden',
-        pointerEvents: 'none',
-      });
-
-      const clone = reportRef.current.cloneNode(true) as HTMLDivElement;
-      clone.style.width = '100%';
-      clone.style.maxWidth = 'none';
-      clone.style.overflow = 'visible';
-      clone.style.height = 'auto';
-      // Hide interactive review buttons in PDF
-      clone.querySelectorAll<HTMLElement>('[data-pdf-hide]').forEach(el => { el.style.display = 'none'; });
-
-      captureRoot.appendChild(clone);
-      document.body.appendChild(captureRoot);
-      await new Promise(r => window.setTimeout(r, 300));
-      captureRoot.style.visibility = 'visible';
-
-      const canvas = await html2canvas(captureRoot, { backgroundColor: '#ffffff', scale: 2, useCORS: true, logging: false });
-      captureRoot.style.visibility = 'hidden';
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdfW = 210;
-      const pdfH = (canvas.height / canvas.width) * pdfW;
-      const pageH = 297;
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-      let heightLeft = pdfH;
-      let pos = 0;
-      doc.addImage(imgData, 'PNG', 0, pos, pdfW, pdfH);
-      heightLeft -= pageH;
-      while (heightLeft > 0) {
-        pos -= pageH;
-        doc.addPage();
-        doc.addImage(imgData, 'PNG', 0, pos, pdfW, pdfH);
-        heightLeft -= pageH;
-      }
-
-      doc.save(`${project.project_number}_Report.pdf`);
-    } catch (err) {
-      console.error('PDF export error:', err);
-      toast({ title: 'PDF export failed', variant: 'destructive' });
-    } finally {
-      if (captureRoot) document.body.removeChild(captureRoot);
-      setDownloadingPDF(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -363,12 +346,12 @@ export default function ReportProjectDetail() {
                 : <FileSpreadsheet className="h-4 w-4 mr-2" />}
               {exportingExcel ? 'Exporting…' : 'Export Excel'}
             </Button>
-            <Button variant="outline" disabled={downloadingPDF} onClick={handleDownloadPDF}>
-              {downloadingPDF
-                ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                : <Download className="h-4 w-4 mr-2" />}
-              {downloadingPDF ? 'Generating PDF…' : 'Download PDF'}
-            </Button>
+            {pdfProps && (
+              <PDFDownloadButton
+                pdfProps={pdfProps}
+                fileName={`${project.project_number}_Report.pdf`}
+              />
+            )}
           </div>
         </div>
 
