@@ -58,8 +58,8 @@ const k = (...parts: (string | number)[]) => parts.join('__');
 
 // ─── Cell helpers ────────────────────────────────────────────────────────────
 
-type CellValue = string | number | null | undefined;
-type AoA = CellValue[][];
+export type CellValue = string | number | null | undefined;
+export type AoA = CellValue[][];
 
 function hdr(text: string): CellValue { return text; }
 
@@ -71,7 +71,7 @@ function buildSheet(data: AoA): XLSX.WorkSheet {
 
 // ─── Section renderers → rows ────────────────────────────────────────────────
 
-function renderSection(section: Section, payload: Record<string, any>): AoA {
+export function renderSection(section: Section, payload: Record<string, any>): AoA {
   const rows: AoA = [];
 
   // Section title

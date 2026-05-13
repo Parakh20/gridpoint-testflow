@@ -15,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/format';
-import { exportReportExcel, type ReportExportGroup } from '@/lib/reportsExcelExport';
+import { exportReportExcel, type ReportExportProject, type ReportExportEquipment } from '@/lib/reportsExcelExport';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import type { ProjectReportPDFProps, PDFEquipmentGroup, PDFTaskItem } from '@/components/pdf/ProjectReportPDF';
 import { TEMPLATE_FALLBACKS } from '@/lib/templateFallbacks';
@@ -289,26 +289,40 @@ export default function ReportProjectDetail() {
   };
 
   const handleExportExcel = () => {
-    if (!project || !tasksByEquipment.size) return;
+    if (!project || !progressStats || !tasksByEquipment.size) return;
     setExportingExcel(true);
     try {
-      const groups: ReportExportGroup[] = [];
-      tasksByEquipment.forEach(({ label, equipmentType, tasks: eqpTasks }) => {
-        groups.push({
+      const exportProject: ReportExportProject = {
+        projectNumber: project.project_number,
+        siteName: project.site_name,
+        siteAddress: project.site_address ?? null,
+        client: project.client ?? null,
+        status: project.status,
+        startDate: project.start_date ? formatDate(project.start_date) : null,
+        createdAt: formatDate(project.created_at),
+        managerName: manager,
+      };
+      const equipment: ReportExportEquipment[] = [];
+      tasksByEquipment.forEach(({ label, equipmentType, nameplate, tasks: eqpTasks }) => {
+        equipment.push({
           label,
           equipmentType,
+          nameplate: nameplate ?? {},
           tasks: eqpTasks.map(t => ({
             testName: t.test_template?.test_name ?? '',
             testCode: t.test_template?.test_code ?? '',
+            status: t.status,
             instrumentId: t.record?.instrument_id ?? null,
             passFail: t.record?.pass_fail ?? null,
-            status: t.status,
-            assignedEngineerName: t.assigned_to ? (engineers.get(t.assigned_to) ?? 'Unknown') : 'Unassigned',
             remarks: t.record?.remarks ?? null,
+            reworkReason: t.rework_reason ?? null,
+            assignedEngineerName: t.assigned_to ? (engineers.get(t.assigned_to) ?? 'Unknown') : 'Unassigned',
+            templateFields: t.test_template?.fields ?? null,
+            payload: t.record?.payload ?? {},
           })),
         });
       });
-      exportReportExcel(project.project_number, project.site_name, groups);
+      exportReportExcel(exportProject, progressStats, equipment);
     } finally {
       setExportingExcel(false);
     }
