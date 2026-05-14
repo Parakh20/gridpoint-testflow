@@ -1,8 +1,4 @@
-import * as XLSX from 'xlsx';
-import { renderSection, type AoA, type CellValue } from './projectExcelExport';
-import { NAMEPLATE_FIELDS } from './nameplateFields';
-import { TEMPLATE_FALLBACKS } from './templateFallbacks';
-import { isV2Schema } from './testSectionTables';
+import ExcelJS from 'exceljs';
 
 // ─── Public data types ────────────────────────────────────────────────────────
 
@@ -45,7 +41,34 @@ export interface ReportExportEquipment {
   tasks: ReportExportTask[];
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Color helpers ────────────────────────────────────────────────────────────
+
+// ExcelJS uses ARGB: FF prefix + 6-char hex
+const argb = (hex: string) => `FF${hex.replace('#', '')}`;
+
+const COLOR = {
+  navy:       argb('0f172a'),
+  warmOff:    argb('f5f0eb'),
+  warmGrey:   argb('78716c'),
+  slate:      argb('1c1917'),
+  blue:       argb('1d4ed8'),
+  darkSlate:  argb('1e293b'),
+  white:      argb('ffffff'),
+  border:     argb('dee2e6'),
+};
+
+const EQ_COLORS: Record<string, { primary: string; light: string }> = {
+  POWER_TRANSFORMER: { primary: argb('1d4ed8'), light: argb('dbeafe') },
+  CT:               { primary: argb('065f46'), light: argb('d1fae5') },
+  CVT:              { primary: argb('6b21a8'), light: argb('f3e8ff') },
+  LA:               { primary: argb('b45309'), light: argb('fef3c7') },
+  SF6_BREAKER:      { primary: argb('9f1239'), light: argb('ffe4e6') },
+  ISOLATOR:         { primary: argb('0e7490'), light: argb('cffafe') },
+  VCB:              { primary: argb('4d7c0f'), light: argb('ecfccb') },
+  EARTH_PIT:        { primary: argb('92400e'), light: argb('fef9c3') },
+  VT:               { primary: argb('1e3a5f'), light: argb('e0f2fe') },
+};
+const DEFAULT_EQ = { primary: argb('374151'), light: argb('f3f4f6') };
 
 const EQP_NAMES: Record<string, string> = {
   POWER_TRANSFORMER: 'Power Transformer',
@@ -67,201 +90,261 @@ const STATUS_LABELS: Record<string, string> = {
   REWORK: 'Rework',
 };
 
-function row(...cells: CellValue[]): CellValue[] { return cells; }
-function blank(): CellValue[] { return []; }
-function section(title: string): CellValue[] { return [`— ${title} —`]; }
-
-function setColWidths(ws: XLSX.WorkSheet, widths: number[]): void {
-  ws['!cols'] = widths.map(w => ({ wch: w }));
+function statusColors(status: string): { bg: string; text: string } {
+  switch (status) {
+    case 'DRAFT':       return { bg: argb('e2e8f0'), text: argb('475569') };
+    case 'IN_PROGRESS': return { bg: argb('dbeafe'), text: argb('1d4ed8') };
+    case 'SUBMITTED':   return { bg: argb('fef3c7'), text: argb('b45309') };
+    case 'APPROVED':    return { bg: argb('d1fae5'), text: argb('065f46') };
+    case 'REWORK':      return { bg: argb('ffe4e6'), text: argb('9f1239') };
+    default:            return { bg: argb('f3f4f6'), text: argb('374151') };
+  }
 }
 
-// ─── Overview sheet ───────────────────────────────────────────────────────────
+// ─── Style helpers ────────────────────────────────────────────────────────────
 
-function buildOverviewSheet(
-  project: ReportExportProject,
-  stats: ReportExportProgressStats,
-  equipment: ReportExportEquipment[],
-): XLSX.WorkSheet {
-  const approvedPct = stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0;
+type Fill = ExcelJS.Fill;
+type Font = Partial<ExcelJS.Font>;
+type Alignment = Partial<ExcelJS.Alignment>;
+type Borders = Partial<ExcelJS.Borders>;
 
-  const aoa: AoA = [
-    // Title block
-    row('PROJECT TEST REPORT'),
-    blank(),
-    // Project details
-    section('PROJECT DETAILS'),
-    row('Project Number', project.projectNumber),
-    row('Site Name', project.siteName),
-    row('Client', project.client ?? '—'),
-    row('Site Address', project.siteAddress ?? '—'),
-    row('Manager', project.managerName ?? '—'),
-    row('Status', project.status),
-    row('Start Date', project.startDate ?? '—'),
-    row('Created', project.createdAt),
-    blank(),
-    // Progress summary
-    section('PROGRESS SUMMARY'),
-    row('Tests Approved', `${stats.approved} / ${stats.total} (${approvedPct}%)`),
-    row('Pending Review', stats.submitted),
-    row('In Progress', stats.inProgress),
-    row('Not Started (Draft)', stats.draft),
-    blank(),
-    // Equipment summary table
-    section('EQUIPMENT SUMMARY'),
-    row('Equipment', 'Type', 'Total Tests', 'Approved', 'Pending Review', 'In Progress', 'Draft / Rework'),
-  ];
-
-  for (const eq of equipment) {
-    const approved = eq.tasks.filter(t => t.status === 'APPROVED').length;
-    const submitted = eq.tasks.filter(t => t.status === 'SUBMITTED').length;
-    const inProgress = eq.tasks.filter(t => t.status === 'IN_PROGRESS').length;
-    const draft = eq.tasks.filter(t => t.status === 'DRAFT' || t.status === 'REWORK').length;
-    aoa.push(row(
-      eq.label,
-      EQP_NAMES[eq.equipmentType] ?? eq.equipmentType.replace(/_/g, ' '),
-      eq.tasks.length,
-      approved,
-      submitted,
-      inProgress,
-      draft,
-    ));
-  }
-
-  aoa.push(blank());
-
-  // Full test list
-  aoa.push(section('ALL TESTS'));
-  aoa.push(row('Equipment', 'Type', 'Test Name', 'Code', 'Status', 'Pass/Fail', 'Instrument ID', 'Engineer', 'Remarks'));
-
-  for (const eq of equipment) {
-    for (const task of eq.tasks) {
-      aoa.push(row(
-        eq.label,
-        EQP_NAMES[eq.equipmentType] ?? eq.equipmentType.replace(/_/g, ' '),
-        task.testName,
-        task.testCode,
-        STATUS_LABELS[task.status] ?? task.status,
-        task.passFail ?? '—',
-        task.instrumentId ?? '—',
-        task.assignedEngineerName,
-        task.remarks ?? '—',
-      ));
-    }
-  }
-
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  setColWidths(ws, [22, 28, 10, 24, 18, 22, 14, 18, 22, 32]);
-  return ws;
+function solidFill(color: string): Fill {
+  return { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
 }
 
-// ─── Equipment sheet ──────────────────────────────────────────────────────────
+function thinBorder(): Borders {
+  const side: Partial<ExcelJS.Border> = { style: 'thin', color: { argb: COLOR.border } };
+  return { top: side, left: side, bottom: side, right: side };
+}
 
-function buildEquipmentSheet(eq: ReportExportEquipment): XLSX.WorkSheet {
-  const typeName = EQP_NAMES[eq.equipmentType] ?? eq.equipmentType.replace(/_/g, ' ');
-  const aoa: AoA = [];
+function medBorder(color: string): Borders {
+  const side: Partial<ExcelJS.Border> = { style: 'medium', color: { argb: color } };
+  return { top: side, left: side, bottom: side, right: side };
+}
 
-  // Header
-  aoa.push(row(`${typeName} — ${eq.label}`));
-  aoa.push(blank());
+const COL_COUNT = 7;
+const COL_WIDTHS = [45, 14, 16, 12, 14, 20, 30];
+const COL_HEADERS = ['Test Name', 'Code', 'Instrument ID', 'Result', 'Status', 'Assigned Engineer', 'Remarks'];
+const LAST_COL_LETTER = 'G';
 
-  // ── Nameplate Details ──────────────────────────────────────────────────────
-  const npFields = NAMEPLATE_FIELDS[eq.equipmentType] ?? [];
-  if (npFields.length > 0) {
-    aoa.push(section('NAMEPLATE DETAILS'));
-    aoa.push(row('Field', 'Value'));
-    for (const f of npFields) {
-      const label = f.unit ? `${f.label} (${f.unit})` : f.label;
-      const val = eq.nameplate?.[f.key];
-      aoa.push(row(label, val != null && val !== '' ? val : '—'));
-    }
-    aoa.push(blank());
-  }
+// ─── Row styling helpers ──────────────────────────────────────────────────────
 
-  // ── Test Results Summary ───────────────────────────────────────────────────
-  aoa.push(section('TEST RESULTS SUMMARY'));
-  aoa.push(row('Test Name', 'Code', 'Status', 'Pass/Fail', 'Instrument ID', 'Engineer', 'Remarks', 'Rework Reason'));
-  for (const task of eq.tasks) {
-    aoa.push(row(
-      task.testName,
-      task.testCode,
-      STATUS_LABELS[task.status] ?? task.status,
-      task.passFail ?? '—',
-      task.instrumentId ?? '—',
-      task.assignedEngineerName,
-      task.remarks ?? '—',
-      task.reworkReason ?? '—',
-    ));
-  }
-  aoa.push(blank());
+function applyToRow(
+  row: ExcelJS.Row,
+  fill: Fill,
+  font: Font,
+  alignment: Alignment,
+  border?: Borders,
+  height?: number,
+): void {
+  if (height) row.height = height;
+  row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+    if (colNumber > COL_COUNT) return;
+    cell.fill = fill;
+    cell.font = { name: 'Calibri', ...font } as ExcelJS.Font;
+    cell.alignment = { wrapText: false, ...alignment } as ExcelJS.Alignment;
+    if (border) cell.border = border;
+  });
+}
 
-  // ── Testing Parameters ─────────────────────────────────────────────────────
-  aoa.push(section('TESTING PARAMETERS'));
-
-  for (const task of eq.tasks) {
-    aoa.push(row(`>>> ${task.testName} (${task.testCode})`));
-    aoa.push(row('Status', STATUS_LABELS[task.status] ?? task.status));
-    if (task.instrumentId) aoa.push(row('Instrument ID', task.instrumentId));
-    if (task.passFail) aoa.push(row('Pass / Fail', task.passFail));
-    if (task.assignedEngineerName) aoa.push(row('Engineer', task.assignedEngineerName));
-    aoa.push(blank());
-
-    // Resolve schema
-    const schema = isV2Schema(task.templateFields)
-      ? task.templateFields
-      : (TEMPLATE_FALLBACKS[task.testCode] ?? null);
-
-    if (schema && schema.sections.length > 0) {
-      for (const s of schema.sections) {
-        const sectionRows = renderSection(s, task.payload ?? {});
-        aoa.push(...sectionRows);
-      }
-    } else if (task.payload && Object.keys(task.payload).length > 0) {
-      // Fallback: dump key-value
-      for (const [key, val] of Object.entries(task.payload)) {
-        if (!key.startsWith('_')) aoa.push(row(key, val));
-      }
-      aoa.push(blank());
-    } else {
-      aoa.push(row('(No parameter data recorded)'));
-      aoa.push(blank());
-    }
-
-    aoa.push(blank());
-  }
-
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  setColWidths(ws, [30, 22, 14, 14, 16, 20, 28, 28]);
-  return ws;
+function applyToCell(cell: ExcelJS.Cell, fill: Fill, font: Font, alignment: Alignment, border?: Borders): void {
+  cell.fill = fill;
+  cell.font = { name: 'Calibri', ...font } as ExcelJS.Font;
+  cell.alignment = { wrapText: false, ...alignment } as ExcelJS.Alignment;
+  if (border) cell.border = border;
 }
 
 // ─── Main export function ─────────────────────────────────────────────────────
 
-export function exportReportExcel(
+export async function exportReportExcel(
   project: ReportExportProject,
   stats: ReportExportProgressStats,
   equipment: ReportExportEquipment[],
-): void {
-  const wb = XLSX.utils.book_new();
+): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Test Report');
 
-  // Sheet 1 — Overview
-  const overviewWs = buildOverviewSheet(project, stats, equipment);
-  XLSX.utils.book_append_sheet(wb, overviewWs, 'Overview');
+  ws.columns = COL_WIDTHS.map(w => ({ width: w }));
 
-  // One sheet per equipment instance
-  const usedNames = new Set<string>(['Overview']);
+  const approvedPct = stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0;
+
+  // ── Row 1: Title ────────────────────────────────────────────────────────────
+  {
+    const row = ws.addRow([
+      `PROJECT TEST REPORT — ${project.projectNumber}`,
+      null, null, null, null, null, null,
+    ]);
+    ws.mergeCells(`A${row.number}:${LAST_COL_LETTER}${row.number}`);
+    applyToRow(
+      row,
+      solidFill(COLOR.navy),
+      { color: { argb: COLOR.white }, bold: true, size: 14 },
+      { horizontal: 'center', vertical: 'middle' },
+      undefined,
+      22,
+    );
+  }
+
+  // ── Row 2: Project info line 1 ──────────────────────────────────────────────
+  {
+    const row = ws.addRow([
+      'PROJECT NO:', project.projectNumber,
+      'SITE:', project.siteName,
+      'CLIENT:', project.client ?? '—', null,
+    ]);
+    ws.mergeCells(`F${row.number}:${LAST_COL_LETTER}${row.number}`);
+    row.height = 15;
+    const labelFont: Font = { color: { argb: COLOR.warmGrey }, size: 9 };
+    const valueFont: Font = { color: { argb: COLOR.slate }, bold: true, size: 9 };
+    const labelAlign: Alignment = { vertical: 'middle' };
+    const valueAlign: Alignment = { vertical: 'middle' };
+    [1, 3, 5].forEach(c => applyToCell(row.getCell(c), solidFill(COLOR.warmOff), labelFont, labelAlign, thinBorder()));
+    [2, 4, 6].forEach(c => applyToCell(row.getCell(c), solidFill(COLOR.warmOff), valueFont, valueAlign, thinBorder()));
+    applyToCell(row.getCell(7), solidFill(COLOR.warmOff), valueFont, valueAlign, thinBorder());
+  }
+
+  // ── Row 3: Project info line 2 ──────────────────────────────────────────────
+  {
+    const row = ws.addRow([
+      'MANAGER:', project.managerName ?? '—',
+      'STATUS:', STATUS_LABELS[project.status] ?? project.status,
+      'DATE:', project.startDate ?? '—', null,
+    ]);
+    ws.mergeCells(`F${row.number}:${LAST_COL_LETTER}${row.number}`);
+    row.height = 15;
+    const labelFont: Font = { color: { argb: COLOR.warmGrey }, size: 9 };
+    const valueFont: Font = { color: { argb: COLOR.slate }, bold: true, size: 9 };
+    const align: Alignment = { vertical: 'middle' };
+    [1, 3, 5].forEach(c => applyToCell(row.getCell(c), solidFill(COLOR.warmOff), labelFont, align, thinBorder()));
+    [2, 4, 6].forEach(c => applyToCell(row.getCell(c), solidFill(COLOR.warmOff), valueFont, align, thinBorder()));
+    applyToCell(row.getCell(7), solidFill(COLOR.warmOff), valueFont, align, thinBorder());
+  }
+
+  // ── Row 4: Empty separator ──────────────────────────────────────────────────
+  {
+    const row = ws.addRow([null, null, null, null, null, null, null]);
+    row.height = 6;
+    applyToRow(row, solidFill(COLOR.warmOff), {}, {});
+  }
+
+  // ── Row 5: Progress summary ─────────────────────────────────────────────────
+  {
+    const text = `Tests Approved: ${stats.approved} / ${stats.total} (${approvedPct}%)  |  Pending Review: ${stats.submitted}  |  In Progress: ${stats.inProgress}  |  Not Started: ${stats.draft}`;
+    const row = ws.addRow([text, null, null, null, null, null, null]);
+    ws.mergeCells(`A${row.number}:${LAST_COL_LETTER}${row.number}`);
+    applyToRow(
+      row,
+      solidFill(COLOR.blue),
+      { color: { argb: COLOR.white }, bold: true, size: 9 },
+      { horizontal: 'center', vertical: 'middle' },
+      undefined,
+      16,
+    );
+  }
+
+  // ── Row 6: Column headers (first occurrence — auto-filter here) ─────────────
+  const HEADER_ROW_NUM = ws.rowCount + 1;
+  {
+    const row = ws.addRow(COL_HEADERS);
+    applyToRow(
+      row,
+      solidFill(COLOR.darkSlate),
+      { color: { argb: COLOR.white }, bold: true, size: 9 },
+      { horizontal: 'center', vertical: 'middle' },
+      thinBorder(),
+      16,
+    );
+  }
+
+  // ── Data rows: equipment groups ─────────────────────────────────────────────
   for (const eq of equipment) {
-    let sheetName = eq.label.slice(0, 31);
-    if (usedNames.has(sheetName)) {
-      sheetName = `${sheetName.slice(0, 28)}_${usedNames.size}`;
+    const ec = EQ_COLORS[eq.equipmentType] ?? DEFAULT_EQ;
+    const approvedCount = eq.tasks.filter(t => t.status === 'APPROVED').length;
+    const eqDisplayName = EQP_NAMES[eq.equipmentType] ?? eq.equipmentType.replace(/_/g, ' ');
+
+    // Equipment header row
+    {
+      const headerText = `${eq.label}  —  ${eqDisplayName}    ✓ ${approvedCount} / ${eq.tasks.length} approved`;
+      const row = ws.addRow([headerText, null, null, null, null, null, null]);
+      ws.mergeCells(`A${row.number}:${LAST_COL_LETTER}${row.number}`);
+      applyToRow(
+        row,
+        solidFill(ec.primary),
+        { color: { argb: COLOR.white }, bold: true, size: 11 },
+        { vertical: 'middle' },
+        medBorder(ec.primary),
+        18,
+      );
     }
-    usedNames.add(sheetName);
-    XLSX.utils.book_append_sheet(wb, buildEquipmentSheet(eq), sheetName);
+
+    // Repeated column headers after each equipment block
+    {
+      const row = ws.addRow(COL_HEADERS);
+      applyToRow(
+        row,
+        solidFill(COLOR.darkSlate),
+        { color: { argb: COLOR.white }, bold: true, size: 9 },
+        { horizontal: 'center', vertical: 'middle' },
+        thinBorder(),
+        14,
+      );
+    }
+
+    // Test data rows
+    eq.tasks.forEach((task, idx) => {
+      const ss = statusColors(task.status);
+      const rowBg = idx % 2 === 1 ? ec.light : COLOR.white;
+
+      const row = ws.addRow([
+        task.testName,
+        task.testCode,
+        task.instrumentId ?? '—',
+        task.passFail ?? '—',
+        STATUS_LABELS[task.status] ?? task.status,
+        task.assignedEngineerName,
+        task.remarks ?? '—',
+      ]);
+      row.height = 14;
+
+      // Default style for all cells
+      const defaultFill = solidFill(rowBg);
+      const defaultFont: Font = { color: { argb: COLOR.slate }, size: 8 };
+      const defaultAlign: Alignment = { vertical: 'middle' };
+      applyToRow(row, defaultFill, defaultFont, defaultAlign, thinBorder());
+
+      // Status cell (column 5) — override with status color
+      applyToCell(
+        row.getCell(5),
+        solidFill(ss.bg),
+        { color: { argb: ss.text }, size: 8, bold: true },
+        { horizontal: 'center', vertical: 'middle' },
+        thinBorder(),
+      );
+    });
   }
 
-  if (wb.SheetNames.length === 1) {
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['No equipment data found']]), 'Info');
-  }
+  // ── Sheet settings ──────────────────────────────────────────────────────────
 
-  const fname = `${project.projectNumber}_${project.siteName.replace(/[^a-zA-Z0-9]/g, '_')}_Report.xlsx`;
-  XLSX.writeFile(wb, fname);
+  // Freeze top 6 rows
+  ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 6, topLeftCell: 'A7', activePane: 'bottomLeft' }];
+
+  // Auto-filter on the first column header row (row 6)
+  ws.autoFilter = {
+    from: { row: HEADER_ROW_NUM, column: 1 },
+    to: { row: HEADER_ROW_NUM, column: COL_COUNT },
+  };
+
+  // ── Download ────────────────────────────────────────────────────────────────
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${project.projectNumber}_${project.siteName.replace(/[^a-zA-Z0-9]/g, '_')}_Report.xlsx`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
 }

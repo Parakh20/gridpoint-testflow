@@ -35,24 +35,73 @@ function getStatusStyle(status: string): { bg: string; text: string; label: stri
   }
 }
 
-// ─── Landscape detection ──────────────────────────────────────────────────────
+// ─── Section column/row count helpers (for layout classification) ─────────────
 
-function maxSectionColumns(schema: TemplateSchema | null): number {
-  if (!schema) return 0;
-  let max = 0;
-  for (const sec of schema.sections) {
-    let c = 2;
-    if (sec.type === 'phase_columns') c = 1 + (sec.phases?.length ?? 3);
-    else if (sec.type === 'phase_rows') c = 1 + (sec.columns?.length ?? 2);
-    else if (sec.type === 'tap_table') c = 1 + (sec.columns?.length ?? 2);
-    else if (sec.type === 'dynamic_table') c = 1 + (sec.columns?.length ?? 2);
-    else if (sec.type === 'core_table') c = 1 + (sec.columns?.length ?? 2);
-    else if (sec.type === 'ir_fixed') c = 1 + (sec.columns?.length ?? 2);
-    else if (sec.type === 'ir_fixed_phase') c = 4 + (sec.phases?.length ?? 3);
-    else if (sec.type === 'core_phase_table') c = 2 + (sec.columns?.length ?? 2);
-    if (c > max) max = c;
+function sectionColumnCount(sec: Section): number {
+  switch (sec.type) {
+    case 'fields':          return 2;
+    case 'phase_columns':   return 1 + (sec.phases?.length ?? 3);
+    case 'phase_rows':      return 1 + (sec.columns?.length ?? 2);
+    case 'tap_table':       return 1 + (sec.columns?.length ?? 2);
+    case 'dynamic_table':   return 1 + (sec.columns?.length ?? 2);
+    case 'core_table':      return 1 + (sec.columns?.length ?? 2);
+    case 'ir_fixed':        return 1 + (sec.columns?.length ?? 2);
+    case 'ir_fixed_phase':  return 4 + (sec.phases?.length ?? 3);
+    case 'core_phase_table':return 2 + (sec.columns?.length ?? 2);
+    default:                return 2;
   }
-  return max;
+}
+
+function sectionRowCount(sec: Section): number {
+  switch (sec.type) {
+    case 'fields':          return sec.fields?.length ?? 0;
+    case 'phase_columns':   return sec.fields?.length ?? 0;
+    case 'phase_rows':      return sec.phases?.length ?? 3;
+    case 'tap_table':       return sec.tap_count_default ?? 17;
+    case 'dynamic_table':   return 20; // unknown — treat as large
+    case 'core_table':      return sec.num_cores_default ?? 4;
+    case 'ir_fixed':        return sec.rows?.length ?? 0;
+    case 'ir_fixed_phase':  return sec.rows?.length ?? 0;
+    case 'core_phase_table':return (sec.num_cores_default ?? 4) * (sec.phases?.length ?? 3);
+    default:                return 0;
+  }
+}
+
+// ─── Task layout classification ───────────────────────────────────────────────
+
+type TaskLayout = 'simple' | 'full';
+
+function classifyTask(task: PDFTaskItem): TaskLayout {
+  if (!task.schema) return 'simple'; // no schema → minimal height → small
+  const secs = task.schema.sections;
+  if (secs.length > 2) return 'full'; // multiple sub-sections always full width
+  for (const sec of secs) {
+    if (sectionColumnCount(sec) >= 4 || sectionRowCount(sec) > 12) return 'full';
+  }
+  return 'simple';
+}
+
+type DisplayRow =
+  | { kind: 'single'; task: PDFTaskItem }
+  | { kind: 'pair'; left: PDFTaskItem; right: PDFTaskItem };
+
+function groupTasks(tasks: PDFTaskItem[]): DisplayRow[] {
+  const rows: DisplayRow[] = [];
+  let i = 0;
+  while (i < tasks.length) {
+    if (
+      i + 1 < tasks.length &&
+      classifyTask(tasks[i]) === 'simple' &&
+      classifyTask(tasks[i + 1]) === 'simple'
+    ) {
+      rows.push({ kind: 'pair', left: tasks[i], right: tasks[i + 1] });
+      i += 2;
+    } else {
+      rows.push({ kind: 'single', task: tasks[i] });
+      i++;
+    }
+  }
+  return rows;
 }
 
 // ─── Color palette ────────────────────────────────────────────────────────────
@@ -76,15 +125,8 @@ const C = {
 // ─── Static styles ────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  // ── Page
+  // ── Page — always A4 portrait
   page: {
-    fontFamily: 'Helvetica',
-    fontSize: 8,
-    color: C.slate,
-    backgroundColor: C.warmWhite,
-    paddingBottom: 44,
-  },
-  pageLandscape: {
     fontFamily: 'Helvetica',
     fontSize: 8,
     color: C.slate,
@@ -147,8 +189,8 @@ const s = StyleSheet.create({
     transform: 'rotate(-2.2deg)',
   },
 
-  // ── Cover — warm white content
-  coverContent: { paddingHorizontal: 36, paddingTop: 20 },
+  // ── Cover — warm white content (reduced paddingTop to close the gap)
+  coverContent: { paddingHorizontal: 36, paddingTop: 8 },
 
   // ── Info card
   infoCard: {
@@ -234,7 +276,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
-    marginTop: 10,
+    marginTop: 12,
   },
   subSectionTitle: {
     fontSize: 7,
@@ -262,6 +304,7 @@ const s = StyleSheet.create({
     padding: '5 8',
     borderBottomWidth: 1,
     marginBottom: 0,
+    minHeight: 22,
   },
   testHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   testBullet: { width: 5, height: 5 },
@@ -295,7 +338,7 @@ const s = StyleSheet.create({
     marginVertical: 2,
   },
   paramSectionSubHeaderText: { fontSize: 6.5, fontWeight: 'bold', color: '#ffffff' },
-  noDataText: { fontSize: 7, fontStyle: 'italic', textAlign: 'center', padding: '6 0' },
+  noDataText: { fontSize: 8, fontStyle: 'italic', textAlign: 'center', padding: '6 0' },
 
   // ── Status badge
   statusBadge: { borderRadius: 3, paddingVertical: 2, paddingHorizontal: 5 },
@@ -365,17 +408,28 @@ function PDFSectionTable({
   section,
   payload,
   eqColor,
+  compact = false,
 }: {
   section: Section;
   payload: Record<string, any>;
   eqColor: { primary: string; light: string };
+  compact?: boolean;
 }) {
+  // Compact mode (wide tables with >7 columns) uses smaller fonts and padding
+  const hPad = compact ? '2 2' : '4 5';
+  const hTextSz = compact ? 5.5 : 6.5;
+  const dPad = compact ? '2 2' : '3.5 5';
+  const dTextSz = compact ? 6 : 7;
+
+  // All tables get the equipment color left-border accent
+  const tableStyle = [s.paramTable, { borderLeftWidth: 3, borderLeftColor: eqColor.primary }];
+
   const HeaderRow = ({ children }: { children: React.ReactNode }) => (
     <View style={[s.paramHeaderRow, { backgroundColor: eqColor.primary }]}>{children}</View>
   );
   const HCell = ({ label, flex, maxWidth }: { label: string; flex?: number; maxWidth?: number }) => (
-    <View style={[s.paramHeaderCell, flex !== undefined ? { flex } : {}, maxWidth !== undefined ? { maxWidth } : {}]}>
-      <Text style={s.paramHeaderCellText}>{label}</Text>
+    <View style={[s.paramHeaderCell, { padding: hPad }, flex !== undefined ? { flex } : {}, maxWidth !== undefined ? { maxWidth } : {}]}>
+      <Text style={[s.paramHeaderCellText, { fontSize: hTextSz }]}>{label}</Text>
     </View>
   );
   const DataRow = ({ idx, children }: { idx: number; children: React.ReactNode }) => (
@@ -384,8 +438,8 @@ function PDFSectionTable({
     </View>
   );
   const DCell = ({ value, flex, maxWidth }: { value: unknown; flex?: number; maxWidth?: number }) => (
-    <View style={[s.paramCell, flex !== undefined ? { flex } : {}, maxWidth !== undefined ? { maxWidth } : {}]}>
-      <Text style={s.paramCellText}>{cell(value)}</Text>
+    <View style={[s.paramCell, { padding: dPad }, flex !== undefined ? { flex } : {}, maxWidth !== undefined ? { maxWidth } : {}]}>
+      <Text style={[s.paramCellText, { fontSize: dTextSz }]}>{cell(value)}</Text>
     </View>
   );
 
@@ -395,22 +449,30 @@ function PDFSectionTable({
     </View>
   ) : null;
 
+  const emptyState = (
+    <View style={[s.paramRow, { backgroundColor: '#ffffff' }]}>
+      <View style={s.paramCell}>
+        <Text style={[s.noDataText, { color: eqColor.primary }]}>No data recorded</Text>
+      </View>
+    </View>
+  );
+
   switch (section.type) {
     case 'fields': {
       const fields = section.fields ?? [];
       if (!fields.length) return null;
       return (
-        <View style={s.paramTable}>
+        <View style={tableStyle}>
           {SectionTitle}
           {fields.map((f, idx) => (
             <DataRow key={f.key} idx={idx}>
-              <View style={[s.paramCell, { flex: 2 }]}>
-                <Text style={[s.paramCellText, { color: C.warmGrey }]}>
+              <View style={[s.paramCell, { flex: 2, padding: dPad }]}>
+                <Text style={[s.paramCellText, { color: C.warmGrey, fontSize: dTextSz }]}>
                   {f.title}{f.unit ? ` (${f.unit})` : ''}
                 </Text>
               </View>
-              <View style={[s.paramCell, { flex: 3 }]}>
-                <Text style={[s.paramCellText, { fontWeight: 'bold' }]}>{cell(payload[k(section.id, f.key)])}</Text>
+              <View style={[s.paramCell, { flex: 3, padding: dPad }]}>
+                <Text style={[s.paramCellText, { fontWeight: 'bold', fontSize: dTextSz }]}>{cell(payload[k(section.id, f.key)])}</Text>
               </View>
             </DataRow>
           ))}
@@ -422,7 +484,7 @@ function PDFSectionTable({
       const phases = section.phases ?? ['R', 'Y', 'B'];
       const fields = section.fields ?? [];
       return (
-        <View style={s.paramTable}>
+        <View style={tableStyle}>
           {SectionTitle}
           <HeaderRow>
             <HCell label="Parameter" flex={2} />
@@ -442,7 +504,7 @@ function PDFSectionTable({
       const phases = section.phases ?? ['R', 'Y', 'B'];
       const cols = section.columns ?? [];
       return (
-        <View style={s.paramTable}>
+        <View style={tableStyle}>
           {SectionTitle}
           <HeaderRow>
             <HCell label="Phase" />
@@ -463,7 +525,7 @@ function PDFSectionTable({
       const tapCount = (section.tap_count_default ?? 17) + extra;
       const cols = section.columns ?? [];
       return (
-        <View style={s.paramTable}>
+        <View style={tableStyle}>
           {SectionTitle}
           <HeaderRow>
             <HCell label="Tap No." maxWidth={30} />
@@ -483,19 +545,13 @@ function PDFSectionTable({
       const cols = section.columns ?? [];
       const rows: Record<string, any>[] = payload[k(section.id, 'rows')] ?? [];
       return (
-        <View style={s.paramTable}>
+        <View style={tableStyle}>
           {SectionTitle}
           <HeaderRow>
             <HCell label="Sr." maxWidth={24} />
             {cols.map(c => <HCell key={c.key} label={c.title} />)}
           </HeaderRow>
-          {rows.length === 0 ? (
-            <View style={[s.paramRow, { backgroundColor: '#ffffff' }]}>
-              <View style={s.paramCell}>
-                <Text style={[s.noDataText, { color: eqColor.primary }]}>No data recorded</Text>
-              </View>
-            </View>
-          ) : rows.map((row, idx) => (
+          {rows.length === 0 ? emptyState : rows.map((row, idx) => (
             <DataRow key={idx} idx={idx}>
               <DCell value={idx + 1} maxWidth={24} />
               {cols.map(c => <DCell key={c.key} value={row[c.key]} />)}
@@ -510,7 +566,7 @@ function PDFSectionTable({
       const numCores = (section.num_cores_default ?? 4) + extra;
       const cols = section.columns ?? [];
       return (
-        <View style={s.paramTable}>
+        <View style={tableStyle}>
           {SectionTitle}
           <HeaderRow>
             <HCell label="Core No." maxWidth={40} />
@@ -535,7 +591,7 @@ function PDFSectionTable({
         ...extraRows,
       ];
       return (
-        <View style={s.paramTable}>
+        <View style={tableStyle}>
           {SectionTitle}
           <HeaderRow>
             <HCell label={section.row_label_header ?? 'Measurement'} flex={2} />
@@ -557,7 +613,7 @@ function PDFSectionTable({
       const extraRows: Array<{ id: string; insulation: string; voltage: string; unit: string }> =
         payload[k(section.id, 'extra_rows')] ?? [];
       return (
-        <View style={s.paramTable}>
+        <View style={tableStyle}>
           {SectionTitle}
           <HeaderRow>
             <HCell label="Sr." maxWidth={18} />
@@ -591,7 +647,7 @@ function PDFSectionTable({
       for (let n = 1; n <= numCores; n++)
         for (const ph of phases) allRows.push({ core: n, phase: ph });
       return (
-        <View style={s.paramTable}>
+        <View style={tableStyle}>
           {SectionTitle}
           <HeaderRow>
             <HCell label="Core" />
@@ -611,7 +667,7 @@ function PDFSectionTable({
 
     default:
       return (
-        <View style={s.paramTable}>
+        <View style={tableStyle}>
           {SectionTitle}
           <Text style={[s.noDataText, { color: eqColor.primary }]}>
             ({section.type} — not rendered)
@@ -665,6 +721,78 @@ export interface ProjectReportPDFProps {
   generatedAt: string;
 }
 
+// ─── Test block component ─────────────────────────────────────────────────────
+
+function TestBlock({
+  task,
+  eqColor,
+}: {
+  task: PDFTaskItem;
+  eqColor: { primary: string; light: string };
+}) {
+  const isWide = task.schema
+    ? task.schema.sections.some(sec => sectionColumnCount(sec) > 7)
+    : false;
+
+  return (
+    <View style={s.testBlock}>
+      {/* Test header strip */}
+      <View style={[s.testHeaderStrip, { backgroundColor: eqColor.light, borderBottomColor: eqColor.primary }]}>
+        <View style={s.testHeaderLeft}>
+          <View style={[s.testBullet, { backgroundColor: eqColor.primary }]} />
+          <Text style={s.testName}>{task.testName}</Text>
+          <Text style={[s.testCode, { color: eqColor.primary }]}> · {task.testCode}</Text>
+        </View>
+        <View style={s.testHeaderRight}>
+          <StatusPill status={task.status} />
+          <EngineerTag color={task.assignedEngineerColor} name={task.assignedEngineerName} />
+        </View>
+      </View>
+
+      {/* Meta bar */}
+      <View style={s.testMetaBar}>
+        {task.instrumentId && (
+          <View style={s.testMetaItem}>
+            <Text style={s.testMetaLabel}>Instrument:</Text>
+            <Text style={s.testMetaValue}>{task.instrumentId}</Text>
+          </View>
+        )}
+        {task.passFail && (
+          <View style={s.testMetaItem}>
+            <Text style={s.testMetaLabel}>Result:</Text>
+            <Text style={[s.testMetaValue, {
+              color: task.passFail === 'PASS' ? '#065f46' : task.passFail === 'FAIL' ? '#9f1239' : C.amberDark,
+            }]}>
+              {task.passFail}
+            </Text>
+          </View>
+        )}
+        {task.remarks && (
+          <View style={s.testMetaItem}>
+            <Text style={s.testMetaLabel}>Remarks:</Text>
+            <Text style={s.testMetaValue}>{task.remarks}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Section tables */}
+      {task.schema ? task.schema.sections.map(sec => (
+        <PDFSectionTable
+          key={sec.id}
+          section={sec}
+          payload={task.payload}
+          eqColor={eqColor}
+          compact={isWide}
+        />
+      )) : (
+        <Text style={[s.noDataText, { color: eqColor.primary }]}>
+          No parameter schema available for this test.
+        </Text>
+      )}
+    </View>
+  );
+}
+
 // ─── Cover page ───────────────────────────────────────────────────────────────
 
 function CoverPage({ props }: { props: ProjectReportPDFProps }) {
@@ -678,26 +806,23 @@ function CoverPage({ props }: { props: ProjectReportPDFProps }) {
     <Page size="A4" style={s.page}>
       {/* ── Navy top section */}
       <View style={s.coverNavy}>
-        {/* Branding */}
         <View style={s.coverBrand}>
           <View>
             <Text style={s.coverBrandName}>TestFlow</Text>
             <Text style={s.coverBrandSub}>GRID CONTROL</Text>
           </View>
         </View>
-        {/* Title */}
         <Text style={s.coverTitle}>PROJECT TEST{'\n'}REPORT</Text>
         <Text style={s.coverDate}>{generatedAt}</Text>
       </View>
 
-      {/* ── Diagonal overlay */}
+      {/* ── Diagonal overlay (absolute — does not affect flow) */}
       <View style={s.coverDiagonal} />
 
-      {/* ── Warm white content */}
+      {/* ── Warm white content — flush below navy block */}
       <View style={s.coverContent}>
         {/* Project details card */}
         <View style={s.infoCard}>
-          {/* Col 1 */}
           <View style={s.infoCol}>
             <Text style={s.infoLabel}>Project Number</Text>
             <Text style={s.infoValue}>{projectNumber}</Text>
@@ -706,7 +831,6 @@ function CoverPage({ props }: { props: ProjectReportPDFProps }) {
             <Text style={s.infoLabel}>Site Address</Text>
             <Text style={s.infoValue}>{siteAddress ?? '—'}</Text>
           </View>
-          {/* Col 2 */}
           <View style={s.infoCol}>
             <Text style={s.infoLabel}>Client</Text>
             <Text style={s.infoValue}>{client ?? '—'}</Text>
@@ -715,7 +839,6 @@ function CoverPage({ props }: { props: ProjectReportPDFProps }) {
             <Text style={s.infoLabel}>Start Date</Text>
             <Text style={s.infoValue}>{startDate ?? '—'}</Text>
           </View>
-          {/* Col 3 */}
           <View style={[s.infoCol, { paddingRight: 0 }]}>
             <Text style={s.infoLabel}>Status</Text>
             <View style={{ marginBottom: 10 }}>
@@ -739,10 +862,10 @@ function CoverPage({ props }: { props: ProjectReportPDFProps }) {
         </View>
         <View style={s.progressPills}>
           {[
-            { dot: C.amber, label: `${submitted} Pending Review` },
-            { dot: C.blue,  label: `${inProgress} In Progress` },
-            { dot: '#94a3b8', label: `${draft} Not Started` },
-            { dot: C.green, label: `${approved} Approved` },
+            { dot: C.amber,    label: `${submitted} Pending Review` },
+            { dot: C.blue,     label: `${inProgress} In Progress` },
+            { dot: '#94a3b8',  label: `${draft} Not Started` },
+            { dot: C.green,    label: `${approved} Approved` },
           ].map(({ dot, label }) => (
             <View key={label} style={s.progressPill}>
               <View style={[s.progressDot, { backgroundColor: dot }]} />
@@ -761,7 +884,7 @@ function CoverPage({ props }: { props: ProjectReportPDFProps }) {
   );
 }
 
-// ─── Equipment page ───────────────────────────────────────────────────────────
+// ─── Equipment page — always A4 portrait ──────────────────────────────────────
 
 function EquipmentPage({
   group,
@@ -777,19 +900,16 @@ function EquipmentPage({
   const eqColor = getEquipmentColor(group.equipmentType);
   const npFields = NAMEPLATE_FIELDS[group.equipmentType] ?? [];
   const approvedCount = group.tasks.filter(t => t.status === 'APPROVED').length;
-  const isLandscape = group.tasks.some(t => maxSectionColumns(t.schema) > 7);
 
-  const pageStyle = isLandscape
-    ? [s.pageLandscape, { paddingBottom: 44 }]
-    : s.page;
+  // Nameplate: 60% width if ≤14 rows, full width otherwise
+  const nameplateContainerStyle = npFields.length <= 14
+    ? { width: '60%' }
+    : {};
+
+  const displayRows = groupTasks(group.tasks);
 
   return (
-    <Page
-      size="A4"
-      orientation={isLandscape ? 'landscape' : 'portrait'}
-      style={pageStyle}
-      break
-    >
+    <Page size="A4" orientation="portrait" style={s.page} break>
       {/* ── Equipment header bar */}
       <View style={[s.eqHeaderBar, { backgroundColor: eqColor.primary }]}>
         <View style={s.eqHeaderBarLeft}>
@@ -808,88 +928,51 @@ function EquipmentPage({
         {npFields.length > 0 && (
           <View>
             <View style={s.subSectionHeader}>
-              <Text style={[s.subSectionTitle, { color: eqColor.primary }]}>Nameplate Details</Text>
+              <Text style={[s.subSectionTitle, { color: eqColor.primary }]}>NAMEPLATE DETAILS</Text>
               <View style={[s.subSectionRule, { backgroundColor: eqColor.primary }]} />
             </View>
-            <View style={[s.kvTable, { borderLeftColor: eqColor.primary }]}>
-              {/* Header */}
-              <View style={[s.kvHeaderRow, { backgroundColor: eqColor.primary }]}>
-                <View style={[s.kvHeaderCell, { flex: 2 }]}><Text style={s.kvHeaderText}>Field</Text></View>
-                <View style={[s.kvHeaderCell, { flex: 3 }]}><Text style={s.kvHeaderText}>Value</Text></View>
-              </View>
-              {npFields.map((f, idx) => (
-                <View
-                  key={f.key}
-                  style={[s.kvRow, idx % 2 === 1 ? { backgroundColor: eqColor.light } : { backgroundColor: '#ffffff' }]}
-                >
-                  <Text style={s.kvLabel}>{f.label}{f.unit ? ` (${f.unit})` : ''}</Text>
-                  <Text style={s.kvValue}>
-                    {cell(group.nameplate?.[f.key])}
-                  </Text>
+            <View style={nameplateContainerStyle}>
+              <View style={[s.kvTable, { borderLeftColor: eqColor.primary }]}>
+                <View style={[s.kvHeaderRow, { backgroundColor: eqColor.primary }]}>
+                  <View style={[s.kvHeaderCell, { flex: 2 }]}><Text style={s.kvHeaderText}>Field</Text></View>
+                  <View style={[s.kvHeaderCell, { flex: 3 }]}><Text style={s.kvHeaderText}>Value</Text></View>
                 </View>
-              ))}
+                {npFields.map((f, idx) => (
+                  <View
+                    key={f.key}
+                    style={[s.kvRow, idx % 2 === 1 ? { backgroundColor: eqColor.light } : { backgroundColor: '#ffffff' }]}
+                  >
+                    <Text style={s.kvLabel}>{f.label}{f.unit ? ` (${f.unit})` : ''}</Text>
+                    <Text style={s.kvValue}>{cell(group.nameplate?.[f.key])}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
         )}
 
         {/* ── Testing Parameters */}
         <View style={s.subSectionHeader}>
-          <Text style={[s.subSectionTitle, { color: eqColor.primary }]}>Testing Parameters</Text>
+          <Text style={[s.subSectionTitle, { color: eqColor.primary }]}>TESTING PARAMETERS</Text>
           <View style={[s.subSectionRule, { backgroundColor: eqColor.primary }]} />
         </View>
 
-        {group.tasks.map(task => (
-          <View key={task.id} style={s.testBlock}>
-            {/* Test header strip */}
-            <View style={[s.testHeaderStrip, { backgroundColor: eqColor.light, borderBottomColor: eqColor.primary }]}>
-              <View style={s.testHeaderLeft}>
-                <View style={[s.testBullet, { backgroundColor: eqColor.primary }]} />
-                <Text style={s.testName}>{task.testName}</Text>
-                <Text style={[s.testCode, { color: eqColor.primary }]}> · {task.testCode}</Text>
+        {/* ── Grouped test layout: side-by-side for simple pairs, full-width for complex */}
+        {displayRows.map((row, rowIdx) => {
+          if (row.kind === 'pair') {
+            return (
+              <View key={rowIdx} style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+                <View style={{ flex: 1 }}>
+                  <TestBlock task={row.left} eqColor={eqColor} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <TestBlock task={row.right} eqColor={eqColor} />
+                </View>
               </View>
-              <View style={s.testHeaderRight}>
-                <StatusPill status={task.status} />
-                <EngineerTag color={task.assignedEngineerColor} name={task.assignedEngineerName} />
-              </View>
-            </View>
-
-            {/* Meta bar */}
-            <View style={s.testMetaBar}>
-              {task.instrumentId && (
-                <View style={s.testMetaItem}>
-                  <Text style={s.testMetaLabel}>Instrument:</Text>
-                  <Text style={s.testMetaValue}>{task.instrumentId}</Text>
-                </View>
-              )}
-              {task.passFail && (
-                <View style={s.testMetaItem}>
-                  <Text style={s.testMetaLabel}>Result:</Text>
-                  <Text style={[s.testMetaValue, {
-                    color: task.passFail === 'PASS' ? '#065f46' : task.passFail === 'FAIL' ? '#9f1239' : C.amberDark
-                  }]}>
-                    {task.passFail}
-                  </Text>
-                </View>
-              )}
-              {task.remarks && (
-                <View style={s.testMetaItem}>
-                  <Text style={s.testMetaLabel}>Remarks:</Text>
-                  <Text style={s.testMetaValue}>{task.remarks}</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Section tables */}
-            {task.schema && task.schema.sections.map(sec => (
-              <PDFSectionTable key={sec.id} section={sec} payload={task.payload} eqColor={eqColor} />
-            ))}
-            {!task.schema && (
-              <Text style={[s.noDataText, { color: eqColor.primary }]}>
-                No parameter schema available for this test.
-              </Text>
-            )}
-          </View>
-        ))}
+            );
+          }
+          return <TestBlock key={row.task.id} task={row.task} eqColor={eqColor} />;
+        })}
       </View>
 
       <PageFooter projectNumber={projectNumber} siteName={siteName} generatedAt={generatedAt} />

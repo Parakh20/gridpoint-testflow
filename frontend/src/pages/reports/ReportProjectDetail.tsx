@@ -288,7 +288,7 @@ export default function ReportProjectDetail() {
     setReworkReason('');
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!project || !progressStats || !tasksByEquipment.size) return;
     setExportingExcel(true);
     try {
@@ -322,7 +322,7 @@ export default function ReportProjectDetail() {
           })),
         });
       });
-      exportReportExcel(exportProject, progressStats, equipment);
+      await exportReportExcel(exportProject, progressStats, equipment);
     } finally {
       setExportingExcel(false);
     }
