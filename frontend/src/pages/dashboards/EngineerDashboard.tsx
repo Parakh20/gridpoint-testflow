@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Wrench, Clock, CheckCircle, Loader2 } from 'lucide-react';
@@ -26,49 +26,24 @@ interface AssignedProject {
 export default function EngineerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<AssignedProject[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ total: 0, inProgress: 0, completed: 0 });
 
-  useEffect(() => {
-    if (!user) return;
-    fetchAssignedProjects();
-  }, [user]);
-
-  const fetchAssignedProjects = async () => {
-    if (!user) return;
-    try {
-      // Tasks are now assigned at scope level, not equipment level
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['engineer-projects', user?.id],
+    queryFn: async () => {
       const { data: myTasks, error: tasksError } = await supabase
-        .from('test_tasks')
-        .select('id, status, equipment_instance_id')
-        .eq('assigned_to', user.id);
-
+        .from('test_tasks').select('id, status, equipment_instance_id').eq('assigned_to', user!.id);
       if (tasksError) throw tasksError;
-      if (!myTasks?.length) {
-        setLoading(false);
-        return;
-      }
+      if (!myTasks?.length) return { projects: [], stats: { total: 0, inProgress: 0, completed: 0 } };
 
       const instanceIds = [...new Set(myTasks.map(t => t.equipment_instance_id))];
-
-      const { data: instances, error: instanceError } = await supabase
-        .from('equipment_instances')
-        .select('id, project_id')
-        .in('id', instanceIds);
-
-      if (instanceError) throw instanceError;
+      const { data: instances } = await supabase
+        .from('equipment_instances').select('id, project_id').in('id', instanceIds);
 
       const projectIds = [...new Set((instances || []).map(i => i.project_id))];
+      const { data: projectData } = await supabase
+        .from('projects').select('id, project_number, site_name, site_address, start_date, status').in('id', projectIds);
 
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .select('id, project_number, site_name, site_address, start_date, status')
-        .in('id', projectIds);
-
-      if (projectError) throw projectError;
-
-      const enriched = (projectData || []).map(p => {
+      const enriched: AssignedProject[] = (projectData || []).map(p => {
         const projectInstanceIds = (instances || []).filter(i => i.project_id === p.id).map(i => i.id);
         const projectTasks = myTasks.filter(t => projectInstanceIds.includes(t.equipment_instance_id));
         return {
@@ -80,18 +55,20 @@ export default function EngineerDashboard() {
         };
       });
 
-      setProjects(enriched);
-      setStats({
-        total: myTasks.length,
-        inProgress: myTasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'SUBMITTED').length,
-        completed: myTasks.filter(t => t.status === 'APPROVED').length,
-      });
-    } catch (error) {
-      console.error('Error fetching assigned projects:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return {
+        projects: enriched,
+        stats: {
+          total: myTasks.length,
+          inProgress: myTasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'SUBMITTED').length,
+          completed: myTasks.filter(t => t.status === 'APPROVED').length,
+        },
+      };
+    },
+    enabled: !!user,
+  });
+
+  const projects = data?.projects ?? [];
+  const stats = data?.stats ?? { total: 0, inProgress: 0, completed: 0 };
 
   const statCards = [
     {
