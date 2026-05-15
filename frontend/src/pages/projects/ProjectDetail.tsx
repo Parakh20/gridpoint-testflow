@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,40 +36,33 @@ export default function ProjectDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userRole } = useAuth();
-  const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refetching, setRefetching] = useState(false);
+  const queryClient = useQueryClient();
   const [showPDF, setShowPDF] = useState(false);
-  const [hasEquipment, setHasEquipment] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
-  const [assignedSupervisor, setAssignedSupervisor] = useState<{ id: string; name: string } | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportMarkdown, setReportMarkdown] = useState<string | null>(null);
   const [exportingExcel, setExportingExcel] = useState(false);
-  const [progressStats, setProgressStats] = useState<{
-    total: number; approved: number; submitted: number; inProgress: number; draft: number;
-  } | null>(null);
 
-  const fetchProject = async (isRefetch = false) => {
-    if (!id) return;
-    if (isRefetch) setRefetching(true);
-
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', id)
-        .single();
-
+  const { data: project, isLoading: loading } = useQuery({
+    queryKey: ['project', id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('projects').select('*').eq('id', id!).single();
       if (error) throw error;
-      setProject(data);
+      return data;
+    },
+    enabled: !!id,
+  });
 
+  const { data: projectMeta, isFetching: refetching } = useQuery({
+    queryKey: ['project-meta', id],
+    queryFn: async () => {
       const { data: equipmentData } = await supabase
         .from('equipment_instances')
         .select('id')
-        .eq('project_id', id);
+        .eq('project_id', id!);
 
-      setHasEquipment(!!equipmentData?.length);
+      const hasEquipment = !!equipmentData?.length;
+      let progressStats = null;
 
       if (equipmentData?.length) {
         const { data: taskStatuses } = await supabase
@@ -76,46 +70,46 @@ export default function ProjectDetail() {
           .select('status')
           .in('equipment_instance_id', equipmentData.map(e => e.id));
         if (taskStatuses?.length) {
-          setProgressStats({
+          progressStats = {
             total: taskStatuses.length,
             approved: taskStatuses.filter(t => t.status === 'APPROVED').length,
             submitted: taskStatuses.filter(t => t.status === 'SUBMITTED').length,
             inProgress: taskStatuses.filter(t => t.status === 'IN_PROGRESS').length,
             draft: taskStatuses.filter(t => t.status === 'DRAFT').length,
-          });
+          };
         }
       }
 
-      if (data.assigned_to) {
-        const { data: supervisorData } = await supabase
-          .from('profiles')
-          .select('id, name')
-          .eq('id', data.assigned_to)
-          .single();
-        setAssignedSupervisor(supervisorData ?? null);
-      } else {
-        setAssignedSupervisor(null);
-      }
-    } catch (error) {
-      console.error('Error fetching project:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load project details',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-      setRefetching(false);
-    }
+      return { hasEquipment, progressStats };
+    },
+    enabled: !!id,
+  });
+
+  const { data: assignedSupervisor } = useQuery({
+    queryKey: ['project-supervisor', project?.assigned_to],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .eq('id', project!.assigned_to!)
+        .single();
+      return data ?? null;
+    },
+    enabled: !!project?.assigned_to,
+  });
+
+  const hasEquipment = projectMeta?.hasEquipment ?? false;
+  const progressStats = projectMeta?.progressStats ?? null;
+
+  const handleStatusChange = () => {
+    queryClient.invalidateQueries({ queryKey: ['project', id] });
+    queryClient.invalidateQueries({ queryKey: ['project-meta', id] });
   };
 
-  useEffect(() => { fetchProject(); }, [id]);
-
-  const handleStatusChange = () => fetchProject(true);
-
-  // Optimistic update: mutate local state immediately, server refetch confirms it
   const handleOptimisticStatusUpdate = (newStatus: string) => {
-    setProject(prev => prev ? { ...prev, status: newStatus as any } : prev);
+    queryClient.setQueryData(['project', id], (old: any) =>
+      old ? { ...old, status: newStatus } : old
+    );
   };
 
   const handleExportExcel = async () => {
@@ -199,7 +193,7 @@ export default function ProjectDetail() {
     }
   };
 
-  if (loading) {
+  if (loading || !project) {
     return (
       <DashboardLayout title="Project Details">
         <div className="flex items-center justify-center py-12">
@@ -389,7 +383,7 @@ export default function ProjectDetail() {
             <ProjectTestingScopeTab
               projectId={project.id}
               projectStatus={project.status}
-              onEquipmentGenerated={() => setHasEquipment(true)}
+              onEquipmentGenerated={() => queryClient.invalidateQueries({ queryKey: ['project-meta', id] })}
             />
           </TabsContent>
 
@@ -418,7 +412,7 @@ export default function ProjectDetail() {
         projectId={project.id}
         projectNumber={project.project_number}
         currentAssignment={assignedSupervisor}
-        onSuccess={fetchProject}
+        onSuccess={handleStatusChange}
       />
 
       {/* AI Report dialog */}
