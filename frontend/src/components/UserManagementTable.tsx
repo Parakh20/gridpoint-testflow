@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { toast } from 'sonner';
 import {
   Table,
@@ -52,6 +54,8 @@ interface UserManagementTableProps {
 
 export function UserManagementTable({ onUserCountChange }: UserManagementTableProps) {
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const { company } = useCompany();
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -67,14 +71,6 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
   const [toggleUserId, setToggleUserId] = useState<string | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-  // Fetch current user ID once on mount — never in render body
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setCurrentUserId(data.user.id);
-    });
-  }, []);
 
   const { data: users = [], isLoading, refetch } = useQuery({
     queryKey: ['users-with-roles'],
@@ -124,7 +120,7 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
   });
 
   const handleToggleActive = async (userId: string, currentStatus: boolean) => {
-    if (userId === currentUserId && currentStatus) {
+    if (userId === currentUser?.id && currentStatus) {
       toast.error('Cannot deactivate yourself');
       return;
     }
@@ -137,11 +133,13 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
 
       if (error) throw error;
 
+      const { data: { user: actor } } = await supabase.auth.getUser();
       await supabase.from('audit_logs').insert({
         entity_type: 'user',
         entity_id: userId,
         action: 'UPDATE',
-        actor_id: currentUserId,
+        actor_id: actor?.id ?? null,
+        company_id: company?.id ?? null,
         before_data: { is_active: currentStatus },
         after_data: { is_active: !currentStatus },
       });
@@ -285,7 +283,7 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
                               handleToggleActive(user.id, user.is_active);
                             }
                           }}
-                          disabled={user.id === currentUserId}
+                          disabled={user.id === currentUser?.id}
                         />
                         <span className="text-sm text-muted-foreground">
                           {user.is_active ? 'Active' : 'Inactive'}
@@ -306,7 +304,7 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          disabled={user.id === currentUserId}
+                          disabled={user.id === currentUser?.id}
                           onClick={() => setDeleteUserId(user.id)}
                         >
                           <Trash2 className="h-4 w-4" />

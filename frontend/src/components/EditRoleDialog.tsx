@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompany } from '@/contexts/CompanyContext';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -62,6 +63,7 @@ interface EditRoleDialogProps {
 }
 
 export function EditRoleDialog({ open, onOpenChange, onSuccess, user }: EditRoleDialogProps) {
+  const { company } = useCompany();
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingRole, setPendingRole] = useState<string | null>(null);
@@ -117,6 +119,7 @@ export function EditRoleDialog({ open, onOpenChange, onSuccess, user }: EditRole
         entity_id: user.id,
         action: 'UPDATE',
         actor_id: (await supabase.auth.getUser()).data.user?.id,
+        company_id: company?.id ?? null,
         before_data: { role: user.currentRole },
         after_data: { role: newRole },
       });
