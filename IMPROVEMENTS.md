@@ -1,31 +1,10 @@
 # Improvements & Known Issues
 
-Legend: 🔴 Security | 🔲 Pending | ⚠️ Partial | ✅ Fixed
-
----
-
-## 2026-04-29 — Pre-sale security pass (✅ all fixed)
-
-- ✅ **Cross-tenant escalation via profiles.company_id** — `profiles_update_own` had no `WITH CHECK`, so any user could change their own `company_id` to another tenant's UUID. `my_company_id()` reads from profiles, so this would have given full read access to that other company's data. Fixed in migration `20260429000001` by adding a `WITH CHECK` that requires the new `company_id` equal the existing one.
-- ✅ **`generate-report` Edge Function had no auth** — anyone with the URL could pass any `project_id` and receive an AI-generated report on it (data leak + Anthropic-bill abuse). Now requires JWT, verifies caller role is GM/SUPERADMIN, and confirms the project belongs to the caller's company.
-- ✅ **CORS wildcard on Edge Functions** — switched `Access-Control-Allow-Origin: *` to an allow-list (`optimustesting.com`, `*.optimustesting.com`, localhost dev ports) via `_shared/cors.ts::buildCorsHeaders`.
-- ✅ **Missing `WITH CHECK` on SUPERADMIN profile/user_roles management and project UPDATE** — added so a SUPERADMIN can't move a row to another tenant.
-- ✅ **Password length minimum was 6 in Auth reset flow** — bumped to 8, matching `InviteUserDialog` zod schema and the new server-side check in `create-user`.
-- ✅ **`create-user` Edge Function lacked input validation** — added strict email regex + 8-char password floor server-side (defense in depth — UI validation is not a security boundary).
+Legend: 🔴 Security | 🔲 Pending | ⚠️ Partial
 
 ---
 
 ## Security
-
-### ✅ User invite bypasses admin server-side creation
-`InviteUserDialog` now calls the `create-user` Edge Function (Supabase Admin SDK, service role key) instead of `supabase.auth.signUp()`. Email confirmation is skipped; account state is deterministic.
-
----
-
-### ✅ Deleted users remain in auth.users
-`delete-user` Edge Function calls `supabase.admin.deleteUser(userId)` using the service role. `UserManagementTable` delete button calls `functions.invoke('delete-user', ...)`. Cascades clean `profiles` and `user_roles`.
-
----
 
 ### 🔴 Audit logs inserted from browser with unvalidated actor_id
 All `audit_logs` inserts happen client-side. `actor_id` is taken from `currentUserId` state which starts as `null` and could be null if `getUser()` hasn't resolved yet. Additionally, any authenticated user could insert fabricated audit entries for any `entity_id` since there's no RLS enforcement on the insert side.
@@ -33,11 +12,6 @@ All `audit_logs` inserts happen client-side. `actor_id` is taken from `currentUs
 **Fix:**
 1. Always resolve `actor_id` from `auth.uid()` via a DB function/trigger rather than the client.
 2. Add an RLS policy on `audit_logs` insert: `actor_id = auth.uid()` must match.
-
----
-
-### ✅ `currentPassword` field in Profile removed
-`Profile.tsx` no longer has a `currentPassword` field. Password update uses `supabase.auth.updateUser({ password: newPassword })` directly. The misleading "verify old password" UI that was never enforced server-side has been removed.
 
 ---
 
@@ -50,13 +24,10 @@ All `audit_logs` inserts happen client-side. `actor_id` is taken from `currentUs
 
 ---
 
-### ✅ `currentPassword` state removed from Profile
-Removed along with the misleading password field. See Security section above.
+### 🔲 test_templates.fields is empty for most templates
+Migration `20260409000002_populate_template_fields.sql` was written but most templates in the seeded DB still have `fields: []`. Until applied, `EngineerProjectDetail` renders "No fields defined" for most test forms.
 
----
-
-### ✅ SuperadminDashboard grid has an empty 4th column
-Fixed — `SuperadminDashboard.tsx` now uses `md:grid-cols-3`.
+**Fix:** Run `supabase db push` to apply the migration, or verify it was applied with `SELECT test_code, fields FROM test_templates LIMIT 5`.
 
 ---
 
@@ -84,13 +55,6 @@ Two test files exist (`format.test.ts`, `StatusBadge.test.tsx`) but cover only u
 - `ProtectedRoute.test.tsx` — redirects for unauthenticated / wrong-role users
 - `UserManagementTable.test.tsx` — deactivate/delete confirmations, self-deactivation block
 - Playwright E2E: login → create project → generate equipment → submit test → approve
-
----
-
-### 🔲 test_templates.fields is empty for most templates
-Migration `20260409000002_populate_template_fields.sql` was written but most templates in the seeded DB still have `fields: []`. Until applied, `EngineerProjectDetail` renders "No fields defined" for most test forms.
-
-**Fix:** Run `supabase db push` to apply the migration, or verify it was applied with `SELECT test_code, fields FROM test_templates LIMIT 5`.
 
 ---
 
