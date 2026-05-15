@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   userRole: string | null;
+  userName: string | null;
   loading: boolean;
   companyMismatch: boolean;
   accountDisabled: boolean;
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [companyMismatch, setCompanyMismatch] = useState(false);
   const [accountDisabled, setAccountDisabled] = useState(false);
@@ -45,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(() => fetchUserRole(session.user.id), 0);
         } else {
           setUserRole(null);
+          setUserName(null);
           setLoading(false);
         }
       }
@@ -67,10 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const [roleResult, profileResult] = await Promise.all([
         supabase.from('user_roles').select('role').eq('user_id', userId).single(),
-        supabase.from('profiles').select('company_id, is_active').eq('id', userId).single(),
+        supabase.from('profiles').select('company_id, is_active, name').eq('id', userId).single(),
       ]);
 
       const userCompanyId = profileResult.data?.company_id ?? null;
+      setUserName(profileResult.data?.name ?? null);
 
       // Block disabled accounts before anything else
       if (profileResult.data?.is_active === false) {
@@ -139,11 +143,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUserRole(null);
+    setUserName(null);
     navigate('/auth');
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, companyMismatch, accountDisabled, signIn, signOut, resetPasswordForEmail, updatePassword }}>
+    <AuthContext.Provider value={{ user, session, userRole, userName, loading, companyMismatch, accountDisabled, signIn, signOut, resetPasswordForEmail, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );
