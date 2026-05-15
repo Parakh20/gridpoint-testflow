@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import type { Tables } from '@/integrations/supabase/types';
 
 type EquipmentInstance = Tables<'equipment_instances'>;
@@ -89,6 +90,7 @@ export function ProjectEquipmentTab({ projectId, projectStatus: _projectStatus }
   const [assigning, setAssigning] = useState<string | null>(null);
   const { toast } = useToast();
   const { userRole } = useAuth();
+  const { company } = useCompany();
 
   const canAssign = userRole === 'SUPERVISOR' || userRole === 'GM' || userRole === 'SUPERADMIN';
 
@@ -157,6 +159,7 @@ export function ProjectEquipmentTab({ projectId, projectStatus: _projectStatus }
   const handleAssignTest = async (taskId: string, engineerId: string | null) => {
     setAssigning(taskId);
     try {
+      const prevTask = tasks.find(t => t.id === taskId);
       const { error } = await supabase
         .from('test_tasks')
         .update({ assigned_to: engineerId })
@@ -165,6 +168,18 @@ export function ProjectEquipmentTab({ projectId, projectStatus: _projectStatus }
       if (error) throw error;
 
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, assigned_to: engineerId } : t));
+
+      const { data: { user: actor } } = await supabase.auth.getUser();
+      await supabase.from('audit_logs').insert({
+        entity_type: 'test_task',
+        entity_id: taskId,
+        action: 'TASK_ASSIGNED',
+        actor_id: actor?.id ?? null,
+        company_id: company?.id ?? null,
+        before_data: { assigned_to: prevTask?.assigned_to ?? null },
+        after_data: { assigned_to: engineerId },
+      });
+
       toast({ title: engineerId ? 'Engineer assigned' : 'Engineer unassigned' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
