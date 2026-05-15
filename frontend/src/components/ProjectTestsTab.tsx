@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -37,10 +38,8 @@ interface ProjectTestsTabProps {
 export function ProjectTestsTab({ projectId, onAllApproved }: ProjectTestsTabProps) {
   const { userRole } = useAuth();
   const { toast } = useToast();
-  const [testTasks, setTestTasks] = useState<TestTask[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [reviewingTaskId, setReviewingTaskId] = useState<string | null>(null);
 
   // Rework reason dialog state
   const [reworkDialogTask, setReworkDialogTask] = useState<TestTask | null>(null);
@@ -56,22 +55,16 @@ export function ProjectTestsTab({ projectId, onAllApproved }: ProjectTestsTabPro
     userRole === 'GM' ||
     userRole === 'SUPERADMIN';
 
-  const submittedTasks = testTasks.filter(t => t.status === 'SUBMITTED');
-  const allSubmittedSelected = submittedTasks.length > 0 && submittedTasks.every(t => selectedTaskIds.has(t.id));
-
-  useEffect(() => {
-    fetchTestTasks();
-  }, [projectId]);
-
-  const fetchTestTasks = async () => {
-    try {
+  const { data: testTasks = [], isLoading: loading } = useQuery({
+    queryKey: ['test-tasks', projectId],
+    queryFn: async () => {
       const { data: instances, error: instError } = await supabase
         .from('equipment_instances')
         .select('id')
         .eq('project_id', projectId);
 
       if (instError) throw instError;
-      if (!instances?.length) { setLoading(false); return; }
+      if (!instances?.length) return [];
 
       const instanceIds = instances.map(i => i.id);
 
@@ -95,18 +88,15 @@ export function ProjectTestsTab({ projectId, onAllApproved }: ProjectTestsTabPro
 
       const recordMap = Object.fromEntries((records || []).map(r => [r.test_task_id, r]));
 
-      const enriched = (data || []).map(t => ({
+      return (data || []).map(t => ({
         ...t,
         record: recordMap[t.id] || null,
       })) as TestTask[];
+    },
+  });
 
-      setTestTasks(enriched);
-    } catch (error) {
-      console.error('Error fetching test tasks:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const submittedTasks = testTasks.filter(t => t.status === 'SUBMITTED');
+  const allSubmittedSelected = submittedTasks.length > 0 && submittedTasks.every(t => selectedTaskIds.has(t.id));
 
   const deriveEquipmentStatus = (tasks: TestTask[]) => {
     const statuses = tasks.map(task => task.status);
@@ -134,10 +124,8 @@ export function ProjectTestsTab({ projectId, onAllApproved }: ProjectTestsTabPro
     }
   };
 
-  const handleTaskReview = async (task: TestTask, nextStatus: 'APPROVED' | 'REWORK', reason?: string) => {
-    if (!task.equipment_instance?.id) return;
-    setReviewingTaskId(task.id);
-    try {
+  const reviewMutation = useMutation({
+    mutationFn: async ({ task, nextStatus, reason }: { task: TestTask; nextStatus: 'APPROVED' | 'REWORK'; reason?: string }) => {
       const update: Record<string, any> =
         nextStatus === 'APPROVED'
           ? { status: 'APPROVED', approved_at: new Date().toISOString(), rework_reason: null }
@@ -146,28 +134,43 @@ export function ProjectTestsTab({ projectId, onAllApproved }: ProjectTestsTabPro
       const { error } = await supabase.from('test_tasks').update(update).eq('id', task.id);
       if (error) throw error;
 
-      const nextTasks = testTasks.map(currentTask =>
-        currentTask.id === task.id
-          ? { ...currentTask, status: nextStatus, rework_reason: reason || null }
-          : currentTask
-      );
+      if (task.equipment_instance?.id) {
+        const nextTasks = testTasks.map(t =>
+          t.id === task.id ? { ...t, status: nextStatus, rework_reason: reason || null } : t
+        );
+        await syncEquipmentStatus(nextTasks, task.equipment_instance.id);
+      }
 
-      await syncEquipmentStatus(nextTasks, task.equipment_instance.id);
-      setTestTasks(nextTasks);
-      toast({
-        title: nextStatus === 'APPROVED' ? 'Test approved' : 'Sent back for rework',
-        description:
-          nextStatus === 'APPROVED'
-            ? 'The submitted test has been approved.'
-            : 'The engineer can now update and resubmit this test.',
-      });
-      if (nextStatus === 'APPROVED') checkAllApproved(nextTasks);
-    } catch (error: any) {
-      console.error('Error reviewing test task:', error);
-      toast({ title: 'Review failed', description: error.message ?? 'Unable to update test status', variant: 'destructive' });
-    } finally {
-      setReviewingTaskId(null);
-    }
+      return { task, nextStatus, reason };
+    },
+    onMutate: async ({ task, nextStatus, reason }) => {
+      await queryClient.cancelQueries({ queryKey: ['test-tasks', projectId] });
+      const snapshot = queryClient.getQueryData<TestTask[]>(['test-tasks', projectId]);
+      queryClient.setQueryData<TestTask[]>(['test-tasks', projectId], prev =>
+        (prev || []).map(t => t.id === task.id ? { ...t, status: nextStatus, rework_reason: reason || null } : t)
+      );
+      return { snapshot };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.snapshot) {
+        queryClient.setQueryData(['test-tasks', projectId], context.snapshot);
+      }
+      toast({ title: 'Review failed', variant: 'destructive' });
+    },
+    onSuccess: ({ nextStatus, task, reason }) => {
+      queryClient.invalidateQueries({ queryKey: ['test-tasks', projectId] });
+      toast({ title: nextStatus === 'APPROVED' ? 'Test approved' : 'Sent back for rework' });
+      if (nextStatus === 'APPROVED') {
+        const nextTasks = testTasks.map(t =>
+          t.id === task.id ? { ...t, status: nextStatus, rework_reason: reason || null } : t
+        );
+        checkAllApproved(nextTasks);
+      }
+    },
+  });
+
+  const handleTaskReview = (task: TestTask, nextStatus: 'APPROVED' | 'REWORK', reason?: string) => {
+    reviewMutation.mutate({ task, nextStatus, reason });
   };
 
   const handleReworkClick = (task: TestTask) => {
@@ -227,8 +230,8 @@ export function ProjectTestsTab({ projectId, onAllApproved }: ProjectTestsTabPro
         await syncEquipmentStatus(nextTasks, instanceId);
       }
 
-      setTestTasks(nextTasks);
       setSelectedTaskIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['test-tasks', projectId] });
       toast({ title: `${tasksToApprove.length} test${tasksToApprove.length > 1 ? 's' : ''} approved` });
       checkAllApproved(nextTasks);
     } catch (error: any) {
@@ -417,18 +420,18 @@ export function ProjectTestsTab({ projectId, onAllApproved }: ProjectTestsTabPro
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    disabled={reviewingTaskId === task.id}
+                                    disabled={reviewMutation.isPending && reviewMutation.variables?.task.id === task.id}
                                     onClick={() => handleReworkClick(task)}
                                   >
-                                    {reviewingTaskId === task.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {reviewMutation.isPending && reviewMutation.variables?.task.id === task.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Rework
                                   </Button>
                                   <Button
                                     size="sm"
-                                    disabled={reviewingTaskId === task.id}
+                                    disabled={reviewMutation.isPending && reviewMutation.variables?.task.id === task.id}
                                     onClick={() => handleTaskReview(task, 'APPROVED')}
                                   >
-                                    {reviewingTaskId === task.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {reviewMutation.isPending && reviewMutation.variables?.task.id === task.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Approve
                                   </Button>
                                 </div>
