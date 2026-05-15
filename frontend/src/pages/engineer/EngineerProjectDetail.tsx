@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,9 +48,7 @@ export default function EngineerProjectDetail() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [project, setProject] = useState<any>(null);
-  const [tasks, setTasks] = useState<TestTask[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('nameplate');
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>('');
   const [expandedTask] = useState<string | null>(null); // unused, kept for future use
@@ -59,31 +58,25 @@ export default function EngineerProjectDetail() {
   const [savingNameplate, setSavingNameplate] = useState(false);
   const [submittingAll, setSubmittingAll] = useState(false);
 
-  useEffect(() => {
-    if (!user || !projectId) return;
-    fetchData();
-  }, [user, projectId]);
-
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  const fetchData = async () => {
-    if (!user || !projectId) return;
-    try {
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['engineer-project-detail', projectId, user?.id],
+    queryFn: async () => {
       const { data: projectData } = await supabase
         .from('projects')
         .select('id, project_number, site_name, status')
-        .eq('id', projectId)
+        .eq('id', projectId!)
         .single();
-      setProject(projectData);
 
       // test_tasks has no project_id — scope via equipment_instances first
       const { data: allInstances, error: allInstError } = await supabase
         .from('equipment_instances')
         .select('id, label, equipment_type, assigned_to, nameplate')
-        .eq('project_id', projectId);
+        .eq('project_id', projectId!);
 
       if (allInstError) throw allInstError;
-      if (!allInstances?.length) { setLoading(false); return; }
+      if (!allInstances?.length) return { project: projectData, tasks: [], instances: [], nameplateInit: {}, formInit: {} };
 
       const allInstanceIds = allInstances.map(i => i.id);
 
@@ -92,13 +85,13 @@ export default function EngineerProjectDetail() {
         .from('test_tasks')
         .select('id, equipment_instance_id')
         .in('equipment_instance_id', allInstanceIds)
-        .eq('assigned_to', user.id);
+        .eq('assigned_to', user!.id);
 
       if (assignedErr) throw assignedErr;
-      if (!myAssignedTasks?.length) { setLoading(false); return; }
+      if (!myAssignedTasks?.length) return { project: projectData, tasks: [], instances: [], nameplateInit: {}, formInit: {} };
 
       const instanceIds = [...new Set(myAssignedTasks.map(t => t.equipment_instance_id))];
-      const instances = allInstances.filter(i => instanceIds.includes(i.id));
+      const filteredInstances = allInstances.filter(i => instanceIds.includes(i.id));
 
       const { data: taskData, error } = await supabase
         .from('test_tasks')
@@ -124,20 +117,17 @@ export default function EngineerProjectDetail() {
         existing_record: recordMap[t.id] || null,
       })) as TestTask[];
 
-      setTasks(enriched);
-
       // Pre-fill nameplate data per instance
-      const np: Record<string, Record<string, any>> = {};
-      instances.forEach(inst => {
-        np[inst.id] = (inst.nameplate as Record<string, any>) || {};
+      const nameplateInit: Record<string, Record<string, any>> = {};
+      filteredInstances.forEach(inst => {
+        nameplateInit[inst.id] = (inst.nameplate as Record<string, any>) || {};
       });
-      setNameplateData(np);
 
       // Pre-fill test form data from existing records / localStorage drafts
-      const prefilled: Record<string, Record<string, any>> = {};
+      const formInit: Record<string, Record<string, any>> = {};
       enriched.forEach(t => {
         if (t.existing_record) {
-          prefilled[t.id] = {
+          formInit[t.id] = {
             ...t.existing_record.payload,
             _remarks: t.existing_record.remarks || '',
             _pass_fail: t.existing_record.pass_fail || '',
@@ -146,22 +136,33 @@ export default function EngineerProjectDetail() {
         } else {
           try {
             const raw = localStorage.getItem(`testflow_draft_${t.id}`);
-            if (raw) prefilled[t.id] = JSON.parse(raw);
+            if (raw) formInit[t.id] = JSON.parse(raw);
           } catch { /* corrupted draft */ }
         }
       });
-      setFormData(prefilled);
 
-      // Default selected instance to first one
-      if (!selectedInstanceId && instances.length > 0) {
-        setSelectedInstanceId(instances[0].id);
-      }
-    } catch (error: any) {
-      toast({ title: 'Error loading tasks', description: error?.message ?? 'Something went wrong', variant: 'destructive' });
-    } finally {
-      setLoading(false);
+      return { project: projectData, tasks: enriched, instances: filteredInstances, nameplateInit, formInit };
+    },
+    enabled: !!user && !!projectId,
+  });
+
+  const project = data?.project ?? null;
+  const tasks = data?.tasks ?? [];
+
+  // Initialise local UI state from query data on first successful load.
+  // We track initialisation with a ref so re-fetches (after invalidateQueries)
+  // don't overwrite in-progress user edits to nameplate / form data.
+  const initialisedRef = useMemo(() => ({ current: false }), [projectId, user?.id]);
+  useEffect(() => {
+    if (!data || initialisedRef.current) return;
+    initialisedRef.current = true;
+    setNameplateData(data.nameplateInit);
+    setFormData(data.formInit);
+    if (!selectedInstanceId && data.instances.length > 0) {
+      setSelectedInstanceId(data.instances[0].id);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
@@ -277,7 +278,7 @@ export default function EngineerProjectDetail() {
 
       clearDraft(task.id);
       toast({ title: submit ? 'Test submitted for review' : 'Readings saved' });
-      await fetchData();
+      queryClient.invalidateQueries({ queryKey: ['engineer-project-detail', projectId, user?.id] });
     } catch (error: any) {
       toast({ title: 'Error saving', description: error.message, variant: 'destructive' });
     } finally {
