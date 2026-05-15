@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,8 +28,7 @@ export default function EditProject() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userRole } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
   
   const [formData, setFormData] = useState({
@@ -45,26 +45,14 @@ export default function EditProject() {
   const [testingScope, setTestingScope] = useState<Record<string, any[]>>({});
   const [savedEnabledIds, setSavedEnabledIds] = useState<Set<string> | undefined>(undefined);
 
-  useEffect(() => {
-    fetchProject();
-  }, [id]);
-
-  const fetchProject = async () => {
-    if (!id) return;
-
-    try {
-      // Fetch project
+  const { isLoading: loading } = useQuery({
+    queryKey: ['edit-project', id],
+    queryFn: async () => {
       const { data: project, error: projectError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', id)
-        .single();
-
+        .from('projects').select('*').eq('id', id!).single();
       if (projectError) throw projectError;
 
-      // Truncate to YYYY-MM-DD — HTML date inputs reject timestamps
       const toDateInput = (v: string | null) => (v ? v.slice(0, 10) : '');
-
       setFormData({
         project_number: project.project_number,
         site_name: project.site_name,
@@ -75,36 +63,20 @@ export default function EditProject() {
         assigned_to: project.assigned_to || null,
       });
 
-      // Fetch scope items
-      const { data: scope, error: scopeError } = await supabase
-        .from('scope_items')
-        .select('equipment_type, quantity')
-        .eq('project_id', id);
-
-      if (scopeError) throw scopeError;
+      const { data: scope } = await supabase
+        .from('scope_items').select('equipment_type, quantity').eq('project_id', id!);
       setScopeItems(scope || []);
 
-      // Fetch existing test scope so step 3 restores the saved selection
       const { data: testScope } = await supabase
-        .from('project_test_scope')
-        .select('test_template_id')
-        .eq('project_id', id);
-
+        .from('project_test_scope').select('test_template_id').eq('project_id', id!);
       if (testScope?.length) {
         setSavedEnabledIds(new Set(testScope.map(r => r.test_template_id)));
       }
-    } catch (error) {
-      console.error('Error fetching project:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load project',
-        variant: 'destructive',
-      });
-      navigate(dashboardPath(userRole));
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      return project;
+    },
+    enabled: !!id,
+  });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -163,12 +135,8 @@ export default function EditProject() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!validateStep1() || !validateStep2() || !validateStep3()) return;
-
-    setSaving(true);
-    try {
-      // Update project
+  const saveMutation = useMutation({
+    mutationFn: async () => {
       const { error: projectError } = await supabase
         .from('projects')
         .update({
@@ -180,37 +148,23 @@ export default function EditProject() {
           end_date: formData.end_date || null,
           assigned_to: formData.assigned_to,
         })
-        .eq('id', id);
-
+        .eq('id', id!);
       if (projectError) throw projectError;
 
-      // Delete existing scope items
       const { error: deleteError } = await supabase
-        .from('scope_items')
-        .delete()
-        .eq('project_id', id);
-
+        .from('scope_items').delete().eq('project_id', id!);
       if (deleteError) throw deleteError;
 
-      // Insert new scope items
-      const scopeData = scopeItems.map((item) => ({
+      const scopeData = scopeItems.map(item => ({
         project_id: id!,
         equipment_type: item.equipment_type as any,
         quantity: item.quantity,
       }));
-
-      const { error: scopeError } = await supabase
-        .from('scope_items')
-        .insert(scopeData);
-
+      const { error: scopeError } = await supabase.from('scope_items').insert(scopeData);
       if (scopeError) throw scopeError;
 
-      // Update testing scope
       const { error: deleteTestScopeError } = await supabase
-        .from('project_test_scope')
-        .delete()
-        .eq('project_id', id);
-
+        .from('project_test_scope').delete().eq('project_id', id!);
       if (deleteTestScopeError) throw deleteTestScopeError;
 
       const testScopeRecords: any[] = [];
@@ -224,31 +178,25 @@ export default function EditProject() {
           });
         });
       });
-
       if (testScopeRecords.length > 0) {
         const { error: testScopeError } = await supabase
-          .from('project_test_scope')
-          .insert(testScopeRecords);
-
+          .from('project_test_scope').insert(testScopeRecords);
         if (testScopeError) throw testScopeError;
       }
-
-      toast({
-        title: 'Success',
-        description: 'Project updated successfully',
-      });
-
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      toast({ title: 'Success', description: 'Project updated successfully.' });
       navigate(`/projects/${id}`);
-    } catch (error) {
-      console.error('Error updating project:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update project',
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
+    },
+    onError: (err: any) => {
+      toast({ title: 'Error', description: err.message ?? 'Failed to update project', variant: 'destructive' });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!validateStep1() || !validateStep2() || !validateStep3()) return;
+    saveMutation.mutate();
   };
 
   if (loading) {
@@ -436,8 +384,8 @@ export default function EditProject() {
             {currentStep < 3 ? (
               <Button onClick={handleNext}>Next</Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={saving}>
-                {saving ? (
+              <Button onClick={handleSubmit} disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Saving...
