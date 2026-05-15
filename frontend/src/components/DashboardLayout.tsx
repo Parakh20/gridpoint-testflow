@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { getInitials, getAvatarColor } from '@/lib/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationBell } from '@/components/NotificationBell';
 import { dashboardPath } from '@/lib/routes';
@@ -76,7 +77,7 @@ function RolePill({ role }: { role: string | null }) {
 }
 
 export function DashboardLayout({ children, title }: DashboardLayoutProps) {
-  const { signOut, user, userRole } = useAuth();
+  const { signOut, user, userRole, userName } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const navItems = getNavItems(userRole);
@@ -131,8 +132,13 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
         {/* Bottom — user info + controls */}
         <div className="border-t border-border px-3 py-4 space-y-2">
           <div className="flex items-center gap-2 px-2 py-1 rounded-lg">
+            <div
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${getAvatarColor(user?.id)}`}
+            >
+              {getInitials(userName, user?.email)}
+            </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-foreground truncate">{user?.email}</p>
+              <p className="text-xs font-medium text-foreground truncate">{userName || user?.email}</p>
               <RolePill role={userRole} />
             </div>
           </div>

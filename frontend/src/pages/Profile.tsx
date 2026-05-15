@@ -7,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Loader2, User, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getInitials, getAvatarColor } from '@/lib/avatar';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Profile() {
-  const { user, updatePassword } = useAuth();
+  const { user, updatePassword, userName: authUserName } = useAuth();
   const { toast } = useToast();
 
   const [name, setName] = useState('');
@@ -79,6 +80,18 @@ export default function Profile() {
   return (
     <DashboardLayout title="My Profile">
       <div className="max-w-lg space-y-6">
+        <div className="flex items-center gap-4">
+          <div
+            className={`flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold text-white ${getAvatarColor(user?.id)}`}
+          >
+            {getInitials(name || authUserName, user?.email)}
+          </div>
+          <div>
+            <p className="text-lg font-semibold">{name || authUserName || 'No name set'}</p>
+            <p className="text-sm text-muted-foreground">{user?.email}</p>
+          </div>
+        </div>
+
         {/* Account info */}
         <Card>
           <CardHeader>
