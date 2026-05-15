@@ -328,9 +328,6 @@ Edge Function verifies target user is in the same company, then calls `admin.del
 |---|---|
 | `CLAUDE.md` | This file — developer reference |
 | `SAAS_ROADMAP.md` | Full multi-tenant SaaS transformation plan and remaining roadmap |
-| `PROJECT.md` | Domain/product description — roles, workflows, data model |
-| `DEVELOPMENT.md` | Setup, env vars, local Supabase, building, CI secrets |
-| `DEPLOYMENT.md` | Deployment guide — Vercel/Netlify, secrets safety, first-run checklist |
 | `IMPROVEMENTS.md` | Bug tracker and enhancement backlog (✅ fixed / 🔲 pending) |
 | `AI_REPORT_PLAN.md` | AI report generation plan, architecture, checklist |
 | `FRONTEND_REVAMP.md` | 2D dark design revamp — Grid Control theme, dark/light toggle, framer-motion |
