@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { AnimatedCounter } from '@/components/AnimatedCounter';
@@ -32,112 +33,84 @@ export default function SupervisorDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [pendingTests, setPendingTests] = useState<PendingTest[]>([]);
-  const [stats, setStats] = useState({ total: 0, active: 0, pendingStart: 0, pendingReview: 0 });
+  const queryClient = useQueryClient();
   const [reviewingTaskId, setReviewingTaskId] = useState<string | null>(null);
   const [reworkDialogTask, setReworkDialogTask] = useState<PendingTest | null>(null);
   const [reworkReason, setReworkReason] = useState('');
   const [submittingRework, setSubmittingRework] = useState(false);
 
+  const { data: projects = [] } = useQuery({
+    queryKey: ['supervisor-projects', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('assigned_to', user!.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: pendingTests = [] } = useQuery({
+    queryKey: ['supervisor-pending-tests', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data: myProjects } = await supabase
+        .from('projects').select('id, project_number').eq('assigned_to', user.id);
+      if (!myProjects?.length) return [];
+
+      const projectIds = myProjects.map(p => p.id);
+      const projectMap = Object.fromEntries(myProjects.map(p => [p.id, p.project_number]));
+
+      const { data: instances } = await supabase
+        .from('equipment_instances').select('id, project_id').in('project_id', projectIds);
+      if (!instances?.length) return [];
+
+      const instanceIds = instances.map(i => i.id);
+      const instanceProjectMap = Object.fromEntries(instances.map(i => [i.id, i.project_id]));
+
+      const { data: tasks, error } = await supabase
+        .from('test_tasks')
+        .select(`id, status, equipment_instance:equipment_instances(id, label, equipment_type), test_template:test_templates(test_name, test_code), equipment_instance_id`)
+        .in('equipment_instance_id', instanceIds)
+        .eq('status', 'SUBMITTED')
+        .order('created_at');
+      if (error) return [];
+
+      return (tasks || []).map(t => ({
+        id: t.id,
+        status: t.status,
+        equipment_instance: t.equipment_instance,
+        test_template: t.test_template,
+        project_id: instanceProjectMap[t.equipment_instance_id] || '',
+        project_number: projectMap[instanceProjectMap[t.equipment_instance_id]] || '',
+      })) as PendingTest[];
+    },
+    enabled: !!user,
+  });
+
+  const stats = {
+    total:         projects.length,
+    active:        projects.filter(p => p.status === 'ACTIVE').length,
+    pendingStart:  projects.filter(p => p.status === 'APPROVED').length,
+    pendingReview: pendingTests.length,
+  };
+
   useEffect(() => {
     if (!user) return;
-
-    fetchAll();
-
     const channel = supabase
       .channel('supervisor-projects-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'projects', filter: `assigned_to=eq.${user.id}` }, () => fetchAll())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects', filter: `assigned_to=eq.${user.id}` }, () => fetchAll())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'test_tasks' }, () => fetchPendingTests())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'projects', filter: `assigned_to=eq.${user.id}` },
+        () => queryClient.invalidateQueries({ queryKey: ['supervisor-projects', user.id] }))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects', filter: `assigned_to=eq.${user.id}` },
+        () => queryClient.invalidateQueries({ queryKey: ['supervisor-projects', user.id] }))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'test_tasks' },
+        () => queryClient.invalidateQueries({ queryKey: ['supervisor-pending-tests', user.id] }))
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
-
-  const fetchAll = async () => {
-    await Promise.all([fetchAssignedProjects(), fetchPendingTests()]);
-  };
-
-  const fetchAssignedProjects = async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('assigned_to', user.id)
-      .order('created_at', { ascending: false });
-
-    if (data && !error) {
-      setProjects(data);
-      setStats(prev => ({
-        ...prev,
-        total:        data.length,
-        active:       data.filter(p => p.status === 'ACTIVE').length,
-        pendingStart: data.filter(p => p.status === 'APPROVED').length,
-      }));
-    }
-  };
-
-  const fetchPendingTests = async () => {
-    if (!user) return;
-
-    // Get all projects assigned to this supervisor
-    const { data: myProjects } = await supabase
-      .from('projects')
-      .select('id, project_number')
-      .eq('assigned_to', user.id);
-
-    if (!myProjects?.length) {
-      setPendingTests([]);
-      setStats(prev => ({ ...prev, pendingReview: 0 }));
-      return;
-    }
-
-    const projectIds = myProjects.map(p => p.id);
-    const projectMap = Object.fromEntries(myProjects.map(p => [p.id, p.project_number]));
-
-    // Get equipment instances for these projects
-    const { data: instances } = await supabase
-      .from('equipment_instances')
-      .select('id, project_id')
-      .in('project_id', projectIds);
-
-    if (!instances?.length) {
-      setPendingTests([]);
-      setStats(prev => ({ ...prev, pendingReview: 0 }));
-      return;
-    }
-
-    const instanceIds = instances.map(i => i.id);
-    const instanceProjectMap = Object.fromEntries(instances.map(i => [i.id, i.project_id]));
-
-    // Get SUBMITTED test tasks
-    const { data: tasks, error } = await supabase
-      .from('test_tasks')
-      .select(`
-        id, status,
-        equipment_instance:equipment_instances(id, label, equipment_type),
-        test_template:test_templates(test_name, test_code),
-        equipment_instance_id
-      `)
-      .in('equipment_instance_id', instanceIds)
-      .eq('status', 'SUBMITTED')
-      .order('created_at');
-
-    if (error) return;
-
-    const enriched: PendingTest[] = (tasks || []).map(t => ({
-      id: t.id,
-      status: t.status,
-      equipment_instance: t.equipment_instance,
-      test_template: t.test_template,
-      project_id: instanceProjectMap[t.equipment_instance_id] || '',
-      project_number: projectMap[instanceProjectMap[t.equipment_instance_id]] || '',
-    }));
-
-    setPendingTests(enriched);
-    setStats(prev => ({ ...prev, pendingReview: enriched.length }));
-  };
+  }, [user, queryClient]);
 
   const handleTaskReview = async (task: PendingTest, nextStatus: 'APPROVED' | 'REWORK', reason?: string) => {
     setReviewingTaskId(task.id);
@@ -162,8 +135,7 @@ export default function SupervisorDashboard() {
         await supabase.from('equipment_instances').update({ status: newEquipStatus }).eq('id', equipId);
       }
 
-      setPendingTests(prev => prev.filter(t => t.id !== task.id));
-      setStats(prev => ({ ...prev, pendingReview: Math.max(0, prev.pendingReview - 1) }));
+      queryClient.invalidateQueries({ queryKey: ['supervisor-pending-tests', user?.id] });
 
       toast({
         title: nextStatus === 'APPROVED' ? 'Test approved' : 'Sent back for rework',
