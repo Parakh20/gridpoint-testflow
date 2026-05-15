@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, FolderOpen, CheckCircle, Clock, UserCheck, UserX, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Badge } from '@/components/ui/badge';
 import { AssignProjectDialog } from '@/components/AssignProjectDialog';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/format';
@@ -26,6 +27,9 @@ type Project = Tables<'projects'> & {
 };
 
 const PAGE_SIZE = 20;
+
+const isOverdue = (endDate: string | null, status: string) =>
+  !!endDate && new Date(endDate) < new Date() && status !== 'CLOSED';
 
 async function fetchAllProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -275,6 +279,9 @@ export default function GMDashboard() {
                         <UserCheck className="h-4 w-4 mr-1" />
                         {project.assigned_to ? 'Reassign' : 'Assign'}
                       </Button>
+                      {isOverdue(project.end_date, project.status) && (
+                        <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                      )}
                       <StatusBadge status={project.status} />
                     </div>
                   </motion.div>

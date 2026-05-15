@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, ArrowLeft, Download, UserCheck, RefreshCw, FileText, Pencil, FileSpreadsheet } from 'lucide-react';
 import { exportProjectExcel, type ExportTask } from '@/lib/projectExcelExport';
@@ -25,6 +26,9 @@ import { formatDate } from '@/lib/format';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Project = Tables<'projects'>;
+
+const isOverdue = (endDate: string | null | undefined, status: string) =>
+  !!endDate && new Date(endDate) < new Date() && status !== 'CLOSED';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -237,6 +241,9 @@ export default function ProjectDetail() {
             <div className="flex items-center gap-3 mt-2">
               <h2 className="text-2xl font-bold">{project.project_number}</h2>
               <StatusBadge status={project.status} />
+              {isOverdue(project.end_date, project.status) && (
+                <Badge variant="destructive" className="text-sm">Overdue</Badge>
+              )}
               {refetching && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
               {assignedSupervisor && (
                 <>
