@@ -15,9 +15,13 @@ gridpoint-testflow/
 │   ├── public/        ← Static assets
 │   └── package.json   ← Frontend dependencies
 ├── supabase/          ← Supabase project (database + backend)
-│   ├── migrations/    ← 9 PostgreSQL schema migrations
+│   ├── migrations/    ← 27 PostgreSQL schema migrations
 │   └── functions/     ← Edge functions (Deno — server-side)
-│       └── generate-report/  ← AI report via Claude API
+│       ├── create-user/        ← Admin user creation (Admin API)
+│       ├── delete-user/        ← Admin user deletion (Admin API)
+│       ├── generate-report/    ← AI report via Claude API
+│       ├── create-tenant/      ← Platform: atomic company + SUPERADMIN creation
+│       └── platform-admin-data/ ← Platform: RLS-bypassing data proxy
 ├── skills/
 │   └── gridpoint-testflow/SKILL.md  ← Claude project skill
 └── .github/workflows/ ← CI/CD (auto-migrate, auto-deploy, lint+build)
@@ -105,9 +109,7 @@ See `.env.example` for full details and where to get each key.
 | [CLAUDE.md](./CLAUDE.md) | Developer reference — stack, conventions, schema, gotchas |
 | [PROJECT.md](./PROJECT.md) | Domain description — roles, workflows, data model |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Full setup guide, env vars, CI secrets, local Supabase |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | Deployment guide — Vercel/Netlify, secrets, first-run checklist |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Deployment guide — Vercel, secrets, first-run checklist |
 | [IMPROVEMENTS.md](./IMPROVEMENTS.md) | Bug tracker and enhancement backlog (✅ fixed / 🔲 pending) |
-| [AI_REPORT_PLAN.md](./AI_REPORT_PLAN.md) | AI report generation plan — architecture, checklist, cost |
-| [FRONTEND_REVAMP.md](./FRONTEND_REVAMP.md) | Frontend design revamp — dark theme, 3D design, framer-motion, phased roadmap |
 | [EMAIL_RATE_LIMIT.md](./EMAIL_RATE_LIMIT.md) | Email rate limit solutions — OAuth (✅ done), custom SMTP, pricing |
 | [skills/gridpoint-testflow/SKILL.md](./skills/gridpoint-testflow/SKILL.md) | Claude project skill — critical rules, quick reference |

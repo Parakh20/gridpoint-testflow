@@ -44,3 +44,6 @@ admin.env
 *.sln
 *.sw?
 .vercel
+
+# ── Internal docs (not needed on GitHub) ─────────
+STUDY_GUIDE.md

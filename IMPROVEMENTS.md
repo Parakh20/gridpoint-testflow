@@ -17,17 +17,13 @@ Legend: 🔴 Security | 🔲 Pending | ⚠️ Partial | ✅ Fixed
 
 ## Security
 
-### 🔴 User invite bypasses admin server-side creation
-`InviteUserDialog` calls `supabase.auth.signUp()` directly from the browser. This creates the user via the public anon key, meaning anyone who can reverse-engineer the call could register accounts without admin intent. The invited user's account is created in `auth.users` but the Supabase confirmation email flow may also fire.
-
-**Proper fix:** Create a `create-user` Supabase Edge Function that uses the Supabase Admin SDK (`createClient` with service role key) to call `auth.admin.createUser()`. The browser should call `functions.invoke('create-user', ...)` instead. This prevents anon signups and gives deterministic account state (no email confirmation needed).
+### ✅ User invite bypasses admin server-side creation
+`InviteUserDialog` now calls the `create-user` Edge Function (Supabase Admin SDK, service role key) instead of `supabase.auth.signUp()`. Email confirmation is skipped; account state is deterministic.
 
 ---
 
-### 🔴 Deleted users remain in auth.users
-`UserManagementTable` deletes `profiles` and `user_roles` rows, but the Supabase `auth.users` record remains. The user can still authenticate via Supabase Auth (their JWT will be valid). Since all RLS depends on `has_role`, they can't read data — but they can still log in and hit the role-fetch flow.
-
-**Fix:** Create a `delete-user` Edge Function that calls `supabase.admin.deleteUser(userId)` using the service role. Wire the delete button to `functions.invoke('delete-user', { body: { userId } })`.
+### ✅ Deleted users remain in auth.users
+`delete-user` Edge Function calls `supabase.admin.deleteUser(userId)` using the service role. `UserManagementTable` delete button calls `functions.invoke('delete-user', ...)`. Cascades clean `profiles` and `user_roles`.
 
 ---
 
@@ -40,10 +36,8 @@ All `audit_logs` inserts happen client-side. `actor_id` is taken from `currentUs
 
 ---
 
-### 🔴 `currentPassword` field in Profile is UI-only — not verified
-`Profile.tsx` has `currentPassword` state declared but it is never sent to the API. `supabase.auth.updateUser({ password: newPassword })` does not re-verify the old password. A logged-in user whose session was hijacked can change the account password without knowing the current one.
-
-**Fix:** Remove the misleading `currentPassword` field from the UI (since Supabase doesn't support re-auth for password update without a separate `reauthenticate()` call), or implement `supabase.auth.reauthenticate()` before allowing password change. For this internal tool, at minimum remove the unused field to avoid misleading users.
+### ✅ `currentPassword` field in Profile removed
+`Profile.tsx` no longer has a `currentPassword` field. Password update uses `supabase.auth.updateUser({ password: newPassword })` directly. The misleading "verify old password" UI that was never enforced server-side has been removed.
 
 ---
 
@@ -56,17 +50,13 @@ All `audit_logs` inserts happen client-side. `actor_id` is taken from `currentUs
 
 ---
 
-### 🔲 `currentPassword` state declared but unused in Profile
-`Profile.tsx` lines 19 + 69: `currentPassword` state is set/cleared but never used in the UI or API call. Dead code.
-
-**Fix:** Remove `currentPassword` state and the associated input entirely.
+### ✅ `currentPassword` state removed from Profile
+Removed along with the misleading password field. See Security section above.
 
 ---
 
-### 🔲 SuperadminDashboard grid has an empty 4th column
-`SuperadminDashboard.tsx` uses `md:grid-cols-4` but only renders 3 stat cards. The 4th column is always empty.
-
-**Fix:** Change to `md:grid-cols-3`.
+### ✅ SuperadminDashboard grid has an empty 4th column
+Fixed — `SuperadminDashboard.tsx` now uses `md:grid-cols-3`.
 
 ---
 
