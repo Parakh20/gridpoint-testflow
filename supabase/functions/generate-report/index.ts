@@ -67,6 +67,24 @@ Deno.serve(async (req) => {
       return json({ error: 'Forbidden: project belongs to another company' }, 403);
     }
 
+    // ── 4b. Claim the AI-report lock ─────────────────────────────────────────
+    // Prevents two concurrent calls from burning Anthropic tokens on the same
+    // project. Stale locks (>5 min) auto-expire so a crashed generation
+    // doesn't permanently block retries.
+    const { data: claimed, error: claimErr } = await supabase.rpc('claim_ai_report_lock', {
+      _project_id: project_id,
+    });
+    if (claimErr) return json({ error: `Lock error: ${claimErr.message}` }, 500);
+    if (!claimed) {
+      return json(
+        { error: 'A report is already being generated for this project. Please wait a moment and try again.' },
+        409,
+      );
+    }
+
+    let success = false;
+    try {
+
     // ── 5. Fetch related data (still service-role since we already verified) ─
     const [scopeRes, instancesRes, tasksRes] = await Promise.all([
       supabase.from('scope_items').select('equipment_type, quantity').eq('project_id', project_id),
@@ -167,7 +185,12 @@ Use formal engineering language. Be concise but thorough. Do not fabricate speci
     const anthropicData = await anthropicRes.json();
     const reportText = anthropicData.content[0]?.text ?? '';
 
-    return json({ report: reportText });
+      success = true;
+      return json({ report: reportText });
+    } finally {
+      // Always release the lock, even on failure — caller can retry.
+      await supabase.rpc('release_ai_report_lock', { _project_id: project_id, _success: success });
+    }
   } catch (error) {
     console.error('generate-report error:', error);
     return json({ error: (error as Error).message }, 500);

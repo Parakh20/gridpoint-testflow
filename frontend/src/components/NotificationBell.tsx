@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRealtimeChannel, usePollingFallback } from '@/lib/realtime';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDateTime } from '@/lib/format';
 
@@ -108,18 +109,35 @@ export function NotificationBell() {
     }
   };
 
+  // Debounce realtime fetches — when 100 users are submitting tests, every
+  // update event would otherwise re-run 3+ queries per bell, per tick. We
+  // coalesce bursts into a single refetch after a 1.5s idle window.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchRef = useRef(fetchNotifications);
+  fetchRef.current = fetchNotifications;
+
+  // Initial fetch + cleanup of pending debounce on user/role change
   useEffect(() => {
-    fetchNotifications();
-
-    const channel = supabase
-      .channel('notification-updates')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'test_tasks' }, () => {
-        fetchNotifications();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    fetchRef.current();
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [user, userRole]);
+
+  const scheduleFetch = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchRef.current(), 1500);
+  };
+
+  useRealtimeChannel(
+    `notification-updates-${user?.id ?? 'anon'}`,
+    (channel) => {
+      channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'test_tasks' }, scheduleFetch);
+    },
+    [user?.id, userRole],
+  );
+
+  usePollingFallback(() => fetchRef.current());
 
   if (userRole !== 'SUPERVISOR' && userRole !== 'ENGINEER') return null;
 

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRealtimeChannel, usePollingFallback } from '@/lib/realtime';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/DashboardLayout';
@@ -98,19 +99,46 @@ export default function SupervisorDashboard() {
     pendingReview: pendingTests.length,
   };
 
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel('supervisor-projects-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'projects', filter: `assigned_to=eq.${user.id}` },
-        () => queryClient.invalidateQueries({ queryKey: ['supervisor-projects', user.id] }))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects', filter: `assigned_to=eq.${user.id}` },
-        () => queryClient.invalidateQueries({ queryKey: ['supervisor-projects', user.id] }))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'test_tasks' },
-        () => queryClient.invalidateQueries({ queryKey: ['supervisor-pending-tests', user.id] }))
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user, queryClient]);
+  // Debounced realtime invalidations + polling fallback when realtime is off
+  const projTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const taskTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const invalidateProjectsNow = () => {
+    if (user) queryClient.invalidateQueries({ queryKey: ['supervisor-projects', user.id] });
+  };
+  const invalidateTasksNow = () => {
+    if (user) queryClient.invalidateQueries({ queryKey: ['supervisor-pending-tests', user.id] });
+  };
+  const invalidateProjects = () => {
+    if (projTimer.current) clearTimeout(projTimer.current);
+    projTimer.current = setTimeout(invalidateProjectsNow, 800);
+  };
+  const invalidateTasks = () => {
+    if (taskTimer.current) clearTimeout(taskTimer.current);
+    taskTimer.current = setTimeout(invalidateTasksNow, 1200);
+  };
+
+  useRealtimeChannel(
+    `supervisor-bus-${user?.id ?? 'anon'}`,
+    (channel) => {
+      if (!user) return;
+      channel
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'projects', filter: `assigned_to=eq.${user.id}` }, invalidateProjects)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects', filter: `assigned_to=eq.${user.id}` }, invalidateProjects)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'test_tasks' }, invalidateTasks);
+    },
+    [user?.id, queryClient],
+  );
+
+  usePollingFallback(() => {
+    invalidateProjectsNow();
+    invalidateTasksNow();
+  });
+
+  useEffect(() => () => {
+    if (projTimer.current) clearTimeout(projTimer.current);
+    if (taskTimer.current) clearTimeout(taskTimer.current);
+  }, []);
 
   const handleTaskReview = async (task: PendingTest, nextStatus: 'APPROVED' | 'REWORK', reason?: string) => {
     setReviewingTaskId(task.id);

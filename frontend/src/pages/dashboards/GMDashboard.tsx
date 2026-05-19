@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/DashboardLayout';
@@ -16,6 +16,7 @@ import { AssignProjectDialog } from '@/components/AssignProjectDialog';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/format';
 import { useEffect } from 'react';
+import { useRealtimeChannel, usePollingFallback } from '@/lib/realtime';
 import type { Tables } from '@/integrations/supabase/types';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -70,18 +71,27 @@ export default function GMDashboard() {
     staleTime: 30_000,
   });
 
-  // Realtime — invalidate query on any project change
-  useEffect(() => {
-    const channel = supabase
-      .channel('gm-projects-rt')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'projects' },
-        () => queryClient.invalidateQueries({ queryKey: ['gm-projects'] }))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects' },
-        () => queryClient.invalidateQueries({ queryKey: ['gm-projects'] }))
-      .subscribe();
+  // Realtime — invalidate on project change. Debounced so a burst of updates
+  // doesn't refetch on every event. Falls back to polling on Free tier or
+  // when the connection errors (see usePollingFallback below).
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['gm-projects'] });
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleInvalidate = () => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(invalidate, 800);
+  };
 
-    return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  useRealtimeChannel(
+    'gm-projects-rt',
+    (channel) => {
+      channel
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'projects' }, scheduleInvalidate)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects' }, scheduleInvalidate);
+    },
+    [queryClient],
+  );
+
+  usePollingFallback(invalidate);
 
   // Reset pagination when filters change
   useEffect(() => { setVisibleCount(PAGE_SIZE); }, [searchQuery, assignmentFilter]);

@@ -41,12 +41,28 @@ export function ProjectStatusActions({ project, onStatusChange, onOptimisticUpda
     // Optimistic update — parent can reflect new status in UI immediately
     onOptimisticUpdate?.(newStatus);
     try {
-      const { error } = await supabase
+      // Optimistic concurrency: guard on the status we read at render-time.
+      // If another user transitioned the project in between, our update
+      // returns 0 rows and we surface a refresh prompt instead of silently
+      // clobbering their change.
+      const { data, error } = await supabase
         .from('projects')
         .update({ status: newStatus as any, ...additionalFields })
-        .eq('id', project.id);
+        .eq('id', project.id)
+        .eq('status', project.status)
+        .select('id');
 
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast({
+          title: 'Project was modified',
+          description: 'Someone else changed this project. Refresh to see the latest status.',
+          variant: 'destructive',
+        });
+        onStatusChange(); // re-fetch so UI re-syncs
+        return;
+      }
 
       toast({
         title: 'Success',

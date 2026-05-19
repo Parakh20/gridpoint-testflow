@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getInitials, getAvatarColor } from '@/lib/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationBell } from '@/components/NotificationBell';
+import { RealtimeStatusBanner } from '@/components/RealtimeStatusBanner';
 import { dashboardPath } from '@/lib/routes';
 import {
   Zap,
@@ -165,6 +166,8 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
         <header className="sticky top-0 z-30 flex h-14 items-center border-b border-border bg-card/80 backdrop-blur-sm px-6">
           <h1 className="text-base font-semibold text-foreground">{title}</h1>
         </header>
+
+        <RealtimeStatusBanner />
 
         <main className="flex-1 px-6 py-6">
           {children}

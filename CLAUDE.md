@@ -251,10 +251,12 @@ Use the `EQUIPMENT_LABEL` map in `ProjectTestingScopeTab.tsx` — do not use `su
 
 ## Key Workflows
 
-### Equipment Generation (Idempotent)
-`ProjectTestingScopeTab` checks for existing instances on mount (`alreadyGenerated` flag). Generate button is disabled if instances exist. On generate:
-1. Insert `equipment_instances` using `EQUIPMENT_LABEL` map for labels
-2. Insert `test_tasks` for each (instance × enabled template)
+### Equipment Generation (Idempotent, Race-Safe)
+`ProjectTestingScopeTab` checks for existing instances on mount (`alreadyGenerated` flag) as a UX hint. The actual generation is server-side via the `generate_project_equipment(_project_id UUID)` Postgres RPC, which takes a `FOR UPDATE` row lock on the project so two simultaneous clicks serialize cleanly. The RPC:
+1. Returns `{ already_existed: true }` if any instances already exist (no inserts)
+2. Otherwise inserts `equipment_instances` with deterministic labels (server-side `CASE` mirrors `EQUIPMENT_LABEL`)
+3. Inserts `test_tasks` for each (instance × enabled template) in the same transaction
+4. Returns `{ generated_instances, generated_tasks, already_existed }`
 
 ### Dynamic Test Forms
 `test_templates.fields` is a JSON Schema (`type: object`, `properties`, `required`). Form rendering must interpret this at runtime. Field types: `string`, `number`, `string`+`enum`.
@@ -313,6 +315,7 @@ Edge Function verifies target user is in the same company, then calls `admin.del
 | `ANTHROPIC_API_KEY` | Edge Function (server) | Claude API key — set via `supabase secrets set`, never in `.env` |
 | `PLATFORM_ADMIN_TOKEN` | Edge Function (server) | Token for `create-tenant` — set via `supabase secrets set PLATFORM_ADMIN_TOKEN=<value>` |
 | `VITE_PLATFORM_ADMIN_TOKEN` | Browser (platform panel only) | Must exactly match `PLATFORM_ADMIN_TOKEN` Supabase secret |
+| `VITE_REALTIME_ENABLED` | Browser | Optional kill-switch for Supabase Realtime. Default `true`. Set to `false` on Free tier to avoid the 200-connection cap — app falls back to 30s polling. |
 | `SUPABASE_ACCESS_TOKEN` | GitHub Actions CI | Supabase personal access token |
 | `SUPABASE_DB_PASSWORD` | GitHub Actions CI | DB password for `supabase db push` |
 
@@ -392,6 +395,7 @@ Only remaining manual step:
 | `delete-user` | Admin-only user deletion via `auth.admin.deleteUser()` — cascades to profile/roles |
 | `generate-report` | AI report generation via Anthropic API |
 | `create-tenant` | Platform-level: creates company + SUPERADMIN user atomically; guarded by `X-Platform-Token` header |
+| `generate-report` | **Concurrency-locked** via `claim_ai_report_lock` / `release_ai_report_lock` RPCs — second concurrent call on same project returns 409 instead of double-billing Anthropic; locks expire after 5 minutes |
 | `platform-admin-data` | Platform-level: RLS-bypassing data proxy for the admin panel; actions: `get_stats`, `get_all_companies`, `get_company_detail`, `get_all_users`, `reset_user_password`, `get_company_magic_link`; guarded by `X-Platform-Token` |
 
 All functions share CORS headers from `supabase/functions/_shared/cors.ts`.
@@ -471,4 +475,11 @@ supabase secrets set PLATFORM_ADMIN_TOKEN=<strong-random-value>
 17. **`PLATFORM_ADMIN_TOKEN` must match exactly** between the `VITE_PLATFORM_ADMIN_TOKEN` Vercel env var and the `PLATFORM_ADMIN_TOKEN` Supabase secret — any mismatch causes 401 on all `create-tenant` and `platform-admin-data` calls. Set both from the same value at the same time.
 18. **Platform admin data queries bypass RLS** via the `platform-admin-data` Edge Function using the service role key. The service role key lives only in the Edge Function's environment — it is never exposed to the browser. The browser only sends the `VITE_PLATFORM_ADMIN_TOKEN` to authenticate the call.
 19. **Magic links require `https://*.optimustesting.com/**` in Supabase Auth → URL Configuration → Redirect URLs.** Without this entry, Supabase ignores the `redirectTo` parameter in `admin.generateLink()` and falls back to the configured Site URL (`optimustesting.com`), sending the user to the root domain instead of their tenant subdomain. The `platform-admin-data` Edge Function works around this by rewriting the `redirect_to` query param on the returned `action_link` URL after generation — but the Supabase dashboard setting is still required for the Supabase auth flow to honour the rewritten URL.
-20. **Magic link `redirectTo` is ignored by Supabase unless the URL is manually rewritten after generation.** `admin.generateLink({ options: { redirectTo } })` has no effect — Supabase always uses the configured Site URL. Workaround: after calling `generateLink`, take `linkData.properties.action_link`, parse it as a URL, call `url.searchParams.set('redirect_to', targetUrl)`, and use the rewritten URL. See `get_company_magic_link` in `supabase/functions/platform-admin-data/index.ts`.
+20. **Project status transitions use optimistic concurrency.** `ProjectStatusActions.updateProjectStatus` adds `.eq('status', project.status)` to its UPDATE — if another user already moved the project, the update affects 0 rows and the user sees a "Project was modified" toast instead of silently clobbering. Never remove the second `.eq` guard.
+21. **AI report generation is concurrency-locked.** Two GMs hitting "Generate AI Report" on the same project: first call claims the row via `claim_ai_report_lock` RPC, second gets HTTP 409. Locks auto-expire after 5 minutes so a crashed generation doesn't permanently block retries. State stored in `projects.ai_report_generating_at` / `projects.ai_report_generated_at`.
+22. **Realtime subscriptions are debounced and centralized.** All channels go through `useRealtimeChannel` in `frontend/src/lib/realtime.ts`. `GMDashboard` (800ms), `SupervisorDashboard` (800/1200ms), and `NotificationBell` (1500ms) coalesce bursts of postgres_changes events into a single query invalidation. Channel names include `user.id` to prevent cross-tab subscription collisions.
+   - **Kill switch:** `VITE_REALTIME_ENABLED=false` makes the helper a no-op. Use on Supabase Free tier to avoid the 200-connection / 100-msgs-per-sec cap.
+   - **Polling fallback:** `usePollingFallback(refetch, 30_000)` companion hook polls every 30s when realtime is disabled OR errored (`CHANNEL_ERROR`/`TIMED_OUT`). Each realtime subscription site MUST pair `useRealtimeChannel` with `usePollingFallback` so the UI stays live whether realtime is on or off.
+   - **Status banner:** `<RealtimeStatusBanner />` in `DashboardLayout` shows a banner when realtime is disabled or has errored, so users know data refreshes via polling instead of live updates.
+23. **Bulk user invites use `BulkInviteDialog`** which posts to `create-user` sequentially with a 800ms inter-call delay. Stops early on detected rate-limit errors (`/rate limit|429|over_email_send_rate_limit/i`) so the rest of the batch doesn't burn invites on the same failure. Custom SMTP is **required** for batches >30.
+24. **Magic link `redirectTo` is ignored by Supabase unless the URL is manually rewritten after generation.** `admin.generateLink({ options: { redirectTo } })` has no effect — Supabase always uses the configured Site URL. Workaround: after calling `generateLink`, take `linkData.properties.action_link`, parse it as a URL, call `url.searchParams.set('redirect_to', targetUrl)`, and use the rewritten URL. See `get_company_magic_link` in `supabase/functions/platform-admin-data/index.ts`.

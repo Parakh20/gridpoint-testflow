@@ -35,8 +35,9 @@ import {
 import { UserRoleBadge } from './UserRoleBadge';
 import { EditRoleDialog } from './EditRoleDialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Edit, UserPlus, Trash2 } from 'lucide-react';
+import { Search, Edit, UserPlus, Trash2, Users } from 'lucide-react';
 import { InviteUserDialog } from './InviteUserDialog';
+import { BulkInviteDialog } from './BulkInviteDialog';
 
 interface UserWithRole {
   id: string;
@@ -60,6 +61,7 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [bulkInviteDialogOpen, setBulkInviteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<{
     id: string;
@@ -240,6 +242,10 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
               </SelectContent>
             </Select>
           </div>
+          <Button variant="outline" onClick={() => setBulkInviteDialogOpen(true)}>
+            <Users className="h-4 w-4 mr-2" />
+            Bulk Invite
+          </Button>
           <Button onClick={() => setInviteDialogOpen(true)}>
             <UserPlus className="h-4 w-4 mr-2" />
             Invite User
@@ -322,6 +328,12 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
       <InviteUserDialog
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
+        onSuccess={refetch}
+      />
+
+      <BulkInviteDialog
+        open={bulkInviteDialogOpen}
+        onOpenChange={setBulkInviteDialogOpen}
         onSuccess={refetch}
       />
 

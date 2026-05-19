@@ -191,48 +191,32 @@ export function ProjectTestingScopeTab({ projectId, projectStatus, onEquipmentGe
         return;
       }
 
-      const { data: fetchedScopeItems, error: fetchScopeError } = await supabase
-        .from('scope_items')
-        .select('*')
-        .eq('project_id', projectId);
-      if (fetchScopeError) throw fetchScopeError;
+      // Save current scope selections first so the RPC sees the latest enabled state
+      await handleSave();
 
-      const instances = (fetchedScopeItems ?? []).flatMap(scopeItem => {
-        const prefix = EQUIPMENT_LABEL[scopeItem.equipment_type as EquipmentType] ?? scopeItem.equipment_type.substring(0, 3).toUpperCase();
-        return Array.from({ length: scopeItem.quantity }, (_, i) => ({
-          project_id: projectId,
-          scope_item_id: scopeItem.id,
-          equipment_type: scopeItem.equipment_type,
-          seq_number: i + 1,
-          label: `${prefix}-${String(i + 1).padStart(3, '0')}`,
-          status: 'UNASSIGNED' as const,
-        }));
+      // Server-side RPC — race-safe (FOR UPDATE lock) and idempotent.
+      // Two simultaneous clicks → one inserts, the other gets already_existed=true.
+      const { data: result, error: rpcError } = await supabase.rpc('generate_project_equipment', {
+        _project_id: projectId,
       });
+      if (rpcError) throw rpcError;
 
-      const { data: createdInstances, error: instanceError } = await supabase
-        .from('equipment_instances')
-        .insert(instances)
-        .select();
-      if (instanceError) throw instanceError;
+      const r = result as { generated_instances: number; generated_tasks: number; already_existed: boolean };
 
-      const testTasks = (createdInstances ?? []).flatMap(instance => {
-        const config = testConfigs.find(c => c.equipmentType === instance.equipment_type);
-        return (config?.templates.filter(t => t.isEnabled) ?? []).map(template => ({
-          equipment_instance_id: instance.id,
-          test_template_id: template.id,
-          status: 'DRAFT' as const,
-        }));
-      });
-
-      if (testTasks.length > 0) {
-        const { error: taskError } = await supabase.from('test_tasks').insert(testTasks);
-        if (taskError) throw taskError;
+      if (r.already_existed) {
+        toast({
+          title: 'Already generated',
+          description: 'Equipment instances were already generated for this project.',
+          variant: 'destructive',
+        });
+        setAlreadyGenerated(true);
+        return;
       }
 
       setAlreadyGenerated(true);
       toast({
         title: 'Success',
-        description: `Generated ${instances.length} equipment instances and ${testTasks.length} test tasks`,
+        description: `Generated ${r.generated_instances} equipment instances and ${r.generated_tasks} test tasks`,
       });
       onEquipmentGenerated?.();
     } catch (error) {
