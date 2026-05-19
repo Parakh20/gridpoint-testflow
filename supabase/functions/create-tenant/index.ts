@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { enforceRateLimit } from '../_shared/rate_limit.ts';
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req.headers.get('Origin'));
@@ -22,14 +23,33 @@ Deno.serve(async (req) => {
       return json({ error: 'Unauthorized' }, 401);
     }
 
+    // Rate limit: 20 tenant creations per IP per hour. Even with a valid
+    // platform token, throttle in case the token is leaked.
+    const supabaseAdminForRl = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    const rl = await enforceRateLimit(supabaseAdminForRl, req, {
+      key: 'create-tenant',
+      limit: 20,
+      windowMinutes: 60,
+    }, cors);
+    if (!rl.ok) return rl.response;
+
     // 2. Parse and validate inputs
     const { name, slug, email, password, full_name } = await req.json();
 
     if (!name || !slug || !email || !password || !full_name) {
       return json({ error: 'name, slug, email, password, and full_name are required' }, 400);
     }
-    if (typeof password !== 'string' || password.length < 8) {
-      return json({ error: 'Password must be at least 8 characters' }, 400);
+    if (typeof password !== 'string' || password.length < 10) {
+      return json({ error: 'Password must be at least 10 characters' }, 400);
+    }
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasDigit = /\d/.test(password);
+    if (!(hasUpper && hasLower && hasDigit)) {
+      return json({ error: 'Password must include uppercase, lowercase, and a number' }, 400);
     }
     if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(slug)) {
       return json({ error: 'Slug must be lowercase alphanumeric with hyphens only' }, 400);

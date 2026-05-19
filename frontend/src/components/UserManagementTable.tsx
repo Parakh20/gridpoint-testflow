@@ -35,9 +35,10 @@ import {
 import { UserRoleBadge } from './UserRoleBadge';
 import { EditRoleDialog } from './EditRoleDialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Edit, UserPlus, Trash2, Users } from 'lucide-react';
+import { Search, Edit, UserPlus, Trash2, Users, UserMinus } from 'lucide-react';
 import { InviteUserDialog } from './InviteUserDialog';
 import { BulkInviteDialog } from './BulkInviteDialog';
+import { OffboardUserDialog } from './OffboardUserDialog';
 
 interface UserWithRole {
   id: string;
@@ -62,6 +63,7 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [bulkInviteDialogOpen, setBulkInviteDialogOpen] = useState(false);
+  const [offboardUser, setOffboardUser] = useState<{ id: string; name: string; email: string } | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<{
     id: string;
@@ -306,12 +308,25 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
                           <Edit className="h-4 w-4 mr-2" />
                           Edit Role
                         </Button>
+                        {user.is_active && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-100/30"
+                            disabled={user.id === currentUser?.id}
+                            onClick={() => setOffboardUser({ id: user.id, name: user.name, email: user.email })}
+                            title="Offboard (transfer work + deactivate)"
+                          >
+                            <UserMinus className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive hover:bg-destructive/10"
                           disabled={user.id === currentUser?.id}
                           onClick={() => setDeleteUserId(user.id)}
+                          title="Permanently delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -334,6 +349,13 @@ export function UserManagementTable({ onUserCountChange }: UserManagementTablePr
       <BulkInviteDialog
         open={bulkInviteDialogOpen}
         onOpenChange={setBulkInviteDialogOpen}
+        onSuccess={refetch}
+      />
+
+      <OffboardUserDialog
+        open={!!offboardUser}
+        onOpenChange={o => { if (!o) setOffboardUser(null); }}
+        user={offboardUser}
         onSuccess={refetch}
       />
 

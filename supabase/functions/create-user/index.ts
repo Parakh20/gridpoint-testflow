@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { enforceRateLimit } from '../_shared/rate_limit.ts';
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req.headers.get('Origin'));
@@ -37,6 +38,19 @@ Deno.serve(async (req) => {
 
     if (roleRow?.role !== 'SUPERADMIN') return json({ error: 'Forbidden: SUPERADMIN role required' }, 403);
 
+    // Rate limit: 30 user creations per SUPERADMIN per hour. Protects against
+    // a compromised account or runaway script burning Supabase auth quotas.
+    const supabaseAdminForRl = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    const rl = await enforceRateLimit(supabaseAdminForRl, req, {
+      key: `create-user:${caller.id}`,
+      limit: 30,
+      windowMinutes: 60,
+    }, cors);
+    if (!rl.ok) return rl.response;
+
     // 3. Get caller's company_id — new users are created in the same company
     const { data: callerProfile } = await callerClient
       .from('profiles')
@@ -51,8 +65,15 @@ Deno.serve(async (req) => {
     if (!name || !email || !password || !role) {
       return json({ error: 'name, email, password, and role are required' }, 400);
     }
-    if (typeof password !== 'string' || password.length < 8) {
-      return json({ error: 'Password must be at least 8 characters' }, 400);
+    if (typeof password !== 'string' || password.length < 10) {
+      return json({ error: 'Password must be at least 10 characters' }, 400);
+    }
+    // Server-side complexity check — keep in sync with frontend zod schema
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasDigit = /\d/.test(password);
+    if (!(hasUpper && hasLower && hasDigit)) {
+      return json({ error: 'Password must include uppercase, lowercase, and a number' }, 400);
     }
     if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return json({ error: 'Invalid email address' }, 400);

@@ -15,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/format';
-import { exportReportExcel, type ReportExportProject, type ReportExportEquipment } from '@/lib/reportsExcelExport';
+import type { ReportExportProject, ReportExportEquipment } from '@/lib/reportsExcelExport';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import type { ProjectReportPDFProps, PDFEquipmentGroup, PDFTaskItem } from '@/components/pdf/ProjectReportPDF';
 import { TEMPLATE_FALLBACKS } from '@/lib/templateFallbacks';
@@ -322,6 +322,7 @@ export default function ReportProjectDetail() {
           })),
         });
       });
+      const { exportReportExcel } = await import('@/lib/reportsExcelExport');
       await exportReportExcel(exportProject, progressStats, equipment);
     } finally {
       setExportingExcel(false);

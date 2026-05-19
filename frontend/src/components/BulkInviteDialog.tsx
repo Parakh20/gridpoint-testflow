@@ -46,10 +46,24 @@ interface BulkInviteDialogProps {
 }
 
 const generatePassword = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%';
-  const bytes = new Uint8Array(12);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, b => chars[b % chars.length]).join('');
+  // Guarantee complexity rules expected by the server-side check
+  const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower  = 'abcdefghijkmnopqrstuvwxyz';
+  const digits = '23456789';
+  const symbols = '@#$%';
+  const pool = upper + lower + digits + symbols;
+  const pick = (src: string) => {
+    const b = new Uint8Array(1); crypto.getRandomValues(b); return src[b[0] % src.length];
+  };
+  const required = [pick(upper), pick(lower), pick(digits)];
+  const rest = Array.from({ length: 9 }, () => pick(pool));
+  const all = [...required, ...rest];
+  for (let i = all.length - 1; i > 0; i--) {
+    const b = new Uint8Array(1); crypto.getRandomValues(b);
+    const j = b[0] % (i + 1);
+    [all[i], all[j]] = [all[j], all[i]];
+  }
+  return all.join('');
 };
 
 const parseInput = (raw: string): ParsedRow[] => {

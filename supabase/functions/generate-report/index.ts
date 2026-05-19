@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { enforceRateLimit } from '../_shared/rate_limit.ts';
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req.headers.get('Origin'));
@@ -38,6 +39,18 @@ Deno.serve(async (req) => {
     if (!roleRow || !['GM', 'SUPERADMIN'].includes(roleRow.role)) {
       return json({ error: 'Forbidden: only GM or SUPERADMIN can generate reports' }, 403);
     }
+
+    // Rate limit: 10 reports per caller per hour. Anthropic tokens are expensive.
+    const supabaseAdminForRl = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    const rl = await enforceRateLimit(supabaseAdminForRl, req, {
+      key: `generate-report:${caller.id}`,
+      limit: 10,
+      windowMinutes: 60,
+    }, cors);
+    if (!rl.ok) return rl.response;
 
     const { data: callerProfile } = await callerClient
       .from('profiles')

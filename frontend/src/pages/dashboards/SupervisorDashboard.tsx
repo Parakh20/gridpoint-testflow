@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ClipboardCheck, AlertCircle, FolderOpen, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -39,6 +40,8 @@ export default function SupervisorDashboard() {
   const [reworkDialogTask, setReworkDialogTask] = useState<PendingTest | null>(null);
   const [reworkReason, setReworkReason] = useState('');
   const [submittingRework, setSubmittingRework] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [bulkApproving, setBulkApproving] = useState(false);
 
   const { data: projects = [] } = useQuery({
     queryKey: ['supervisor-projects', user?.id],
@@ -178,6 +181,54 @@ export default function SupervisorDashboard() {
     }
   };
 
+  const toggleSelect = (taskId: string) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId); else next.add(taskId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedTaskIds(prev =>
+      prev.size === pendingTests.length ? new Set() : new Set(pendingTests.map(t => t.id)),
+    );
+  };
+
+  const handleBulkApprove = async () => {
+    const ids = Array.from(selectedTaskIds);
+    if (!ids.length) return;
+    setBulkApproving(true);
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('test_tasks')
+        .update({ status: 'APPROVED', approved_at: now, rework_reason: null })
+        .in('id', ids)
+        .eq('status', 'SUBMITTED'); // concurrency guard: skip anything already moved
+      if (error) throw error;
+
+      // Sync each touched equipment_instance status — if any pending tasks
+      // remain for that instance after approval, leave as SUBMITTED; otherwise APPROVED.
+      const instanceIds = [...new Set(pendingTests.filter(t => ids.includes(t.id)).map(t => t.equipment_instance?.id).filter(Boolean))] as string[];
+      for (const equipId of instanceIds) {
+        const remaining = pendingTests.filter(t => !ids.includes(t.id) && t.equipment_instance?.id === equipId);
+        const newStatus = remaining.length > 0 ? 'SUBMITTED' : 'APPROVED';
+        await supabase.from('equipment_instances').update({ status: newStatus }).eq('id', equipId);
+      }
+
+      toast({ title: `Approved ${ids.length} test${ids.length === 1 ? '' : 's'}` });
+      setSelectedTaskIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['supervisor-pending-tests', user?.id] });
+    } catch (err) {
+      console.error('Bulk approve failed:', err);
+      const message = err instanceof Error ? err.message : 'Bulk approve failed';
+      toast({ title: 'Bulk approve failed', description: message, variant: 'destructive' });
+    } finally {
+      setBulkApproving(false);
+    }
+  };
+
   const handleReworkClick = (task: PendingTest) => {
     setReworkDialogTask(task);
     setReworkReason('');
@@ -237,9 +288,35 @@ export default function SupervisorDashboard() {
             </div>
           ) : (
             <div className="space-y-3">
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={selectedTaskIds.size > 0 && selectedTaskIds.size === pendingTests.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                  <span className="text-muted-foreground">
+                    {selectedTaskIds.size > 0
+                      ? `${selectedTaskIds.size} selected`
+                      : `Select all ${pendingTests.length}`}
+                  </span>
+                </div>
+                {selectedTaskIds.size > 0 && (
+                  <Button size="sm" onClick={handleBulkApprove} disabled={bulkApproving}>
+                    {bulkApproving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    Approve selected ({selectedTaskIds.size})
+                  </Button>
+                )}
+              </div>
               {pendingTests.map(task => (
                 <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg bg-orange-50/50">
-                  <div className="space-y-1">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Checkbox
+                      checked={selectedTaskIds.has(task.id)}
+                      onCheckedChange={() => toggleSelect(task.id)}
+                      aria-label={`Select test ${task.test_template?.test_code}`}
+                    />
+                  <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">{task.test_template?.test_name}</span>
                       <span className="text-xs font-mono text-muted-foreground">{task.test_template?.test_code}</span>
@@ -256,6 +333,7 @@ export default function SupervisorDashboard() {
                         {task.project_number}
                       </button>
                     </div>
+                  </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Button

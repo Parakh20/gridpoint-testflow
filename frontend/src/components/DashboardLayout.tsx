@@ -5,6 +5,7 @@ import { getInitials, getAvatarColor } from '@/lib/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationBell } from '@/components/NotificationBell';
 import { RealtimeStatusBanner } from '@/components/RealtimeStatusBanner';
+import { TrialBanner } from '@/components/TrialBanner';
 import { dashboardPath } from '@/lib/routes';
 import {
   Zap,
@@ -167,6 +168,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
           <h1 className="text-base font-semibold text-foreground">{title}</h1>
         </header>
 
+        <TrialBanner />
         <RealtimeStatusBanner />
 
         <main className="flex-1 px-6 py-6">

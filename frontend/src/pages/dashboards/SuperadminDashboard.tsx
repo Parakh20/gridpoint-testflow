@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserManagementTable } from '@/components/UserManagementTable';
+import { AuditLogViewer } from '@/components/AuditLogViewer';
 import { AnimatedCounter } from '@/components/AnimatedCounter';
 import { Users, Shield, Activity, UserCheck, CheckCircle2, XCircle, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -240,6 +241,16 @@ export default function SuperadminDashboard() {
         </CardHeader>
         <CardContent>
           <UserManagementTable onUserCountChange={setTotalUsers} />
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Audit Log</CardTitle>
+          <CardDescription>Append-only history of changes across your company</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AuditLogViewer />
         </CardContent>
       </Card>
     </DashboardLayout>

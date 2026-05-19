@@ -12,7 +12,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, ArrowLeft, Download, UserCheck, RefreshCw, FileText, Pencil, FileSpreadsheet } from 'lucide-react';
-import { exportProjectExcel, type ExportTask } from '@/lib/projectExcelExport';
+import type { ExportTask } from '@/lib/projectExcelExport';
 import { ProjectStatusActions } from '@/components/ProjectStatusActions';
 import { ProjectScopeTab } from '@/components/ProjectScopeTab';
 import { ProjectTestingScopeTab } from '@/components/ProjectTestingScopeTab';
@@ -162,6 +162,8 @@ export default function ProjectDetail() {
         };
       });
 
+      // Lazy-load the Excel module so xlsx isn't in the initial bundle
+      const { exportProjectExcel } = await import('@/lib/projectExcelExport');
       exportProjectExcel(project.project_number, project.site_name, exportTasks);
       toast({ title: 'Excel exported', description: 'File downloaded to your device.' });
     } catch (err: any) {

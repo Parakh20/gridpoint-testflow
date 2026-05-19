@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { enforceRateLimit } from '../_shared/rate_limit.ts';
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req.headers.get('Origin'));
@@ -36,6 +37,18 @@ Deno.serve(async (req) => {
       .single();
 
     if (roleRow?.role !== 'SUPERADMIN') return json({ error: 'Forbidden: SUPERADMIN role required' }, 403);
+
+    // Rate limit: 30 deletions per SUPERADMIN per hour
+    const supabaseAdminForRl = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    const rl = await enforceRateLimit(supabaseAdminForRl, req, {
+      key: `delete-user:${caller.id}`,
+      limit: 30,
+      windowMinutes: 60,
+    }, cors);
+    if (!rl.ok) return rl.response;
 
     // 3. Get caller's company_id
     const { data: callerProfile } = await callerClient

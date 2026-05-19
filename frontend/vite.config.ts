@@ -16,6 +16,26 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split heavy third-party libs into their own chunks so they cache
+        // independently and don't bloat the main entry. PDF/Excel are also
+        // dynamic-imported at call sites for true on-demand loading.
+        manualChunks: {
+          recharts: ["recharts"],
+          radix: [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-popover",
+            "@radix-ui/react-select",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-toast",
+          ],
+          supabase: ["@supabase/supabase-js"],
+        },
+      },
+    },
+  },
   test: {
     globals: true,
     environment: "jsdom",

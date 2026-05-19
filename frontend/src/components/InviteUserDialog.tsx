@@ -35,7 +35,12 @@ const inviteUserSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
   email: z.string().trim().email('Invalid email address').max(255),
   role: z.enum(['SUPERADMIN', 'GM', 'SUPERVISOR', 'ENGINEER']),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z
+    .string()
+    .min(10, 'Password must be at least 10 characters')
+    .regex(/[A-Z]/, 'Password must include an uppercase letter')
+    .regex(/[a-z]/, 'Password must include a lowercase letter')
+    .regex(/\d/, 'Password must include a number'),
 });
 
 type InviteUserForm = z.infer<typeof inviteUserSchema>;
@@ -56,10 +61,25 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
   });
 
   const generatePassword = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%';
-    const bytes = new Uint8Array(12);
-    crypto.getRandomValues(bytes);
-    form.setValue('password', Array.from(bytes, b => chars[b % chars.length]).join(''));
+    // Guarantee complexity rules by seeding one of each required class.
+    const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower  = 'abcdefghijkmnopqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = '@#$%';
+    const pool = upper + lower + digits + symbols;
+    const pick = (src: string) => {
+      const b = new Uint8Array(1); crypto.getRandomValues(b); return src[b[0] % src.length];
+    };
+    const required = [pick(upper), pick(lower), pick(digits)];
+    const rest = Array.from({ length: 9 }, () => pick(pool));
+    const all = [...required, ...rest];
+    // Fisher-Yates shuffle so required chars aren't always at the start
+    for (let i = all.length - 1; i > 0; i--) {
+      const b = new Uint8Array(1); crypto.getRandomValues(b);
+      const j = b[0] % (i + 1);
+      [all[i], all[j]] = [all[j], all[i]];
+    }
+    form.setValue('password', all.join(''));
     setShowPassword(true);
   };
 

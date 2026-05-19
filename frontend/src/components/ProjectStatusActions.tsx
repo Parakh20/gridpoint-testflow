@@ -14,7 +14,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { dashboardPath } from '@/lib/routes';
-import { Loader2, CheckCircle, PlayCircle, XCircle, Edit, Trash2 } from 'lucide-react';
+import { Loader2, CheckCircle, PlayCircle, XCircle, Edit, Trash2, Copy } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 
 interface ProjectStatusActionsProps {
@@ -22,6 +32,8 @@ interface ProjectStatusActionsProps {
     id: string;
     status: string;
     project_number: string;
+    site_name?: string;
+    site_address?: string;
   };
   onStatusChange: () => void;
   /** Called immediately before the API call — lets the parent update UI optimistically */
@@ -35,6 +47,41 @@ export function ProjectStatusActions({ project, onStatusChange, onOptimisticUpda
   const [loading, setLoading] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
   const [dialogAction, setDialogAction] = useState<'approve' | 'activate' | 'close' | 'revert' | 'delete'>('approve');
+
+  const [showCloneDialog, setShowCloneDialog] = useState(false);
+  const [cloning, setCloning] = useState(false);
+  const [cloneNumber, setCloneNumber] = useState('');
+  const [cloneSiteName, setCloneSiteName] = useState('');
+  const [cloneAddress, setCloneAddress] = useState('');
+
+  const openCloneDialog = () => {
+    setCloneNumber(`${project.project_number}-COPY`);
+    setCloneSiteName(project.site_name ?? '');
+    setCloneAddress(project.site_address ?? '');
+    setShowCloneDialog(true);
+  };
+
+  const handleClone = async () => {
+    setCloning(true);
+    try {
+      const { data: newId, error } = await supabase.rpc('clone_project', {
+        _source_project_id: project.id,
+        _new_project_number: cloneNumber,
+        _new_site_name: cloneSiteName,
+        _new_site_address: cloneAddress,
+      });
+      if (error) throw error;
+      toast({ title: 'Project cloned', description: 'Scope and test selections copied. New project is in DRAFT.' });
+      setShowCloneDialog(false);
+      if (newId) navigate(`/projects/${newId}`);
+    } catch (err) {
+      console.error('Clone failed:', err);
+      const message = err instanceof Error ? err.message : 'Failed to clone project';
+      toast({ title: 'Clone failed', description: message, variant: 'destructive' });
+    } finally {
+      setCloning(false);
+    }
+  };
 
   const updateProjectStatus = async (newStatus: string, additionalFields: Record<string, unknown> = {}) => {
     setLoading(true);
@@ -184,6 +231,7 @@ export function ProjectStatusActions({ project, onStatusChange, onOptimisticUpda
     delete:   { title: 'Delete Project',       description: 'Are you sure you want to delete this project? This action cannot be undone.' },
   }[dialogAction];
 
+  const canClone = userRole === 'GM' || userRole === 'SUPERADMIN';
   const renderActions = () => {
     switch (project.status) {
       case 'DRAFT':
@@ -192,6 +240,11 @@ export function ProjectStatusActions({ project, onStatusChange, onOptimisticUpda
             <Button onClick={() => navigate(`/projects/${project.id}/edit`)} variant="outline">
               <Edit className="h-4 w-4 mr-2" />Edit
             </Button>
+            {canClone && (
+              <Button onClick={openCloneDialog} variant="outline">
+                <Copy className="h-4 w-4 mr-2" />Clone
+              </Button>
+            )}
             <Button onClick={() => openDialog('approve')} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
               Approve
@@ -210,6 +263,11 @@ export function ProjectStatusActions({ project, onStatusChange, onOptimisticUpda
             <Button onClick={() => navigate(`/projects/${project.id}/edit`)} variant="outline">
               <Edit className="h-4 w-4 mr-2" />Edit
             </Button>
+            {canClone && (
+              <Button onClick={openCloneDialog} variant="outline">
+                <Copy className="h-4 w-4 mr-2" />Clone
+              </Button>
+            )}
             <Button onClick={() => openDialog('activate')} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-2" />}
               Activate
@@ -218,12 +276,24 @@ export function ProjectStatusActions({ project, onStatusChange, onOptimisticUpda
         );
       case 'ACTIVE':
         return (
-          <Button onClick={() => openDialog('close')} variant="destructive" disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
-            Close Project
-          </Button>
+          <>
+            {canClone && (
+              <Button onClick={openCloneDialog} variant="outline">
+                <Copy className="h-4 w-4 mr-2" />Clone
+              </Button>
+            )}
+            <Button onClick={() => openDialog('close')} variant="destructive" disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
+              Close Project
+            </Button>
+          </>
         );
       case 'CLOSED':
+        return canClone ? (
+          <Button onClick={openCloneDialog} variant="outline">
+            <Copy className="h-4 w-4 mr-2" />Clone
+          </Button>
+        ) : null;
       default:
         return null;
     }
@@ -247,6 +317,38 @@ export function ProjectStatusActions({ project, onStatusChange, onOptimisticUpda
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showCloneDialog} onOpenChange={o => { if (!cloning) setShowCloneDialog(o); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clone Project</DialogTitle>
+            <DialogDescription>
+              Creates a new DRAFT project with the same equipment scope and test selections. Equipment instances and test records are NOT copied.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="clone-number">New project number</Label>
+              <Input id="clone-number" value={cloneNumber} onChange={e => setCloneNumber(e.target.value)} disabled={cloning} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="clone-site">Site name</Label>
+              <Input id="clone-site" value={cloneSiteName} onChange={e => setCloneSiteName(e.target.value)} disabled={cloning} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="clone-address">Site address</Label>
+              <Input id="clone-address" value={cloneAddress} onChange={e => setCloneAddress(e.target.value)} disabled={cloning} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCloneDialog(false)} disabled={cloning}>Cancel</Button>
+            <Button onClick={handleClone} disabled={cloning || !cloneNumber.trim() || !cloneSiteName.trim() || !cloneAddress.trim()}>
+              {cloning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Clone Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

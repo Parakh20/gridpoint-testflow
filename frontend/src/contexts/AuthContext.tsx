@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -146,6 +146,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserName(null);
     navigate('/auth');
   };
+
+  // ── Idle timeout: auto-logout after 30 minutes of no user activity ────────
+  // Standard B2B hygiene — protects against an unattended workstation in a
+  // shared office. Reset on any mouse/keyboard/touch interaction.
+  const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!session) return;
+
+    const resetTimer = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        console.info('[AuthContext] Idle timeout — signing out');
+        signOut();
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'pointermove'];
+    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetTimer));
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   return (
     <AuthContext.Provider value={{ user, session, userRole, userName, loading, companyMismatch, accountDisabled, signIn, signOut, resetPasswordForEmail, updatePassword }}>
