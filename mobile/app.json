@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "TestFlow Field",
+    "slug": "testflow-field",
+    "version": "0.1.0",
+    "scheme": "testflow",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#0f172a",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.testflow.field"
+    },
+    "android": {
+      "package": "io.testflow.field",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      }
+    },
+    "extra": {
+      "supabaseUrl": "https://hxfilijpaocogsgjrjnq.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh4ZmlsaWpwYW9jb2dzZ2pyam5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDI0NzMsImV4cCI6MjA5MDk3ODQ3M30.HEA9t7h876Sf7vJlIrVd5MGSADf9t-wbv5y0xe9zAws",
+      "realtimeEnabled": false
+    }
+  }
+}

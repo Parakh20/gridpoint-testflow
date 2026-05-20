@@ -5,17 +5,101 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <title>TestFlow - Electrical Testing Management</title>
-    <meta name="description" content="Professional electrical testing management platform for power systems equipment" />
-    <meta name="author" content="TestFlow" />
 
-    <meta property="og:title" content="TestFlow - Electrical Testing Management" />
-    <meta property="og:description" content="Professional electrical testing management platform for power systems equipment" />
+    <!-- Primary meta (overridden by JS for admin/tenant subdomains) -->
+    <title>Optimus Testing — Digital commissioning for electrical substations</title>
+    <meta
+      name="description"
+      content="Optimus Testing replaces paper test sheets, scattered Excel, and WhatsApp coordination with a single platform field engineers actually use. 46+ ready test templates, mobile app, AI-drafted handover reports, multi-tenant isolation."
+    />
+    <meta name="keywords" content="substation commissioning, electrical testing software, transformer testing, CT testing, CVT testing, SF6 breaker testing, switchgear commissioning, power system testing, commissioning report software, India commissioning contractor, EPC testing platform" />
+    <meta name="author" content="Optimus Testing" />
+    <meta name="robots" content="index, follow" />
+
+    <link rel="canonical" href="https://optimustesting.com/" />
+
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://optimustesting.com/" />
+    <meta property="og:site_name" content="Optimus Testing" />
+    <meta property="og:title" content="Optimus Testing — Digital commissioning for electrical substations" />
+    <meta
+      property="og:description"
+      content="Replace paper test sheets, Excel and WhatsApp with one platform for substation commissioning. 46+ test templates, field engineer mobile app, AI handover reports."
+    />
+    <meta property="og:image" content="https://optimustesting.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_IN" />
+
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Optimus Testing — Digital commissioning for electrical substations" />
+    <meta
+      name="twitter:description"
+      content="One platform for substation commissioning. 46+ test templates, mobile app, AI handover reports."
+    />
+    <meta name="twitter:image" content="https://optimustesting.com/og-image.png" />
+
+    <!-- Theme color (mobile address-bar tint) -->
+    <meta name="theme-color" content="#0f172a" />
+
+    <!-- Preconnect to Supabase so the first API call is faster on tenant subdomains -->
+    <link rel="preconnect" href="https://hxfilijpaocogsgjrjnq.supabase.co" />
+    <link rel="dns-prefetch" href="https://hxfilijpaocogsgjrjnq.supabase.co" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- JSON-LD: Organization + SoftwareApplication -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://optimustesting.com/#org",
+            "name": "Optimus Testing",
+            "url": "https://optimustesting.com",
+            "logo": "https://optimustesting.com/logo.png",
+            "sameAs": []
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "Optimus Testing — TestFlow Platform",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web, iOS, Android",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "INR",
+              "description": "14-day free trial; paid plans by contract"
+            },
+            "publisher": { "@id": "https://optimustesting.com/#org" },
+            "description": "Multi-tenant SaaS platform for electrical substation commissioning: digital test sheets, role-based workflow, field engineer mobile app, AI-drafted handover reports."
+          }
+        ]
+      }
+    </script>
+
+    <!-- Mark admin/tenant subdomains as noindex without needing per-route SSR.
+         The marketing apex stays indexable; everything else is excluded. -->
+    <script>
+      (function () {
+        var h = window.location.hostname;
+        if (h !== 'optimustesting.com' && h !== 'www.optimustesting.com' && h !== 'localhost' && h !== '127.0.0.1') {
+          var m = document.createElement('meta');
+          m.name = 'robots';
+          m.content = 'noindex, nofollow';
+          document.head.appendChild(m);
+        }
+      })();
+    </script>
   </head>
 
   <body>

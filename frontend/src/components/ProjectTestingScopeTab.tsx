@@ -12,21 +12,13 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import type { Database } from '@/integrations/supabase/types';
+import { EQUIPMENT_LABEL as SHARED_EQUIPMENT_LABEL } from '@testflow/shared';
 
 type EquipmentType = Database['public']['Enums']['equipment_type'];
 
-/** Canonical short labels for equipment instance IDs, e.g. PTR-001 */
-const EQUIPMENT_LABEL: Record<EquipmentType, string> = {
-  POWER_TRANSFORMER: 'PTR',
-  CT:               'CT',
-  CVT:              'CVT',
-  LA:               'LA',
-  SF6_BREAKER:      'SF6',
-  ISOLATOR:         'ISO',
-  VCB:              'VCB',
-  EARTH_PIT:        'EP',
-  VT:               'VT',
-};
+/** Canonical short labels for equipment instance IDs, e.g. PTR-001.
+ *  Sourced from @testflow/shared so the mobile app can't drift. */
+const EQUIPMENT_LABEL = SHARED_EQUIPMENT_LABEL as Record<EquipmentType, string>;
 
 interface TestScopeConfig {
   equipmentType: EquipmentType;

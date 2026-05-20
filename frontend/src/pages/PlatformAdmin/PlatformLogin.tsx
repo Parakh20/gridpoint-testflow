@@ -79,7 +79,7 @@ export default function PlatformLogin() {
 
           <div className="mt-6 flex items-center gap-2 text-[11px] text-muted-foreground">
             <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Platform owner access only · optimustesting.com</span>
+            <span>Platform owner access only · admin.optimustesting.com</span>
           </div>
         </div>
       </div>

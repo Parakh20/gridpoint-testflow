@@ -1,0 +1,53 @@
+name: Mobile — Type Check & Bundle
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile/src/**'
+      - 'mobile/App.tsx'
+      - 'mobile/app.json'
+      - 'mobile/babel.config.js'
+      - 'mobile/package.json'
+      - 'mobile/package-lock.json'
+      - 'mobile/tsconfig.json'
+      - '.github/workflows/mobile.yml'
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile.yml'
+
+jobs:
+  check:
+    name: Type check and Metro bundle
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Verify Expo dep alignment
+        run: npx expo install --check
+
+      - name: Metro bundle (Android)
+        run: npx expo export --platform android --output-dir .expo-ci-export
+
+      - name: Metro bundle (iOS)
+        run: npx expo export --platform ios --output-dir .expo-ci-export-ios

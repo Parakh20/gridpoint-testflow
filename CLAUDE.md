@@ -6,6 +6,10 @@
 
 **TestFlow** is a **multi-tenant B2B SaaS** platform for electrical substation commissioning. Each client company gets an isolated workspace at their own subdomain (`company.testflow.io`). Field teams manage test projects, record measurements, and generate PDF/AI reports. Sold to commissioning companies — not a public consumer product.
 
+**Mobile companion app (`mobile/`)** — Expo + React Native app for field engineers. Reuses the same Supabase backend and RLS. ENGINEER role only; other roles see a friendly block screen. Scope: project list, task list with filters/progress, dynamic JSON-Schema test forms with auto-save, draft/submit flow. Out of scope: PDF/Excel export, AI reports, user management (use web). Realtime/polling pattern mirrors `frontend/src/lib/realtime.ts`; the flag is `app.json → expo.extra.realtimeEnabled` and is kept in lock-step with web's `VITE_REALTIME_ENABLED`. See `mobile/README.md` for architecture.
+
+**Shared package (`packages/shared/`)** — source-only TypeScript files imported by both web and mobile via the `@testflow/shared` path alias. Holds `EQUIPMENT_LABEL`, `AppRole + ROLE_RANK + highestRole()`, `ProjectStatus/TestStatus + status constants`, `explainSupabaseError`, and `normalizeFields()`. No build step. Add to it whenever you spot logic that lives in two places. Mobile wires it via `metro.config.js → watchFolders` + `babel.config.js → module-resolver`; web wires it via `vite.config.ts → resolve.alias`. Both tsconfigs declare a `paths` entry.
+
 **Multi-tenancy model:** Single Supabase project, `company_id` column on root tables, RLS enforces isolation. Users cannot see or touch another company's data.
 
 **No public sign-up.** All accounts are created by Company SUPERADMINs via the User Management dashboard, which calls the `create-user` Edge Function (Admin API, server-side). Self-registration is permanently disabled.
@@ -382,7 +386,7 @@ Add these in: repo → Settings → Secrets and variables → Actions
 `my_company_id()` — `SECURITY DEFINER` function that returns `auth.uid()`'s company_id from profiles. Used in every RLS policy. Returning NULL means user has no company → they see nothing.
 
 ### Onboarding a new client (GridPoint internal)
-Use the Platform Admin panel at `optimustesting.com/admin` → **Create Company + Admin** form. The form creates the company row, the SUPERADMIN auth user, their profile, and the role assignment in one call to the `create-tenant` Edge Function.
+Use the Platform Admin panel at `admin.optimustesting.com/admin` → **Create Company + Admin** form. The form creates the company row, the SUPERADMIN auth user, their profile, and the role assignment in one call to the `create-tenant` Edge Function.
 
 Only remaining manual step:
 1. Send workspace URL + credentials to client
@@ -407,10 +411,14 @@ All functions share CORS headers from `supabase/functions/_shared/cors.ts`.
 
 ## Platform Admin Panel
 
-The platform owner (Parakh) manages all tenant companies at `optimustesting.com` (root domain).
+The platform owner (Parakh) manages all tenant companies at `admin.optimustesting.com`. The apex `optimustesting.com` (and `www.optimustesting.com`) serve a public **marketing site** instead — see `frontend/src/pages/Marketing.tsx`.
 
 ### How it works
-- `App.tsx` checks `window.location.hostname` at startup. If it matches `optimustesting.com` or `www.optimustesting.com`, the normal tenant router (CompanyProvider + AuthProvider + tenant routes) is **not rendered**. Instead a minimal 2-route platform router is rendered.
+- `App.tsx` checks `window.location.hostname` at startup. **Three-way routing:**
+  - `admin.optimustesting.com` → minimal 2-route platform router (PlatformLogin + PlatformDashboard). No CompanyProvider / AuthProvider.
+  - `optimustesting.com` / `www.optimustesting.com` / `localhost` → public marketing site (single `<Marketing />` component). No CompanyProvider / AuthProvider.
+  - Anything else (`<slug>.optimustesting.com`) → tenant workspace (CompanyProvider + AuthProvider + protected routes).
+- Query string overrides: `?admin` forces admin router, `?marketing` forces marketing — useful for previewing in dev.
 - **No Supabase Auth involved.** The panel is gated purely by a hardcoded platform password stored in `VITE_PLATFORM_ADMIN_PASSWORD`. On success, `sessionStorage.setItem('platform_authed', 'true')` is set and the user is navigated to `/admin`.
 - Each page checks `sessionStorage.getItem('platform_authed')` on mount; mismatches redirect to `/`.
 - The panel uses the standard anon Supabase client (`@/integrations/supabase/client`).
@@ -480,7 +488,7 @@ supabase secrets set PLATFORM_ADMIN_TOKEN=<strong-random-value>
 19. **Magic links require `https://*.optimustesting.com/**` in Supabase Auth → URL Configuration → Redirect URLs.** Without this entry, Supabase ignores the `redirectTo` parameter in `admin.generateLink()` and falls back to the configured Site URL (`optimustesting.com`), sending the user to the root domain instead of their tenant subdomain. The `platform-admin-data` Edge Function works around this by rewriting the `redirect_to` query param on the returned `action_link` URL after generation — but the Supabase dashboard setting is still required for the Supabase auth flow to honour the rewritten URL.
 20. **Project status transitions use optimistic concurrency.** `ProjectStatusActions.updateProjectStatus` adds `.eq('status', project.status)` to its UPDATE — if another user already moved the project, the update affects 0 rows and the user sees a "Project was modified" toast instead of silently clobbering. Never remove the second `.eq` guard.
 21. **AI report generation is concurrency-locked.** Two GMs hitting "Generate AI Report" on the same project: first call claims the row via `claim_ai_report_lock` RPC, second gets HTTP 409. Locks auto-expire after 5 minutes so a crashed generation doesn't permanently block retries. State stored in `projects.ai_report_generating_at` / `projects.ai_report_generated_at`.
-22. **Realtime subscriptions are debounced and centralized.** All channels go through `useRealtimeChannel` in `frontend/src/lib/realtime.ts`. `GMDashboard` (800ms), `SupervisorDashboard` (800/1200ms), and `NotificationBell` (1500ms) coalesce bursts of postgres_changes events into a single query invalidation. Channel names include `user.id` to prevent cross-tab subscription collisions.
+22. **Realtime subscriptions are debounced and centralized.** All channels go through `useRealtimeChannel` in `frontend/src/lib/realtime.ts` (web) and `mobile/src/lib/realtime.ts` (mobile, identical API). `GMDashboard` (800ms), `SupervisorDashboard` (800/1200ms), and `NotificationBell` (1500ms) on web; `ProjectListScreen` (800ms) and `TaskListScreen` (800ms) on mobile coalesce bursts of postgres_changes events into a single query invalidation. Channel names include `user.id` to prevent cross-tab/device subscription collisions. **Both `projects` and `test_tasks` are in the `supabase_realtime` publication (migrations `20251029110912` and `20260520000001`) with `REPLICA IDENTITY FULL` so filtered UPDATE/DELETE events deliver correctly.**
    - **Kill switch:** `VITE_REALTIME_ENABLED=false` makes the helper a no-op. Use on Supabase Free tier to avoid the 200-connection / 100-msgs-per-sec cap.
    - **Polling fallback:** `usePollingFallback(refetch, 30_000)` companion hook polls every 30s when realtime is disabled OR errored (`CHANNEL_ERROR`/`TIMED_OUT`). Each realtime subscription site MUST pair `useRealtimeChannel` with `usePollingFallback` so the UI stays live whether realtime is on or off.
    - **Status banner:** `<RealtimeStatusBanner />` in `DashboardLayout` shows a banner when realtime is disabled or has errored, so users know data refreshes via polling instead of live updates.

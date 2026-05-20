@@ -1,14 +1,9 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
+
+Sitemap: https://optimustesting.com/sitemap.xml
+
+# Tenant workspaces and the platform admin are served from subdomains
+# (<slug>.optimustesting.com, admin.optimustesting.com). Each subdomain serves
+# the same SPA but the runtime injects <meta name="robots" content="noindex">
+# (see frontend/index.html). Crawl gating is therefore on the apex only.

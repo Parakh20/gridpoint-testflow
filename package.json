@@ -3,10 +3,13 @@
   "private": true,
   "description": "Convenience scripts — delegates to frontend/. Supabase CLI runs from root.",
   "scripts": {
-    "setup":   "cd frontend && npm install",
-    "dev":     "cd frontend && npm run dev",
-    "build":   "cd frontend && npm run build",
+    "setup": "cd frontend && npm install",
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
     "preview": "cd frontend && npm run preview",
-    "lint":    "cd frontend && npm run lint"
+    "lint": "cd frontend && npm run lint"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
   }
 }

@@ -9,6 +9,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlatformLogin, PlatformDashboard } from "./pages/PlatformAdmin";
+import Marketing from "./pages/Marketing";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import SuperadminDashboard from "./pages/dashboards/SuperadminDashboard";
@@ -26,8 +27,23 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Platform admin panel renders at the root domain; all other hostnames are tenant subdomains.
-const isRootDomain = ['optimustesting.com', 'www.optimustesting.com', 'localhost', '127.0.0.1'].includes(window.location.hostname);
+// Three host modes:
+//   - `admin.optimustesting.com`             → platform admin (PlatformLogin + PlatformDashboard)
+//   - `optimustesting.com` / www / localhost → public marketing site
+//   - anything-else.optimustesting.com       → tenant workspace (CompanyProvider + AuthProvider)
+// `?marketing` query string forces the marketing site on any host (useful for previewing locally).
+const HOST = window.location.hostname;
+const FORCE_MARKETING = new URLSearchParams(window.location.search).has('marketing');
+const FORCE_ADMIN = new URLSearchParams(window.location.search).has('admin');
+
+const IS_ADMIN_HOST = FORCE_ADMIN || HOST === 'admin.optimustesting.com';
+const IS_MARKETING_HOST =
+  !IS_ADMIN_HOST &&
+  (FORCE_MARKETING ||
+    HOST === 'optimustesting.com' ||
+    HOST === 'www.optimustesting.com' ||
+    HOST === 'localhost' ||
+    HOST === '127.0.0.1');
 
 const App = () => (
   <ErrorBoundary>
@@ -37,11 +53,17 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            {isRootDomain ? (
+            {IS_ADMIN_HOST ? (
               // Platform admin — no CompanyProvider / AuthProvider needed
               <Routes>
                 <Route path="/" element={<PlatformLogin />} />
                 <Route path="/admin" element={<PlatformDashboard />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            ) : IS_MARKETING_HOST ? (
+              // Public-facing marketing site at optimustesting.com (apex)
+              <Routes>
+                <Route path="/" element={<Marketing />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             ) : (
