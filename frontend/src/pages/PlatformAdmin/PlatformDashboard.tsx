@@ -324,8 +324,12 @@ export default function PlatformDashboard() {
       toast({ variant: 'destructive', title: 'Invalid slug', description: 'Lowercase alphanumeric and hyphens only.' });
       return;
     }
-    if (adminPassword.length < 8) {
-      toast({ variant: 'destructive', title: 'Password too short', description: 'Minimum 8 characters required.' });
+    if (adminPassword.length < 10) {
+      toast({ variant: 'destructive', title: 'Password too short', description: 'Minimum 10 characters required.' });
+      return;
+    }
+    if (!/[A-Z]/.test(adminPassword) || !/[a-z]/.test(adminPassword) || !/\d/.test(adminPassword)) {
+      toast({ variant: 'destructive', title: 'Password too weak', description: 'Must include uppercase, lowercase, and a number.' });
       return;
     }
 
@@ -977,11 +981,11 @@ export default function PlatformDashboard() {
                         <Input
                           id="admin-password"
                           type={showPassword ? 'text' : 'password'}
-                          placeholder="Min. 8 characters"
+                          placeholder="Min. 10 chars, upper+lower+digit"
                           value={adminPassword}
                           onChange={e => setAdminPassword(e.target.value)}
                           required
-                          minLength={8}
+                          minLength={10}
                           className="pr-10"
                         />
                         <button
@@ -999,7 +1003,7 @@ export default function PlatformDashboard() {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={addLoading || !companyName || !slug || !slugValid || !adminFullName || !adminEmail || adminPassword.length < 8}
+                    disabled={addLoading || !companyName || !slug || !slugValid || !adminFullName || !adminEmail || adminPassword.length < 10}
                   >
                     {addLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     {addLoading ? 'Creating…' : 'Create Company + Admin'}

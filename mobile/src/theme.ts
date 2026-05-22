@@ -1,18 +1,47 @@
+// Colors mirror the web app's dark-theme tokens in frontend/src/index.css
+// (the same palette the Platform Admin panel uses). Keep these in lock-step
+// when the web theme changes.
 export const theme = {
-  bg: '#0f172a',
-  card: '#1e293b',
-  cardAlt: '#334155',
-  border: '#334155',
-  text: '#f1f5f9',
-  textDim: '#94a3b8',
-  primary: '#38bdf8',
-  primaryText: '#0f172a',
-  danger: '#ef4444',
-  success: '#22c55e',
-  warn: '#f59e0b',
+  // hsl(245 9% 15%) — --background
+  bg: '#232229',
+  // hsl(245 10% 18%) — --card
+  card: '#2a2932',
+  // hsl(245 10% 22%) — --secondary  (kept for back-compat; was used as cardAlt)
+  cardAlt: '#34323c',
+  // hsl(245 10% 27%) — --border / --input
+  border: '#3f3d49',
+  // hsl(245 20% 97%) — --foreground
+  text: '#f5f4f8',
+  // hsl(245 8% 62%) — --muted-foreground
+  textDim: '#989599',
+  // hsl(217 91% 60%) — --primary
+  primary: '#3b82f6',
+  // --primary-foreground
+  primaryText: '#ffffff',
+  // hsl(5 72% 50%) — --destructive
+  danger: '#db392a',
+  // hsl(148 55% 40%) — --success
+  success: '#2e9e63',
+  // hsl(38 85% 52%) — --warning
+  warn: '#ec9d2a',
+  // hsl(189 94% 43%) — --accent (used for highlights, magic-link CTA, etc.)
+  accent: '#06b6d4',
+  // hsl(245 10% 24%) — --muted (subtle row backgrounds)
+  muted: '#393740',
+  // Slight transparency overlay used for backdrop-blur cards on web
+  cardSoft: 'rgba(42, 41, 50, 0.6)',
   radius: 12,
   pad: 16,
 };
+
+// Tailwind text-{color}-400 / bg-{color}-500/15 equivalents used for role
+// pills in the Platform Admin web UI. Mirrored for visual parity.
+export const roleBadge = {
+  SUPERADMIN: { text: '#f87171', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.30)' },
+  GM:         { text: '#60a5fa', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.30)' },
+  SUPERVISOR: { text: '#facc15', bg: 'rgba(234, 179, 8, 0.15)',  border: 'rgba(234, 179, 8, 0.30)' },
+  ENGINEER:   { text: '#4ade80', bg: 'rgba(34, 197, 94, 0.15)',  border: 'rgba(34, 197, 94, 0.30)' },
+} as const;
 
 export const statusColor = (s: string) => {
   switch (s) {

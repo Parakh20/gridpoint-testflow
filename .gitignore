@@ -47,3 +47,7 @@ admin.env
 
 # ── Internal docs (not needed on GitHub) ─────────
 STUDY_GUIDE.md
+
+# ── Tool runtime state (Claude Code plugins, etc.) ─
+.remember/
+.claude/

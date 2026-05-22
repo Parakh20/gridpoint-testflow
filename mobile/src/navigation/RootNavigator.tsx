@@ -9,6 +9,8 @@ import TaskListScreen from '@/screens/TaskListScreen';
 import TestFormScreen from '@/screens/TestFormScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
 import RoleBlockedScreen from '@/screens/RoleBlockedScreen';
+import PlatformLoginScreen from '@/screens/PlatformLoginScreen';
+import PlatformDashboardScreen from '@/screens/PlatformDashboardScreen';
 import type { RootStackParamList } from './types';
 import { theme } from '@/theme';
 
@@ -36,6 +38,8 @@ const linking = {
       Profile: 'profile',
       Tasks: 'projects/:projectId',
       TestForm: 'tasks/:taskId',
+      PlatformLogin: 'admin/login',
+      PlatformDashboard: 'admin',
     },
   },
 };
@@ -72,7 +76,19 @@ export default function RootNavigator() {
         }}
       >
         {!session ? (
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen
+              name="PlatformLogin"
+              component={PlatformLoginScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="PlatformDashboard"
+              component={PlatformDashboardScreen}
+              options={{ headerShown: false }}
+            />
+          </>
         ) : !isEngineer ? (
           <Stack.Screen
             name="Login"
@@ -97,6 +113,16 @@ export default function RootNavigator() {
               options={({ route }) => ({ title: route.params.instanceLabel })}
             />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+            <Stack.Screen
+              name="PlatformLogin"
+              component={PlatformLoginScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="PlatformDashboard"
+              component={PlatformDashboardScreen}
+              options={{ headerShown: false }}
+            />
           </>
         )}
       </Stack.Navigator>

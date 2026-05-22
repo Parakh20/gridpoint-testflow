@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -10,9 +11,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
 import { theme } from '@/theme';
+import type { RootStackParamList } from '@/navigation/types';
 
 function isLikelyEmail(s: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
@@ -21,6 +25,7 @@ function isLikelyEmail(s: string) {
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const toast = useToast();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
@@ -56,9 +61,13 @@ export default function LoginScreen() {
         style={s.flex}
       >
         <View style={s.brand}>
-          <View style={s.logoBox}>
+          <Pressable
+            onLongPress={() => navigation.navigate('PlatformLogin')}
+            delayLongPress={800}
+            style={s.logoBox}
+          >
             <Text style={s.logoMark}>⚡</Text>
-          </View>
+          </Pressable>
           <Text style={s.logo}>TestFlow</Text>
           <Text style={s.tag}>Field Engineer</Text>
         </View>

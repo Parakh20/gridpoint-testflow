@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "backgroundColor": "#0f172a",
+      "backgroundColor": "#232229",
       "resizeMode": "contain"
     },
     "assetBundlePatterns": ["**/*"],
@@ -18,13 +18,15 @@
     "android": {
       "package": "io.testflow.field",
       "adaptiveIcon": {
-        "backgroundColor": "#0f172a"
+        "backgroundColor": "#232229"
       }
     },
     "extra": {
       "supabaseUrl": "https://hxfilijpaocogsgjrjnq.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh4ZmlsaWpwYW9jb2dzZ2pyam5xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDI0NzMsImV4cCI6MjA5MDk3ODQ3M30.HEA9t7h876Sf7vJlIrVd5MGSADf9t-wbv5y0xe9zAws",
-      "realtimeEnabled": false
+      "realtimeEnabled": false,
+      "platformAdminPassword": "",
+      "platformAdminToken": ""
     }
   }
 }

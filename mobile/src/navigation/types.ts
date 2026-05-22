@@ -10,4 +10,6 @@ export type RootStackParamList = {
     testName: string;
     currentStatus: string;
   };
+  PlatformLogin: undefined;
+  PlatformDashboard: undefined;
 };
