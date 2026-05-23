@@ -8,6 +8,7 @@ export function initMonitoring(): void {
   Sentry.init({
     dsn: DSN,
     environment: ENV,
+    sendDefaultPii: true,
     integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
     tracesSampleRate: ENV === 'production' ? 0.1 : 1.0,
     replaysSessionSampleRate: 0,
