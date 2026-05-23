@@ -816,6 +816,7 @@ function DemoRequestForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.name.trim() || !form.email.trim() || !form.company.trim()) return;
     setStatus('submitting');
     const { error } = await supabase.from('demo_requests').insert({
       name: form.name.trim(),
@@ -824,6 +825,7 @@ function DemoRequestForm() {
       phone: form.phone.trim() || null,
       message: form.message.trim() || null,
     });
+    if (error) console.error('[DemoRequestForm] submit failed:', error);
     setStatus(error ? 'error' : 'success');
   };
 
