@@ -1,4 +1,5 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowRight,
   PlayCircle,
@@ -804,6 +805,86 @@ const FAQ = () => {
 };
 
 /* ============================================================
+   DEMO REQUEST FORM
+   ============================================================ */
+function DemoRequestForm() {
+  const [form, setForm] = useState({ name: '', email: '', company: '', phone: '', message: '' });
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+
+  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm(f => ({ ...f, [key]: e.target.value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus('submitting');
+    const { error } = await supabase.from('demo_requests').insert({
+      name: form.name.trim(),
+      email: form.email.trim(),
+      company: form.company.trim(),
+      phone: form.phone.trim() || null,
+      message: form.message.trim() || null,
+    });
+    setStatus(error ? 'error' : 'success');
+  };
+
+  if (status === 'success') {
+    return (
+      <div className="rounded-2xl border border-white/15 bg-[#07070c]/60 backdrop-blur p-6 md:p-7 text-center">
+        <div className="text-4xl mb-3">✓</div>
+        <div className="text-white font-semibold text-lg">Request received</div>
+        <div className="mt-2 text-white/55 text-sm">We'll reach out within one business day.</div>
+      </div>
+    );
+  }
+
+  const fieldBase = 'w-full rounded-lg border border-white/10 bg-white/[.04] px-3 py-2 text-[14px] text-white placeholder:text-white/25 focus:outline-none focus:border-[#3b82f6]/60 transition';
+
+  return (
+    <div className="rounded-2xl border border-white/15 bg-[#07070c]/60 backdrop-blur p-6 md:p-7">
+      <div className="font-mono text-[10.5px] uppercase tracking-widest text-white/50 mb-5">Book a demo</div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block font-mono text-[10px] uppercase tracking-widest text-white/45 mb-1">Full name *</label>
+            <input type="text" required value={form.name} onChange={set('name')} className={fieldBase} />
+          </div>
+          <div>
+            <label className="block font-mono text-[10px] uppercase tracking-widest text-white/45 mb-1">Company *</label>
+            <input type="text" required value={form.company} onChange={set('company')} className={fieldBase} />
+          </div>
+        </div>
+        <div>
+          <label className="block font-mono text-[10px] uppercase tracking-widest text-white/45 mb-1">Work email *</label>
+          <input type="email" required value={form.email} onChange={set('email')} className={fieldBase} />
+        </div>
+        <div>
+          <label className="block font-mono text-[10px] uppercase tracking-widest text-white/45 mb-1">Phone</label>
+          <input type="tel" value={form.phone} onChange={set('phone')} className={fieldBase} />
+        </div>
+        <div>
+          <label className="block font-mono text-[10px] uppercase tracking-widest text-white/45 mb-1">Message</label>
+          <textarea rows={3} value={form.message} onChange={set('message')} className={`${fieldBase} resize-none`} />
+        </div>
+        {status === 'error' && (
+          <p className="text-red-400 text-sm">Something went wrong — email us at sharmaparakh05@gmail.com</p>
+        )}
+        <button
+          type="submit"
+          disabled={status === 'submitting'}
+          className="w-full rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-60 px-4 py-2.5 text-[14px] font-semibold text-white transition"
+        >
+          {status === 'submitting' ? 'Sending…' : 'Request a Demo'}
+        </button>
+        <p className="text-center font-mono text-[10.5px] text-white/35">
+          Or call{' '}
+          <a href="tel:+919413552887" className="underline text-white/55">+91 94135-52887</a>
+        </p>
+      </form>
+    </div>
+  );
+}
+
+/* ============================================================
    FOOTER CTA — contact section
    ============================================================ */
 const FooterCTA = () => (
@@ -841,43 +922,7 @@ const FooterCTA = () => (
           </div>
 
           <div className="lg:col-span-5">
-            <div className="rounded-2xl border border-white/15 bg-[#07070c]/60 backdrop-blur p-6 md:p-7">
-              <div className="font-mono text-[10.5px] uppercase tracking-widest text-white/50 mb-5">Reach out</div>
-              <a
-                href="mailto:sharmaparakh05@gmail.com"
-                className="group flex items-start gap-4 p-4 rounded-xl border border-white/10 hover:border-[#60a5fa]/50 hover:bg-white/[.03] transition"
-              >
-                <div className="w-10 h-10 rounded-lg bg-[#3b82f6]/15 border border-[#3b82f6]/25 grid place-items-center text-[#60a5fa] shrink-0">
-                  <Mail className="w-5 h-5" strokeWidth={1.6} />
-                </div>
-                <div className="min-w-0">
-                  <div className="font-mono text-[10.5px] uppercase tracking-widest text-white/45">Email</div>
-                  <div className="mt-1 text-[15.5px] font-medium text-white group-hover:text-[#60a5fa] transition break-all">
-                    sharmaparakh05@gmail.com
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-white/40 group-hover:text-[#60a5fa] ml-auto shrink-0" strokeWidth={1.6} />
-              </a>
-              <a
-                href="tel:+919413552887"
-                className="group flex items-start gap-4 p-4 mt-3 rounded-xl border border-white/10 hover:border-[#a78bfa]/50 hover:bg-white/[.03] transition"
-              >
-                <div className="w-10 h-10 rounded-lg bg-[#8b5cf6]/15 border border-[#8b5cf6]/25 grid place-items-center text-[#a78bfa] shrink-0">
-                  <Phone className="w-5 h-5" strokeWidth={1.6} />
-                </div>
-                <div className="min-w-0">
-                  <div className="font-mono text-[10.5px] uppercase tracking-widest text-white/45">Phone</div>
-                  <div className="mt-1 text-[15.5px] font-medium text-white group-hover:text-[#a78bfa] transition">
-                    +91 94135-52887
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-white/40 group-hover:text-[#a78bfa] ml-auto shrink-0" strokeWidth={1.6} />
-              </a>
-              <div className="mt-5 pt-5 border-t border-white/[.08] flex items-center gap-2 font-mono text-[11px] text-white/45">
-                <Clock className="w-3.5 h-3.5" strokeWidth={1.6} />
-                <span>Mon – Sat · 9:00 – 19:00 IST</span>
-              </div>
-            </div>
+            <DemoRequestForm />
           </div>
         </div>
       </div>
