@@ -10,6 +10,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlatformLogin, PlatformDashboard } from "./pages/PlatformAdmin";
 import Marketing from "./pages/Marketing";
+import BlogIndex from "@/pages/blog/BlogIndex";
+import BlogPost from "@/pages/blog/BlogPost";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import SuperadminDashboard from "./pages/dashboards/SuperadminDashboard";
@@ -64,6 +66,8 @@ const App = () => (
               // Public-facing marketing site at optimustesting.com (apex)
               <Routes>
                 <Route path="/" element={<Marketing />} />
+                <Route path="/blog" element={<BlogIndex />} />
+                <Route path="/blog/:slug" element={<BlogPost />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             ) : (
