@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { dashboardPath } from '@/lib/routes';
 import { formatDate } from '@/lib/format';
+import { useFeature } from '@/lib/features';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Project = Tables<'projects'>;
@@ -37,6 +38,7 @@ export default function ProjectDetail() {
   const { toast } = useToast();
   const { userRole } = useAuth();
   const queryClient = useQueryClient();
+  const canGenerateReport = useFeature('ai_reports');
   const [showPDF, setShowPDF] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -278,7 +280,7 @@ export default function ProjectDetail() {
                 {exportingExcel ? 'Exporting…' : 'Export Excel'}
               </Button>
             )}
-            {(userRole === 'GM' || userRole === 'SUPERADMIN') && project.status === 'CLOSED' && (
+            {canGenerateReport && (userRole === 'GM' || userRole === 'SUPERADMIN') && project.status === 'CLOSED' && (
               <Button variant="outline" disabled={generatingReport} onClick={handleGenerateReport}>
                 {generatingReport
                   ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />

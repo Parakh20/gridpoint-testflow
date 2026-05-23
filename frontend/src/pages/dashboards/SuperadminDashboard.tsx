@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useFeature } from '@/lib/features';
 
 type ServiceStatus = 'ok' | 'error' | 'checking';
 
@@ -90,6 +91,7 @@ function ServiceRow({ svc }: { svc: ServiceCheck }) {
 }
 
 export default function SuperadminDashboard() {
+  const canViewAuditLog = useFeature('audit_log_viewer');
   const [totalUsers, setTotalUsers] = useState(0);
 
   const { data: health, isLoading: healthLoading, isFetching: healthFetching, refetch: refetchHealth, dataUpdatedAt } = useQuery({
@@ -250,7 +252,7 @@ export default function SuperadminDashboard() {
           <CardDescription>Append-only history of changes across your company</CardDescription>
         </CardHeader>
         <CardContent>
-          <AuditLogViewer />
+          {canViewAuditLog && <AuditLogViewer />}
         </CardContent>
       </Card>
     </DashboardLayout>
