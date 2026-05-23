@@ -365,7 +365,17 @@ export default function PlatformDashboard() {
       await fetchAll();
     } catch (err: any) {
       console.error('[PlatformDashboard] create-tenant error:', err);
-      toast({ variant: 'destructive', title: 'Failed to create tenant', description: err.message });
+      let description = err.message ?? 'Unknown error';
+      // FunctionsHttpError carries the actual response body — extract it for a useful message.
+      if (err?.context instanceof Response) {
+        try {
+          const body = await err.context.json();
+          description = body?.error ?? body?.message ?? description;
+        } catch {
+          try { description = await err.context.text(); } catch { /* ignore */ }
+        }
+      }
+      toast({ variant: 'destructive', title: 'Failed to create tenant', description });
     } finally {
       setAddLoading(false);
     }
