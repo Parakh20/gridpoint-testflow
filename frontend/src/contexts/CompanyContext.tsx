@@ -52,6 +52,22 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       .single()
       .then(({ data, error }) => {
         if (error || !data) {
+          // If the error is "column does not exist" (migration pending), retry with
+          // base columns only so tenants can still log in.
+          if (error?.message?.includes('column') || error?.code === '42703') {
+            supabase
+              .from('companies')
+              .select('id, name, slug, is_active')
+              .eq('slug', slug)
+              .single()
+              .then(({ data: d2, error: e2 }) => {
+                if (e2 || !d2) { setNotFound(true); }
+                else if (!d2.is_active) { setSuspended(true); supabase.auth.signOut(); }
+                else { setCompany({ ...d2, oauth_provisioning: 'off', allowed_domains: [] }); }
+                setLoading(false);
+              });
+            return;
+          }
           setNotFound(true);
         } else if (!data.is_active) {
           setSuspended(true);
