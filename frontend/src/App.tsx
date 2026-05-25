@@ -9,9 +9,6 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlatformLogin, PlatformDashboard } from "./pages/PlatformAdmin";
-import { initMonitoring } from "@/lib/monitoring";
-
-initMonitoring();
 import Marketing from "./pages/Marketing";
 import BlogIndex from "@/pages/blog/BlogIndex";
 import BlogPost from "@/pages/blog/BlogPost";
