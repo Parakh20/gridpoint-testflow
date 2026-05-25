@@ -1,9 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState, PanResponder, type PanResponderInstance } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '@/lib/supabase';
 import { setUserContext } from '@/lib/monitoring';
 import { highestRole, type AppRole } from '@testflow/shared';
+
+WebBrowser.maybeCompleteAuthSession();
 
 type Role = AppRole | null;
 
@@ -21,7 +25,9 @@ type AuthState = {
   role: Role;
   profile: Profile | null;
   loading: boolean;
+  oauthPending: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   touch: () => void;
 };
@@ -35,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<Role>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [oauthPending, setOauthPending] = useState(false);
 
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -42,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setRole(null);
     setProfile(null);
+    setOauthPending(false);
     setUserContext(null);
   }, []);
 
@@ -53,6 +61,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, IDLE_TIMEOUT_MS);
   }, [session, signOut]);
 
+  const provisionOAuthUser = useCallback(async (accessToken: string, userId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('provision-oauth-user', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (error || !data) {
+        await supabase.auth.signOut();
+        setRole(null); setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      const errCode = data.error as string | undefined;
+      if (errCode) {
+        await supabase.auth.signOut();
+        setRole(null); setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      if (data.status === 'pending') {
+        setOauthPending(true);
+        setLoading(false);
+        return;
+      }
+
+      // provisioned — fetch role/profile normally (trigger re-run via session effect below)
+      // The session is already set; the deferred useEffect will pick it up.
+    } catch {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
@@ -63,10 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!s) {
         setRole(null);
         setProfile(null);
+        setOauthPending(false);
         setLoading(false);
       }
-      // TOKEN_REFRESHED with null session means refresh failed (e.g. revoked, expired beyond grace).
-      // SIGNED_OUT covers explicit + server-side invalidations. USER_DELETED handled implicitly.
       if (event === 'TOKEN_REFRESHED' && !s) {
         setRole(null);
         setProfile(null);
@@ -77,18 +118,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!session?.user) return;
-    // Defer fetches off the auth callback tick (same deadlock workaround as the web app).
+    const isGoogle = session.user.app_metadata?.provider === 'google';
     let cancelled = false;
     const t = setTimeout(async () => {
+      if (cancelled) return;
+
+      if (isGoogle) {
+        await provisionOAuthUser(session.access_token, session.user.id);
+        return;
+      }
+
       try {
-        // user_roles is UNIQUE(user_id, role) — a single user CAN have multiple roles.
-        // Don't use .maybeSingle() (it throws on >1 row). Fetch the array and pick the
-        // highest-privilege one for the role-gate decision.
         const [rolesRes, profRes] = await Promise.all([
           supabase.from('user_roles').select('role').eq('user_id', session.user.id),
           supabase
             .from('profiles')
-            .select('full_name, email, company_id, companies(name)')
+            .select('name, email, company_id, companies(name)')
             .eq('id', session.user.id)
             .maybeSingle(),
         ]);
@@ -96,14 +141,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const rolesData = (rolesRes.data ?? []) as Array<{ role: string }>;
         const best = highestRole(rolesData.map((r) => r.role));
-
         setRole(best);
 
         const profRow = profRes.data as any;
         const companyName = profRow?.companies?.name ?? null;
         const newProfile = profRow
           ? {
-              full_name: profRow.full_name ?? null,
+              full_name: profRow.name ?? null,
               email: profRow.email ?? session.user.email ?? null,
               company_id: profRow.company_id ?? null,
               company_name: companyName,
@@ -117,7 +161,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           companyId: newProfile?.company_id ?? null,
         });
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.warn('[AuthContext] role/profile fetch failed', e);
       } finally {
         if (!cancelled) setLoading(false);
@@ -127,9 +170,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, provisionOAuthUser]);
 
-  // Idle timeout — start when session exists, restart on touch().
   useEffect(() => {
     if (!session) {
       if (idleTimer.current) clearTimeout(idleTimer.current);
@@ -150,6 +192,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message ?? null };
   };
 
+  const signInWithGoogle = async (): Promise<{ error: string | null }> => {
+    try {
+      const redirectUri = makeRedirectUri({ scheme: 'testflow', path: 'auth/callback' });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUri,
+          skipBrowserRedirect: true,
+          queryParams: { access_type: 'offline', prompt: 'consent' },
+        },
+      });
+
+      if (error || !data.url) return { error: error?.message ?? 'Failed to get OAuth URL' };
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+
+      if (result.type !== 'success') return { error: null }; // user cancelled
+
+      const url = result.url;
+      const params = new URL(url);
+      const code = params.searchParams.get('code');
+
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) return { error: exchangeError.message };
+      }
+
+      return { error: null };
+    } catch (e: any) {
+      return { error: e.message ?? 'Google sign-in failed' };
+    }
+  };
+
   return (
     <AuthCtx.Provider
       value={{
@@ -159,7 +235,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role,
         profile,
         loading,
+        oauthPending,
         signIn,
+        signInWithGoogle,
         signOut,
         touch,
       }}
@@ -175,23 +253,13 @@ export function useAuth() {
   return ctx;
 }
 
-/**
- * Wraps children in a PanResponder that resets the idle timer on any touch.
- * Doesn't block child gestures — only observes.
- */
 export function useIdleResetResponder(): PanResponderInstance {
   const { touch } = useAuth();
   const ref = useRef<PanResponderInstance | null>(null);
   if (!ref.current) {
     ref.current = PanResponder.create({
-      onStartShouldSetPanResponderCapture: () => {
-        touch();
-        return false;
-      },
-      onMoveShouldSetPanResponderCapture: () => {
-        touch();
-        return false;
-      },
+      onStartShouldSetPanResponderCapture: () => { touch(); return false; },
+      onMoveShouldSetPanResponderCapture: () => { touch(); return false; },
     });
   }
   return ref.current;

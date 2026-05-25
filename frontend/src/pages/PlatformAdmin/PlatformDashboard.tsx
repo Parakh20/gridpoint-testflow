@@ -68,6 +68,8 @@ interface Company {
   slug: string;
   created_at: string;
   is_active: boolean;
+  allowed_domains: string[];
+  oauth_provisioning: string;
 }
 
 interface Stats {
@@ -171,6 +173,97 @@ function CopyButton({ text }: { text: string }) {
     >
       {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
+  );
+}
+
+// ─── OAuth config panel (rendered inside expanded company row) ────────────────
+function OAuthConfigPanel({
+  company,
+  onSaved,
+  platformFetch,
+}: {
+  company: Company;
+  onSaved: (updated: Pick<Company, 'id' | 'allowed_domains' | 'oauth_provisioning'>) => void;
+  platformFetch: (action: string, payload?: object) => Promise<any>;
+}) {
+  const [domainsText, setDomainsText] = useState((company.allowed_domains ?? []).join(', '));
+  const [mode, setMode] = useState(company.oauth_provisioning ?? 'off');
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; err?: boolean } | null>(null);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const domains = domainsText
+        .split(',')
+        .map(d => d.trim().toLowerCase())
+        .filter(Boolean);
+      await platformFetch('set_company_oauth_config', {
+        company_id: company.id,
+        allowed_domains: domains,
+        oauth_provisioning: mode,
+      });
+      onSaved({ id: company.id, allowed_domains: domains, oauth_provisioning: mode });
+      setToast({ msg: 'OAuth config saved' });
+    } catch (e: any) {
+      setToast({ msg: e.message ?? 'Save failed', err: true });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
+  return (
+    <div>
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+        <KeyRound className="h-3 w-3" /> Google Sign-In / OAuth Config
+      </p>
+      <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+        <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+          <div>
+            <p className="text-[10px] text-muted-foreground mb-1">Allowed email domains (comma-separated)</p>
+            <input
+              className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+              placeholder="e.g. sterlingwilson.com, ltconstruction.in"
+              value={domainsText}
+              onChange={e => setDomainsText(e.target.value)}
+            />
+          </div>
+          <div>
+            <p className="text-[10px] text-muted-foreground mb-1">Provisioning mode</p>
+            <select
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+              value={mode}
+              onChange={e => setMode(e.target.value)}
+            >
+              <option value="off">Off (disabled)</option>
+              <option value="auto">Auto (assign Engineer)</option>
+              <option value="pending">Pending (SUPERADMIN approves)</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition"
+          >
+            {saving && <Loader2 className="h-3 w-3 animate-spin" />}
+            {saving ? 'Saving…' : 'Save OAuth Config'}
+          </button>
+          {toast && (
+            <span className={`text-xs ${toast.err ? 'text-destructive' : 'text-green-500'}`}>
+              {toast.msg}
+            </span>
+          )}
+        </div>
+        <p className="text-[10px] text-muted-foreground">
+          <strong>Auto:</strong> employees matching a domain get ENGINEER role instantly.&nbsp;
+          <strong>Pending:</strong> they wait for SUPERADMIN approval in their workspace.&nbsp;
+          SAML/enterprise SSO requires Supabase Team plan — available as an upgrade.
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -827,6 +920,11 @@ export default function PlatformDashboard() {
                                         </table>
                                       )}
                                     </div>
+
+                                    {/* OAuth / Google Sign-In Config */}
+                                    <OAuthConfigPanel company={company} onSaved={(updated) => {
+                                      setCompanies(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c));
+                                    }} platformFetch={platformFetch} />
 
                                   </div>
                                 )}

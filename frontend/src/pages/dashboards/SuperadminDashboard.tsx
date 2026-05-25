@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserManagementTable } from '@/components/UserManagementTable';
 import { AuditLogViewer } from '@/components/AuditLogViewer';
 import { AnimatedCounter } from '@/components/AnimatedCounter';
-import { Users, Shield, Activity, UserCheck, CheckCircle2, XCircle, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Users, Shield, Activity, UserCheck, CheckCircle2, XCircle, Loader2, RefreshCw, AlertCircle, UserPlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useFeature } from '@/lib/features';
+import { useToast } from '@/hooks/use-toast';
 
 type ServiceStatus = 'ok' | 'error' | 'checking';
 
@@ -58,6 +60,104 @@ async function checkEdgeFunction(name: string): Promise<ServiceCheck> {
   } catch (e: any) {
     return { name, status: 'error', detail: e.message ?? 'Unreachable' };
   }
+}
+
+interface PendingUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
+function OAuthPendingQueue() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [roles, setRoles] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+
+  const { data: pending = [], isLoading } = useQuery<PendingUser[]>({
+    queryKey: ['oauth-pending-users'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .eq('oauth_pending', true)
+        .eq('is_active', true);
+      if (error) throw error;
+      return (data ?? []) as PendingUser[];
+    },
+    refetchInterval: 30_000,
+  });
+
+  const act = async (userId: string, action: 'approve' | 'reject') => {
+    setBusy(b => ({ ...b, [userId]: true }));
+    try {
+      if (action === 'approve') {
+        const role = roles[userId] ?? 'ENGINEER';
+        const { error } = await supabase.rpc('approve_oauth_user', { _user_id: userId, _role: role });
+        if (error) throw error;
+        toast({ title: 'User approved', description: `Assigned as ${role}` });
+      } else {
+        const { error } = await supabase.rpc('reject_oauth_user', { _user_id: userId });
+        if (error) throw error;
+        toast({ title: 'User rejected' });
+      }
+      qc.invalidateQueries({ queryKey: ['oauth-pending-users'] });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Action failed', description: e.message });
+    } finally {
+      setBusy(b => ({ ...b, [userId]: false }));
+    }
+  };
+
+  if (isLoading) return <Skeleton className="h-20 w-full" />;
+  if (pending.length === 0) return (
+    <p className="text-sm text-muted-foreground">No pending approvals.</p>
+  );
+
+  return (
+    <div className="space-y-3">
+      {pending.map(u => (
+        <div key={u.id} className="flex items-center justify-between rounded-lg border border-border bg-card/60 p-3 gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">{u.name}</p>
+            <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Select
+              value={roles[u.id] ?? 'ENGINEER'}
+              onValueChange={v => setRoles(r => ({ ...r, [u.id]: v }))}
+            >
+              <SelectTrigger className="h-8 w-32 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ENGINEER">Engineer</SelectItem>
+                <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
+                <SelectItem value="GM">GM</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              className="h-8"
+              disabled={!!busy[u.id]}
+              onClick={() => act(u.id, 'approve')}
+            >
+              {busy[u.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Approve'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8"
+              disabled={!!busy[u.id]}
+              onClick={() => act(u.id, 'reject')}
+            >
+              Reject
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function StatusIcon({ status }: { status: ServiceStatus }) {
@@ -235,6 +335,19 @@ export default function SuperadminDashboard() {
           </CardContent>
         </Card>
       </motion.div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-primary" />
+            <CardTitle>Google Sign-In Approvals</CardTitle>
+          </div>
+          <CardDescription>Employees who signed in with Google and are awaiting role assignment</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <OAuthPendingQueue />
+        </CardContent>
+      </Card>
 
       <Card className="mt-6">
         <CardHeader>

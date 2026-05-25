@@ -60,7 +60,7 @@ serve(async (req) => {
     if (action === 'get_all_companies') {
       let { data, error } = await adminClient
         .from('companies')
-        .select('id, name, slug, created_at, is_active')
+        .select('id, name, slug, created_at, is_active, allowed_domains, oauth_provisioning')
         .order('created_at', { ascending: false });
 
       // Fallback: if the is_active column doesn't exist yet (migration pending),
@@ -71,7 +71,12 @@ serve(async (req) => {
           .select('id, name, slug, created_at')
           .order('created_at', { ascending: false });
         if (fallback.error) throw fallback.error;
-        data = (fallback.data ?? []).map((c: Record<string, unknown>) => ({ ...c, is_active: true }));
+        data = (fallback.data ?? []).map((c: Record<string, unknown>) => ({
+          ...c,
+          is_active: true,
+          allowed_domains: [],
+          oauth_provisioning: 'off',
+        }));
         error = null;
       }
 
@@ -400,6 +405,25 @@ serve(async (req) => {
       }
 
       return respond({ user_id: newUserId, email, name, role });
+    }
+
+    // ── set_company_oauth_config ───────────────────────────────────────────────
+    if (action === 'set_company_oauth_config') {
+      const company_id = payload?.company_id as string | undefined;
+      const allowed_domains = payload?.allowed_domains as string[] | undefined;
+      const oauth_provisioning = payload?.oauth_provisioning as string | undefined;
+      if (!company_id || !Array.isArray(allowed_domains) || !oauth_provisioning) {
+        return respond({ error: 'company_id, allowed_domains, and oauth_provisioning are required' }, 400);
+      }
+      if (!['off', 'auto', 'pending'].includes(oauth_provisioning)) {
+        return respond({ error: 'oauth_provisioning must be off, auto, or pending' }, 400);
+      }
+      const { error } = await adminClient
+        .from('companies')
+        .update({ allowed_domains, oauth_provisioning })
+        .eq('id', company_id);
+      if (error) return respond({ error: error.message }, 500);
+      return respond({ success: true });
     }
 
     return respond({ error: `Unknown action: ${action}` }, 400);

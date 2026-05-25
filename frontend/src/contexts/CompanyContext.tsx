@@ -7,6 +7,8 @@ interface Company {
   name: string;
   slug: string;
   is_active: boolean;
+  oauth_provisioning: string;
+  allowed_domains: string[];
 }
 
 interface CompanyContextType {
@@ -45,7 +47,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
     supabase
       .from('companies')
-      .select('id, name, slug, is_active')
+      .select('id, name, slug, is_active, oauth_provisioning, allowed_domains')
       .eq('slug', slug)
       .single()
       .then(({ data, error }) => {

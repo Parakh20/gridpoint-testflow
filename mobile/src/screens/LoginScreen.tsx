@@ -23,13 +23,21 @@ function isLikelyEmail(s: string) {
 }
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle, oauthPending } = useAuth();
   const toast = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  const onGoogleSignIn = async () => {
+    setGoogleBusy(true);
+    const { error } = await signInWithGoogle();
+    setGoogleBusy(false);
+    if (error) toast.error(error);
+  };
 
   const onSubmit = async () => {
     const trimmed = email.trim();
@@ -73,6 +81,19 @@ export default function LoginScreen() {
         </View>
 
         <View style={s.card}>
+          {oauthPending ? (
+            <>
+              <Text style={s.cardTitle}>Awaiting approval</Text>
+              <Text style={s.cardSub}>
+                Your Google sign-in was received. Your workspace administrator needs to approve
+                your account before you can continue.
+              </Text>
+              <TouchableOpacity style={[s.button, { marginTop: 16, backgroundColor: theme.border }]} onPress={() => signInWithGoogle()}>
+                <Text style={[s.buttonText, { color: theme.text }]}>Try again</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+          <>
           <Text style={s.cardTitle}>Sign in</Text>
           <Text style={s.cardSub}>Use the credentials issued by your company admin.</Text>
 
@@ -121,6 +142,25 @@ export default function LoginScreen() {
           <Text style={s.note}>
             No public sign-up. Forgot your password? Ask your company admin to reset it.
           </Text>
+
+          <View style={s.dividerRow}>
+            <View style={s.dividerLine} />
+            <Text style={s.dividerText}>or</Text>
+            <View style={s.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={[s.googleButton, googleBusy && { opacity: 0.6 }]}
+            onPress={onGoogleSignIn}
+            disabled={googleBusy}
+          >
+            {googleBusy
+              ? <ActivityIndicator color={theme.text} />
+              : <Text style={s.googleButtonText}>Sign in with Google</Text>
+            }
+          </TouchableOpacity>
+          </>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -184,4 +224,17 @@ const s = StyleSheet.create({
   },
   buttonText: { color: theme.primaryText, fontWeight: '700', fontSize: 15 },
   note: { color: theme.textDim, fontSize: 11, marginTop: 16, textAlign: 'center', lineHeight: 16 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 8 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  dividerText: { color: theme.textDim, fontSize: 11 },
+  googleButton: {
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  googleButtonText: { color: theme.text, fontWeight: '600', fontSize: 14 },
 });

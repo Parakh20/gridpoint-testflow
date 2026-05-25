@@ -1,18 +1,18 @@
 name: Database Backup
 
-# Nightly pg_dump of the Supabase DB, uploaded to S3-compatible storage.
-# All inputs come from GitHub Secrets (trusted) — no github.event.* refs.
+# Nightly pg_dump → GitHub Actions artifact (free, 30-day retention).
+# Works on Supabase Free plan — only needs SUPABASE_DB_PASSWORD secret.
+# Credentials are passed via env vars, never interpolated into shell strings.
 #
-# To enable, add these GitHub Actions secrets:
-#   SUPABASE_DB_URL              full postgres connection string
+# Required GitHub Actions secret:
+#   SUPABASE_DB_PASSWORD   postgres user password (from Supabase Dashboard → Settings → Database)
+#
+# Optional secrets for longer-lived S3 backups:
 #   BACKUP_S3_ENDPOINT           e.g. https://<account>.r2.cloudflarestorage.com
 #   BACKUP_S3_BUCKET             bucket name
 #   BACKUP_S3_ACCESS_KEY_ID
 #   BACKUP_S3_SECRET_ACCESS_KEY
 #   BACKUP_S3_REGION             e.g. auto for R2, us-east-1 for AWS
-#
-# Until SUPABASE_DB_URL is set the job no-ops. Manual trigger via the Actions
-# tab is always available via workflow_dispatch.
 
 on:
   schedule:
@@ -23,54 +23,67 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
-      - name: Install postgres client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client awscli
-
       - name: Check secrets
         id: check
+        env:
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          if [ -z "$SUPABASE_DB_URL" ]; then
+          if [ -z "${DB_PASSWORD}" ]; then
+            echo "SUPABASE_DB_PASSWORD not configured. Skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "SUPABASE_DB_URL not configured. Skipping."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Install postgres client
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
       - name: Dump database
         if: steps.check.outputs.skip == 'false'
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
           FILE="testflow-${STAMP}.sql.gz"
-          echo "FILE=$FILE" >> "$GITHUB_ENV"
-          pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --format=plain | gzip -9 > "$FILE"
-          ls -lh "$FILE"
+          echo "FILE=${FILE}" >> "$GITHUB_ENV"
+          pg_dump \
+            --host=db.hxfilijpaocogsgjrjnq.supabase.co \
+            --port=5432 \
+            --username=postgres \
+            --dbname=postgres \
+            --no-owner \
+            --no-privileges \
+            --format=plain \
+            | gzip -9 > "${FILE}"
+          ls -lh "${FILE}"
 
-      - name: Upload to S3-compatible storage
-        if: steps.check.outputs.skip == 'false' && env.FILE != ''
-        env:
-          AWS_ACCESS_KEY_ID:     ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION:    ${{ secrets.BACKUP_S3_REGION }}
-          ENDPOINT:              ${{ secrets.BACKUP_S3_ENDPOINT }}
-          BUCKET:                ${{ secrets.BACKUP_S3_BUCKET }}
-        run: |
-          set -euo pipefail
-          if [ -z "${BUCKET:-}" ] || [ -z "${ENDPOINT:-}" ]; then
-            echo "S3 credentials not set. Skipping upload; artifact retained instead."
-            exit 0
-          fi
-          aws s3 cp "$FILE" "s3://$BUCKET/$FILE" --endpoint-url "$ENDPOINT"
-
-      - name: Retain as Actions artifact (fallback)
+      - name: Upload as GitHub Actions artifact
         if: steps.check.outputs.skip == 'false' && env.FILE != ''
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.FILE }}
           path: ${{ env.FILE }}
-          retention-days: 14
+          retention-days: 30
+
+      - name: Upload to S3-compatible storage (optional)
+        if: steps.check.outputs.skip == 'false' && env.FILE != ''
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:    ${{ secrets.BACKUP_S3_REGION }}
+          S3_ENDPOINT:           ${{ secrets.BACKUP_S3_ENDPOINT }}
+          S3_BUCKET:             ${{ secrets.BACKUP_S3_BUCKET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${S3_BUCKET:-}" ] || [ -z "${S3_ENDPOINT:-}" ]; then
+            echo "S3 secrets not set — skipping S3 upload. Artifact above is the backup."
+            exit 0
+          fi
+          pip install awscli --quiet
+          aws s3 cp "${FILE}" "s3://${S3_BUCKET}/${FILE}" --endpoint-url "${S3_ENDPOINT}"
+          echo "Uploaded to S3: s3://${S3_BUCKET}/${FILE}"

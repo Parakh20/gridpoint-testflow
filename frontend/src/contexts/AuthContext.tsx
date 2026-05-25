@@ -12,7 +12,9 @@ interface AuthContextType {
   loading: boolean;
   companyMismatch: boolean;
   accountDisabled: boolean;
+  oauthPending: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signInWithGoogle: () => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<{ error: any }>;
   updatePassword: (password: string) => Promise<{ error: any }>;
@@ -28,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [companyMismatch, setCompanyMismatch] = useState(false);
   const [accountDisabled, setAccountDisabled] = useState(false);
+  const [oauthPending, setOauthPending] = useState(false);
   const navigate = useNavigate();
   const { company } = useCompany();
 
@@ -44,10 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           // setTimeout defers the Supabase call to avoid a deadlock inside the
           // onAuthStateChange callback (Supabase holds a lock during this event).
-          setTimeout(() => fetchUserRole(session.user.id), 0);
+          const isGoogle = session.user.app_metadata?.provider === 'google';
+          setTimeout(() => isGoogle ? provisionOAuthUser(session.user.id) : fetchUserRole(session.user.id), 0);
         } else {
           setUserRole(null);
           setUserName(null);
+          setOauthPending(false);
           setLoading(false);
         }
       }
@@ -57,7 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchUserRole(session.user.id);
+        const isGoogle = session.user.app_metadata?.provider === 'google';
+        isGoogle ? provisionOAuthUser(session.user.id) : fetchUserRole(session.user.id);
       } else {
         setLoading(false);
       }
@@ -123,8 +129,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const provisionOAuthUser = async (userId: string) => {
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession) { setLoading(false); return; }
+
+      const { data, error } = await supabase.functions.invoke('provision-oauth-user', {
+        headers: { Authorization: `Bearer ${currentSession.access_token}` },
+      });
+
+      if (error || !data) {
+        console.error('[AuthContext] OAuth provision error', error);
+        await supabase.auth.signOut();
+        setUser(null); setSession(null); setUserRole(null);
+        setAccountDisabled(true);
+        navigate('/auth');
+        return;
+      }
+
+      const errCode = data.error as string | undefined;
+      if (errCode) {
+        await supabase.auth.signOut();
+        setUser(null); setSession(null); setUserRole(null);
+        if (errCode === 'account_disabled') {
+          setAccountDisabled(true);
+        } else if (errCode === 'no_company_match') {
+          setCompanyMismatch(true);
+          navigate('/auth?error=no_google_company');
+        } else if (errCode === 'oauth_disabled') {
+          setCompanyMismatch(true);
+          navigate('/auth?error=oauth_disabled');
+        } else {
+          navigate('/auth');
+        }
+        setLoading(false);
+        return;
+      }
+
+      if (data.status === 'pending') {
+        setOauthPending(true);
+        setLoading(false);
+        navigate('/auth');
+        return;
+      }
+
+      // status === 'provisioned' — fetch role normally
+      await fetchUserRole(userId);
+    } catch {
+      setLoading(false);
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error };
+  };
+
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { access_type: 'offline', prompt: 'consent' },
+      },
+    });
     return { error };
   };
 
@@ -176,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   return (
-    <AuthContext.Provider value={{ user, session, userRole, userName, loading, companyMismatch, accountDisabled, signIn, signOut, resetPasswordForEmail, updatePassword }}>
+    <AuthContext.Provider value={{ user, session, userRole, userName, loading, companyMismatch, accountDisabled, oauthPending, signIn, signInWithGoogle, signOut, resetPasswordForEmail, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );
