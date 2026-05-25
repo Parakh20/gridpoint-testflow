@@ -51,6 +51,12 @@ jobs:
         with:
           version: latest
 
+      - name: Link Supabase project
+        if: steps.check.outputs.skip == 'false'
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase link --project-ref "${PROJECT_ID}" --password "${SUPABASE_DB_PASSWORD}"
+
       - name: Dump database
         if: steps.check.outputs.skip == 'false'
         env:
@@ -59,13 +65,9 @@ jobs:
           set -euo pipefail
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
           FILE="testflow-${STAMP}.sql"
-          echo "FILE=${FILE}" >> "$GITHUB_ENV"
-          supabase db dump \
-            --project-ref "${PROJECT_ID}" \
-            --password "${SUPABASE_DB_PASSWORD}" \
-            -f "${FILE}"
-          gzip -9 "${FILE}"
           echo "FILE=${FILE}.gz" >> "$GITHUB_ENV"
+          supabase db dump --linked --password "${SUPABASE_DB_PASSWORD}" -f "${FILE}"
+          gzip -9 "${FILE}"
           ls -lh "${FILE}.gz"
 
       - name: Upload as GitHub Actions artifact
