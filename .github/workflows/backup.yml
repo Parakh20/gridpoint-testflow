@@ -40,12 +40,25 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client dnsutils
+
+      - name: Resolve IPv4 address
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          # GitHub Actions runners try IPv6 first; Supabase direct DB only accepts IPv4.
+          # Resolve to IPv4 explicitly and export as PGHOSTADDR so pg_dump skips DNS.
+          DB_IPV4=$(dig +short A db.hxfilijpaocogsgjrjnq.supabase.co | grep -E '^[0-9]+\.' | head -1)
+          if [ -z "${DB_IPV4}" ]; then
+            echo "Could not resolve IPv4 for Supabase DB host" && exit 1
+          fi
+          echo "Resolved to: ${DB_IPV4}"
+          echo "DB_IPV4=${DB_IPV4}" >> "$GITHUB_ENV"
 
       - name: Dump database
         if: steps.check.outputs.skip == 'false'
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PGHOSTADDR: ${{ env.DB_IPV4 }}
         run: |
           set -euo pipefail
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
