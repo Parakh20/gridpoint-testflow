@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         const isGoogle = session.user.app_metadata?.provider === 'google';
-        isGoogle ? provisionOAuthUser(session.user.id) : fetchUserRole(session.user.id);
+        if (isGoogle) { provisionOAuthUser(session.user.id); } else { fetchUserRole(session.user.id); }
       } else {
         setLoading(false);
       }
