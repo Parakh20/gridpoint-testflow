@@ -1,11 +1,13 @@
 name: Database Backup
 
-# Nightly pg_dump → GitHub Actions artifact (free, 30-day retention).
-# Works on Supabase Free plan — only needs SUPABASE_DB_PASSWORD secret.
-# Credentials are passed via env vars, never interpolated into shell strings.
+# Nightly backup using the Supabase CLI (supabase db dump).
+# The CLI handles connection routing internally — no IPv4/IPv6 issues.
+# Primary destination: GitHub Actions artifact (30-day retention, free).
 #
-# Required GitHub Actions secret:
-#   SUPABASE_DB_PASSWORD   postgres user password (from Supabase Dashboard → Settings → Database)
+# Required GitHub Actions secrets:
+#   SUPABASE_ACCESS_TOKEN   from supabase.com → Account → Access Tokens
+#   SUPABASE_PROJECT_ID     hxfilijpaocogsgjrjnq
+#   SUPABASE_DB_PASSWORD    from Supabase Dashboard → Settings → Database
 #
 # Optional secrets for longer-lived S3 backups:
 #   BACKUP_S3_ENDPOINT           e.g. https://<account>.r2.cloudflarestorage.com
@@ -23,57 +25,48 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
     steps:
       - name: Check secrets
         id: check
         env:
           DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          if [ -z "${DB_PASSWORD}" ]; then
-            echo "SUPABASE_DB_PASSWORD not configured. Skipping."
+          missing=()
+          [ -n "${SUPABASE_ACCESS_TOKEN}" ] || missing+=("SUPABASE_ACCESS_TOKEN")
+          [ -n "${PROJECT_ID}" ]            || missing+=("SUPABASE_PROJECT_ID")
+          [ -n "${DB_PASSWORD}" ]           || missing+=("SUPABASE_DB_PASSWORD")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Missing secrets: ${missing[*]} — skipping backup."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install postgres client
+      - name: Set up Supabase CLI
         if: steps.check.outputs.skip == 'false'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y postgresql-client dnsutils
-
-      - name: Resolve IPv4 address
-        if: steps.check.outputs.skip == 'false'
-        run: |
-          # GitHub Actions runners try IPv6 first; Supabase direct DB only accepts IPv4.
-          # Resolve to IPv4 explicitly and export as PGHOSTADDR so pg_dump skips DNS.
-          DB_IPV4=$(dig +short A db.hxfilijpaocogsgjrjnq.supabase.co | grep -E '^[0-9]+\.' | head -1)
-          if [ -z "${DB_IPV4}" ]; then
-            echo "Could not resolve IPv4 for Supabase DB host" && exit 1
-          fi
-          echo "Resolved to: ${DB_IPV4}"
-          echo "DB_IPV4=${DB_IPV4}" >> "$GITHUB_ENV"
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Dump database
         if: steps.check.outputs.skip == 'false'
         env:
-          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          PGHOSTADDR: ${{ env.DB_IPV4 }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
-          FILE="testflow-${STAMP}.sql.gz"
+          FILE="testflow-${STAMP}.sql"
           echo "FILE=${FILE}" >> "$GITHUB_ENV"
-          pg_dump \
-            --host=db.hxfilijpaocogsgjrjnq.supabase.co \
-            --port=5432 \
-            --username=postgres \
-            --dbname=postgres \
-            --no-owner \
-            --no-privileges \
-            --format=plain \
-            | gzip -9 > "${FILE}"
-          ls -lh "${FILE}"
+          supabase db dump \
+            --project-ref "${PROJECT_ID}" \
+            --password "${SUPABASE_DB_PASSWORD}" \
+            -f "${FILE}"
+          gzip -9 "${FILE}"
+          echo "FILE=${FILE}.gz" >> "$GITHUB_ENV"
+          ls -lh "${FILE}.gz"
 
       - name: Upload as GitHub Actions artifact
         if: steps.check.outputs.skip == 'false' && env.FILE != ''
