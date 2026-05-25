@@ -42,6 +42,10 @@ export default function Auth() {
   const isResetMode = new URLSearchParams(location.search).get('reset') === 'true';
 
   const handleGoogleSignIn = async () => {
+    if (company?.oauth_provisioning === 'off') {
+      toast({ variant: 'destructive', title: 'Google sign-in not enabled', description: 'Contact your administrator to enable Google sign-in for this workspace.' });
+      return;
+    }
     setGoogleLoading(true);
     const { error } = await signInWithGoogle();
     if (error) {
@@ -358,7 +362,7 @@ export default function Auth() {
                 </Button>
               </form>
 
-              {(company?.oauth_provisioning !== 'off') && (
+              {(
                 <>
                   <div className="mt-5 flex items-center gap-3">
                     <div className="h-px flex-1 bg-border" />
