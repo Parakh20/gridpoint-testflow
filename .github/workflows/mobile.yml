@@ -77,10 +77,12 @@ jobs:
         run: npm ci
 
       - name: Publish EAS Update
-        run: npx eas-cli update --branch production --message "CI $COMMIT_SHA" --non-interactive
+        run: npx eas-cli update --channel production --message "CI $COMMIT_SHA" --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           COMMIT_SHA: ${{ github.sha }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
 # ── When to cut a new native build ──────────────────────────────────────────
 # Run `eas build --profile production` manually (from your local machine) when:
