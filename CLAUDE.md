@@ -150,6 +150,25 @@ All share CORS via `_shared/cors.ts`. New domains → add to `ALLOWED_ORIGINS`. 
 - Data queries go via `platform-admin-data` Edge Function (service role).
 - Magic links: Supabase ignores `redirectTo` in `admin.generateLink()` — must rewrite `action_link?redirect_to=...` after generation. Requires `https://*.optimustesting.com/**` in Supabase Auth → URL Configuration.
 
+## Mobile Deployment (EAS)
+
+The mobile app uses EAS (Expo Application Services) for builds and OTA updates.
+
+**OTA updates (automatic):** CI publishes a new JS bundle to the `production` channel on every push to `main`. Engineers receive updates silently on next app launch — no reinstall needed.
+
+**Cut a new native build when:**
+- Adding a new Expo/native module (e.g., `expo-camera`, `expo-notifications`)
+- Bumping `version`, `versionCode`, or `buildNumber` in `mobile/app.config.js`
+- Changing native config: permissions, deep-link scheme, splash/icon assets
+
+To build: `cd mobile && eas build --profile production`
+
+Share the resulting install link (QR code in Expo dashboard) with field engineers. Android: direct APK install. iOS: device UDID must be registered in Apple Developer first.
+
+**Secrets:** Supabase URL/key and platform admin tokens are in EAS Secrets (Expo dashboard → project → Secrets). For local dev, they're in `mobile/.env` (committed for public values) and `mobile/.env.local` (gitignored for private values).
+
+**EAS project ID:** In `mobile/app.config.js` → `PROJECT_ID` constant (`fdb44eda-7e1e-4b67-93e9-fb314f0b105d`). Do not change without also updating the `updates.url` field.
+
 ## Gotchas
 
 1. `AuthContext` `setTimeout(..., 0)` — don't remove.
