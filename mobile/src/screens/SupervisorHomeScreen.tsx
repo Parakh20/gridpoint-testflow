@@ -344,10 +344,10 @@ const s = StyleSheet.create({
     borderRadius: theme.radius,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    alignItems: 'center' as const,
-    minWidth: 90,
+    alignItems: 'center',
+    minWidth: 80,
   },
-  statValue: { fontSize: 22, fontWeight: '700' as const },
+  statValue: { fontSize: 22, fontWeight: '700' },
   statLabel: { color: theme.textDim, fontSize: 11, marginTop: 2 },
 
   // Tab bar
