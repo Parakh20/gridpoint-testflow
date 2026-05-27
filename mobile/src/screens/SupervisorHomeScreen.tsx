@@ -55,6 +55,7 @@ export default function SupervisorHomeScreen() {
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkApproving, setBulkApproving] = useState(false);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -68,7 +69,10 @@ export default function SupervisorHomeScreen() {
     });
   };
 
-  const selectAll = () => setSelectedIds(new Set(pendingTests.map((t) => t.id)));
+  const selectAll = useCallback(
+    () => setSelectedIds(new Set(pendingTests.map((t) => t.id))),
+    [pendingTests]
+  );
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
   const allSelected = pendingTests.length > 0 && selectedIds.size === pendingTests.length;
 
@@ -115,21 +119,21 @@ export default function SupervisorHomeScreen() {
     }
   };
 
-  const [bulkApproving, setBulkApproving] = useState(false);
-
   const handleBulkApprove = async () => {
     const ids = Array.from(selectedIds);
     if (!ids.length) return;
     setBulkApproving(true);
     try {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('test_tasks')
         .update({ status: 'APPROVED', approved_at: new Date().toISOString(), rework_reason: null })
         .in('id', ids)
-        .eq('status', 'SUBMITTED');
+        .eq('status', 'SUBMITTED')
+        .select('id');
       if (error) throw error;
+      const count = updated?.length ?? 0;
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      toast.success(`${ids.length} task${ids.length > 1 ? 's' : ''} approved`);
+      toast.success(`${count} task${count !== 1 ? 's' : ''} approved`);
       clearSelection();
       qc.invalidateQueries({ queryKey: ['pending-reviews', userId] });
       qc.invalidateQueries({ queryKey: ['sup-projects', userId] });
