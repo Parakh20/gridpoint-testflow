@@ -1,4 +1,4 @@
-name: Mobile — Type Check & Bundle
+name: Mobile — Type Check, Bundle & OTA Update
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     paths:
       - 'mobile/src/**'
       - 'mobile/App.tsx'
-      - 'mobile/app.json'
+      - 'mobile/app.config.js'
       - 'mobile/babel.config.js'
       - 'mobile/package.json'
       - 'mobile/package-lock.json'
@@ -51,3 +51,42 @@ jobs:
 
       - name: Metro bundle (iOS)
         run: npx expo export --platform ios --output-dir .expo-ci-export-ios
+
+  ota-update:
+    name: Publish EAS OTA Update
+    needs: check
+    # Only publish on main-branch pushes, not on PRs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish EAS Update
+        run: npx eas-cli update --branch production --message "CI $COMMIT_SHA" --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+
+# ── When to cut a new native build ──────────────────────────────────────────
+# Run `eas build --profile production` manually (from your local machine) when:
+#   - Adding a new Expo/native module (expo-camera, expo-notifications, etc.)
+#   - Bumping version / versionCode / buildNumber in app.config.js
+#   - Changing native config: permissions, deep-link scheme, splash/icon assets
+#
+# CI only publishes OTA (JS) updates. Native builds are intentionally manual.
+# Share the resulting install link (QR code in Expo dashboard) with engineers.
