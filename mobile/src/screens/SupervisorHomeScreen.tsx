@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -66,13 +66,13 @@ export default function SupervisorHomeScreen() {
   };
 
   const selectAll = () => setSelectedIds(new Set(pendingTests.map((t) => t.id)));
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
   const allSelected = pendingTests.length > 0 && selectedIds.size === pendingTests.length;
 
   // Clear stale selections when the pending review list refreshes
   React.useEffect(() => {
-    setSelectedIds(new Set());
-  }, [reviewsQ.dataUpdatedAt]);
+    clearSelection();
+  }, [clearSelection, reviewsQ.dataUpdatedAt]);
 
   const handleApprove = (task: PendingReview) => {
     Alert.alert(
@@ -233,7 +233,7 @@ export default function SupervisorHomeScreen() {
               onRework={() => { setReworkTask(item); setReworkReason(''); }}
               loading={reviewMutation.isPending && reviewMutation.variables?.taskId === item.id}
               selected={selectedIds.has(item.id)}
-              onToggle={() => toggleSelect(item.id)}
+              onToggle={toggleSelect}
             />
           )}
         />
@@ -327,12 +327,12 @@ const ReviewCard = memo(function ReviewCard({
   onRework: () => void;
   loading: boolean;
   selected: boolean;
-  onToggle: () => void;
+  onToggle: (id: string) => void;
 }) {
   return (
     <View style={s.reviewCard}>
       <View style={s.reviewCardTop}>
-        <TouchableOpacity style={s.checkbox} onPress={onToggle} hitSlop={8}>
+        <TouchableOpacity style={s.checkbox} onPress={() => onToggle(task.id)} hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}>
           <View style={[s.checkboxInner, selected && s.checkboxChecked]}>
             {selected && <Text style={s.checkmark}>✓</Text>}
           </View>
