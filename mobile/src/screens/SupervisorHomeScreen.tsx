@@ -57,7 +57,7 @@ export default function SupervisorHomeScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkApproving, setBulkApproving] = useState(false);
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -67,7 +67,7 @@ export default function SupervisorHomeScreen() {
       }
       return next;
     });
-  };
+  }, []); // empty deps: uses functional setState, no external references
 
   const selectAll = useCallback(
     () => setSelectedIds(new Set(pendingTests.map((t) => t.id))),
