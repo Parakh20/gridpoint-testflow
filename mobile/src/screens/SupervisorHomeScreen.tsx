@@ -15,11 +15,13 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useSupProjects, usePendingReviews, useReviewTask, type SupProject, type PendingReview } from '@/hooks/useSupervisor';
 import { theme, statusColor } from '@/theme';
 import { useToast } from '@/components/Toast';
 import { explainSupabaseError } from '@/lib/errors';
+import { supabase } from '@/lib/supabase';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'SupervisorHome'>;
@@ -29,6 +31,7 @@ export default function SupervisorHomeScreen() {
   const nav = useNavigation<Nav>();
   const { userId } = useAuth();
   const toast = useToast();
+  const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('reviews');
 
   const projectsQ = useSupProjects(userId);
@@ -109,6 +112,32 @@ export default function SupervisorHomeScreen() {
       toast.error(explainSupabaseError(e));
     } finally {
       setSubmittingRework(false);
+    }
+  };
+
+  const [bulkApproving, setBulkApproving] = useState(false);
+
+  const handleBulkApprove = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setBulkApproving(true);
+    try {
+      const { error } = await supabase
+        .from('test_tasks')
+        .update({ status: 'APPROVED', approved_at: new Date().toISOString(), rework_reason: null })
+        .in('id', ids)
+        .eq('status', 'SUBMITTED');
+      if (error) throw error;
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      toast.success(`${ids.length} task${ids.length > 1 ? 's' : ''} approved`);
+      clearSelection();
+      qc.invalidateQueries({ queryKey: ['pending-reviews', userId] });
+      qc.invalidateQueries({ queryKey: ['sup-projects', userId] });
+      reviewMutation.reset();
+    } catch (e) {
+      toast.error(explainSupabaseError(e));
+    } finally {
+      setBulkApproving(false);
     }
   };
 
@@ -215,9 +244,32 @@ export default function SupervisorHomeScreen() {
             />
           }
           ListHeaderComponent={
-            reviewsQ.isLoading ? (
-              <View style={s.center}><ActivityIndicator color={theme.primary} /></View>
-            ) : null
+            <>
+              {reviewsQ.isLoading && (
+                <View style={s.center}><ActivityIndicator color={theme.primary} /></View>
+              )}
+              {!reviewsQ.isLoading && selectedIds.size > 0 && (
+                <View style={s.bulkHeader}>
+                  <TouchableOpacity style={s.checkbox} onPress={allSelected ? clearSelection : selectAll} hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}>
+                    <View style={[s.checkboxInner, allSelected && s.checkboxChecked]}>
+                      {allSelected && <Text style={s.checkmark}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+                  <Text style={s.bulkCount}>{selectedIds.size} selected</Text>
+                  <TouchableOpacity
+                    style={[s.bulkApproveBtn, bulkApproving && s.btnDisabled]}
+                    disabled={bulkApproving}
+                    onPress={handleBulkApprove}
+                  >
+                    {bulkApproving ? (
+                      <ActivityIndicator color={theme.primaryText} size="small" />
+                    ) : (
+                      <Text style={s.bulkApproveBtnText}>Approve All</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
           }
           ListEmptyComponent={
             !reviewsQ.isLoading ? (
@@ -458,6 +510,26 @@ const s = StyleSheet.create({
   actionBtnReworkText: { color: theme.text, fontWeight: '600', fontSize: 13 },
   actionBtnApproveText: { color: theme.primaryText, fontWeight: '700', fontSize: 13 },
   btnDisabled: { opacity: 0.5 },
+
+  // Bulk approval header
+  bulkHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.cardAlt,
+    borderRadius: theme.radius,
+    paddingHorizontal: theme.pad,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  bulkCount: { flex: 1, color: theme.text, fontWeight: '600', fontSize: 13 },
+  bulkApproveBtn: {
+    backgroundColor: theme.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  bulkApproveBtnText: { color: theme.primaryText, fontWeight: '700', fontSize: 13 },
 
   // Rework modal
   modalOverlay: {
