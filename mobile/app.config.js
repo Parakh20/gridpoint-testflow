@@ -33,6 +33,7 @@ export default ({ config }) => ({
     supabaseUrl: process.env.SUPABASE_URL ?? '',
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
     realtimeEnabled: false,
+    // Set PLATFORM_ADMIN_PASSWORD + PLATFORM_ADMIN_TOKEN as EAS secrets before running eas build
     platformAdminPassword: process.env.PLATFORM_ADMIN_PASSWORD ?? '',
     platformAdminToken: process.env.PLATFORM_ADMIN_TOKEN ?? '',
     eas: {
