@@ -25,6 +25,8 @@ frontend/dist-ssr
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
+# mobile/.env is intentionally committed — only public values (anon key, URL)
+!mobile/.env
 
 # ── Admin bootstrap credentials (NEVER commit) ───
 admin.env
