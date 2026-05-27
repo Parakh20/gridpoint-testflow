@@ -50,6 +50,30 @@ export default function SupervisorHomeScreen() {
   const [reworkReason, setReworkReason] = useState('');
   const [submittingRework, setSubmittingRework] = useState(false);
 
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedIds(new Set(pendingTests.map((t) => t.id)));
+  const clearSelection = () => setSelectedIds(new Set());
+  const allSelected = pendingTests.length > 0 && selectedIds.size === pendingTests.length;
+
+  // Clear stale selections when the pending review list refreshes
+  React.useEffect(() => {
+    setSelectedIds(new Set());
+  }, [reviewsQ.dataUpdatedAt]);
+
   const handleApprove = (task: PendingReview) => {
     Alert.alert(
       'Approve test?',
@@ -208,6 +232,8 @@ export default function SupervisorHomeScreen() {
               onApprove={() => handleApprove(item)}
               onRework={() => { setReworkTask(item); setReworkReason(''); }}
               loading={reviewMutation.isPending && reviewMutation.variables?.taskId === item.id}
+              selected={selectedIds.has(item.id)}
+              onToggle={() => toggleSelect(item.id)}
             />
           )}
         />
@@ -293,19 +319,32 @@ const ReviewCard = memo(function ReviewCard({
   onApprove,
   onRework,
   loading,
+  selected,
+  onToggle,
 }: {
   task: PendingReview;
   onApprove: () => void;
   onRework: () => void;
   loading: boolean;
+  selected: boolean;
+  onToggle: () => void;
 }) {
   return (
     <View style={s.reviewCard}>
-      <Text style={s.reviewProject}>{task.projectNumber}</Text>
-      <Text style={s.reviewTest}>{task.testName}</Text>
-      <Text style={s.reviewInstance}>
-        {task.instanceLabel} · {task.testCode}
-      </Text>
+      <View style={s.reviewCardTop}>
+        <TouchableOpacity style={s.checkbox} onPress={onToggle} hitSlop={8}>
+          <View style={[s.checkboxInner, selected && s.checkboxChecked]}>
+            {selected && <Text style={s.checkmark}>✓</Text>}
+          </View>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={s.reviewProject}>{task.projectNumber}</Text>
+          <Text style={s.reviewTest}>{task.testName}</Text>
+          <Text style={s.reviewInstance}>
+            {task.instanceLabel} · {task.testCode}
+          </Text>
+        </View>
+      </View>
       <View style={s.reviewActions}>
         <TouchableOpacity
           style={[s.actionBtn, s.actionBtnRework, loading && s.btnDisabled]}
@@ -396,6 +435,19 @@ const s = StyleSheet.create({
     marginBottom: 10,
     gap: 4,
   },
+  reviewCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
+  checkbox: { paddingTop: 2 },
+  checkboxInner: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: { backgroundColor: theme.primary, borderColor: theme.primary },
+  checkmark: { color: theme.primaryText, fontSize: 12, fontWeight: '700' },
   reviewProject: { color: theme.primary, fontSize: 11, fontWeight: '700' },
   reviewTest: { color: theme.text, fontWeight: '600', fontSize: 15 },
   reviewInstance: { color: theme.textDim, fontSize: 12 },
