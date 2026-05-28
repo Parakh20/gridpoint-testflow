@@ -102,6 +102,37 @@ export function useReviewTask(userId: string | null) {
       action: 'APPROVED' | 'REWORK';
       reason?: string;
     }) => {
+      if (!userId) throw new Error('Not authenticated');
+
+      // Ownership pre-flight: confirm the task belongs to a project assigned
+      // to this supervisor. This mirrors the RLS policy and provides a clear
+      // error before hitting the DB update. Two steps because PostgREST nested
+      // column filters on deeply-joined tables are not reliable in the JS client.
+
+      // Step 1: resolve the project that owns this task
+      const { data: taskRow, error: taskErr } = await supabase
+        .from('test_tasks')
+        .select('id, equipment_instance_id, equipment_instances!inner(project_id)')
+        .eq('id', taskId)
+        .eq('status', 'SUBMITTED')
+        .maybeSingle();
+      if (taskErr) throw taskErr;
+      if (!taskRow) throw new Error('Task not found or no longer in SUBMITTED status');
+
+      const projectId = (taskRow as any).equipment_instances?.project_id as string | undefined;
+      if (!projectId) throw new Error('Could not determine project for this task');
+
+      // Step 2: verify this supervisor owns the project
+      const { data: projectRow, error: projErr } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('id', projectId)
+        .eq('assigned_to', userId)
+        .maybeSingle();
+      if (projErr) throw projErr;
+      if (!projectRow) throw new Error('Not authorised: this task belongs to another supervisor\'s project');
+
+      // Ownership confirmed — perform the review action
       const update: Record<string, any> =
         action === 'APPROVED'
           ? { status: 'APPROVED', approved_at: new Date().toISOString(), rework_reason: null }
