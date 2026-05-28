@@ -15,6 +15,16 @@ import EquipmentDetailScreen from '@/screens/EquipmentDetailScreen';
 import TestFormScreen from '@/screens/TestFormScreen';
 // GM
 import GMProjectsScreen from '@/screens/GMProjectsScreen';
+// GM / SUPERADMIN screens
+import CreateProjectScreen from '@/screens/CreateProjectScreen';
+import EditProjectScreen from '@/screens/EditProjectScreen';
+import ScopeManagementScreen from '@/screens/ScopeManagementScreen';
+import AssignSupervisorScreen from '@/screens/AssignSupervisorScreen';
+import EngineerAssignmentScreen from '@/screens/EngineerAssignmentScreen';
+// SUPERADMIN only
+import UserManagementScreen from '@/screens/UserManagementScreen';
+import CreateUserScreen from '@/screens/CreateUserScreen';
+import UserDetailScreen from '@/screens/UserDetailScreen';
 // Supervisor
 import SupervisorHomeScreen from '@/screens/SupervisorHomeScreen';
 // Shared
@@ -106,6 +116,22 @@ export default function RootNavigator() {
           <>
             <Stack.Screen name="GMProjects" component={GMProjectsScreen}
               options={{ title: role === 'SUPERADMIN' ? 'All Projects (Admin)' : 'All Projects' }} />
+            <Stack.Screen name="CreateProject" component={CreateProjectScreen}
+              options={{ title: 'New Project' }} />
+            <Stack.Screen name="EditProject" component={EditProjectScreen}
+              options={({ route }) => ({ title: `Edit ${route.params.projectNumber}` })} />
+            <Stack.Screen name="ScopeManagement" component={ScopeManagementScreen}
+              options={({ route }) => ({ title: `Scope — ${route.params.projectNumber}` })} />
+            <Stack.Screen name="AssignSupervisor" component={AssignSupervisorScreen}
+              options={{ title: 'Assign Supervisor' }} />
+            <Stack.Screen name="EngineerAssignment" component={EngineerAssignmentScreen}
+              options={{ title: 'Assign Engineers' }} />
+            <Stack.Screen name="UserManagement" component={UserManagementScreen}
+              options={{ title: 'Users' }} />
+            <Stack.Screen name="CreateUser" component={CreateUserScreen}
+              options={{ title: 'Add User' }} />
+            <Stack.Screen name="UserDetail" component={UserDetailScreen}
+              options={({ route }) => ({ title: route.params.userName })} />
             <Stack.Screen name="ProjectOverview" component={ProjectOverviewScreen}
               options={({ route }) => ({ title: route.params.projectNumber })} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
@@ -114,6 +140,8 @@ export default function RootNavigator() {
         ) : role === 'SUPERVISOR' ? (
           <>
             <Stack.Screen name="SupervisorHome" component={SupervisorHomeScreen} options={{ title: 'Supervisor' }} />
+            <Stack.Screen name="EngineerAssignment" component={EngineerAssignmentScreen}
+              options={{ title: 'Assign Engineers' }} />
             <Stack.Screen name="ProjectOverview" component={ProjectOverviewScreen}
               options={({ route }) => ({ title: route.params.projectNumber })} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />

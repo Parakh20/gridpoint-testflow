@@ -5,15 +5,19 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
-import { useRoute, type RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 import { theme, statusColor } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 
 type R = RouteProp<RootStackParamList, 'ProjectOverview'>;
+type Nav = NativeStackNavigationProp<RootStackParamList, 'ProjectOverview'>;
 
 type InstanceSummary = {
   id: string;
@@ -84,6 +88,8 @@ function fmt(d: string | null) {
 
 export default function ProjectOverviewScreen() {
   const { params } = useRoute<R>();
+  const nav = useNavigation<Nav>();
+  const { role } = useAuth();
   const q = useQuery({
     queryKey: ['project-overview', params.projectId],
     queryFn: () => fetchProjectDetail(params.projectId),
@@ -136,6 +142,33 @@ export default function ProjectOverviewScreen() {
         </View>
       </View>
 
+      {/* Action buttons — role gated */}
+      {(role === 'GM' || role === 'SUPERADMIN' || role === 'SUPERVISOR') && (
+        <View style={s.actionsRow}>
+          {(role === 'GM' || role === 'SUPERADMIN') && (
+            <>
+              <ActionButton
+                label="Edit Project"
+                onPress={() => nav.navigate('EditProject', { projectId: params.projectId, projectNumber: params.projectNumber })}
+              />
+              <ActionButton
+                label="Manage Scope"
+                onPress={() => nav.navigate('ScopeManagement', { projectId: params.projectId, projectNumber: params.projectNumber })}
+                disabled={data.status === 'CLOSED'}
+              />
+              <ActionButton
+                label="Assign Supervisor"
+                onPress={() => nav.navigate('AssignSupervisor', { projectId: params.projectId, projectNumber: params.projectNumber })}
+              />
+            </>
+          )}
+          <ActionButton
+            label="Assign Engineers"
+            onPress={() => nav.navigate('EngineerAssignment', { projectId: params.projectId, projectNumber: params.projectNumber })}
+          />
+        </View>
+      )}
+
       {/* Overall progress */}
       <View style={s.progressCard}>
         <View style={s.progressRow}>
@@ -181,6 +214,18 @@ export default function ProjectOverviewScreen() {
         })
       )}
     </ScrollView>
+  );
+}
+
+function ActionButton({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <TouchableOpacity
+      style={[s.actionBtn, disabled && s.actionBtnDisabled]}
+      onPress={onPress}
+      disabled={disabled}
+    >
+      <Text style={s.actionBtnText}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -239,4 +284,15 @@ const s = StyleSheet.create({
   instPct: { fontSize: 16, fontWeight: '700' },
   instCount: { color: theme.textDim, fontSize: 11, marginTop: 1 },
   emptyText: { color: theme.textDim },
+  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  actionBtn: {
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  actionBtnDisabled: { opacity: 0.35 },
+  actionBtnText: { color: theme.primary, fontWeight: '600', fontSize: 13 },
 });

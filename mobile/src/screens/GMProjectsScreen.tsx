@@ -28,7 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function GMProjectsScreen() {
   const nav = useNavigation<Nav>();
-  const { profile } = useAuth();
+  const { profile, role } = useAuth();
   const q = useGMProjects();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string>('ALL');
@@ -43,12 +43,22 @@ export default function GMProjectsScreen() {
   useLayoutEffect(() => {
     nav.setOptions({
       headerRight: () => (
-        <TouchableOpacity onPress={() => nav.navigate('Profile')} style={s.avatar}>
-          <Text style={s.avatarText}>{initials}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {role === 'SUPERADMIN' && (
+            <TouchableOpacity
+              onPress={() => nav.navigate('UserManagement')}
+              style={s.headerIcon}
+            >
+              <Text style={s.headerIconText}>👥</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => nav.navigate('Profile')} style={s.avatar}>
+            <Text style={s.avatarText}>{initials}</Text>
+          </TouchableOpacity>
+        </View>
       ),
     });
-  }, [nav, initials]);
+  }, [nav, initials, role]);
 
   const projects = q.data ?? [];
 
@@ -156,6 +166,11 @@ export default function GMProjectsScreen() {
           />
         )}
       />
+
+      {/* FAB — create new project */}
+      <TouchableOpacity style={s.fab} onPress={() => nav.navigate('CreateProject')}>
+        <Text style={s.fabText}>+</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -258,4 +273,32 @@ const s = StyleSheet.create({
     marginRight: 4,
   },
   avatarText: { color: theme.primary, fontWeight: '800', fontSize: 13 },
+  headerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIconText: { fontSize: 16 },
+  fab: {
+    position: 'absolute',
+    bottom: 28,
+    right: 20,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: theme.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  fabText: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 32 },
 });
