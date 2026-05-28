@@ -244,6 +244,6 @@ UserDetail: { userId: string; userName: string };
 - All new hooks in `src/hooks/` following existing `useGMProjects.ts` / `useSupervisor.ts` patterns
 - Query keys: `['company-users']`, `['company-supervisors']`, `['company-engineers']`, `['scope-items', projectId]`, `['project-instances', projectId]`
 - All screens follow `StyleSheet.create` pattern with `theme.*` tokens — no inline style objects
-- Date pickers: use `@react-native-community/datetimepicker` (already a transitive dep via expo)
+- Date inputs: plain `TextInput` with `YYYY-MM-DD` format + regex validation (no native date picker — keeps OTA-compatible; no new native modules needed)
 - No new native modules — OTA-compatible
 - Invalidation: mutations invalidate relevant query keys on success
