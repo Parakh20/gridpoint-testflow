@@ -444,7 +444,7 @@ function buildEquipmentSheet(wb: ExcelJS.Workbook, eq: ReportExportEquipment, sh
   }
 
   // Freeze top 2 rows (title + first nameplate header)
-  ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft' }];
+  ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1, topLeftCell: 'A2' }];
 }
 
 // ─── Main export function ─────────────────────────────────────────────────────
@@ -619,7 +619,7 @@ export async function exportReportExcel(
   // ── Sheet settings ──────────────────────────────────────────────────────────
 
   // Freeze top 6 rows
-  ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 6, topLeftCell: 'A7', activePane: 'bottomLeft' }];
+  ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 6, topLeftCell: 'A7' }];
 
   // Auto-filter on the first column header row (row 6)
   ws.autoFilter = {

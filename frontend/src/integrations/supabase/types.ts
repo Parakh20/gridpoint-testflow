@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -20,6 +20,7 @@ export type Database = {
           actor_id: string | null
           after_data: Json | null
           before_data: Json | null
+          company_id: string | null
           created_at: string
           entity_id: string
           entity_type: string
@@ -30,6 +31,7 @@ export type Database = {
           actor_id?: string | null
           after_data?: Json | null
           before_data?: Json | null
+          company_id?: string | null
           created_at?: string
           entity_id: string
           entity_type: string
@@ -40,10 +42,88 @@ export type Database = {
           actor_id?: string | null
           after_data?: Json | null
           before_data?: Json | null
+          company_id?: string | null
           created_at?: string
           entity_id?: string
           entity_type?: string
           id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          allowed_domains: string[]
+          created_at: string
+          features: Json
+          id: string
+          is_active: boolean
+          name: string
+          oauth_provisioning: string
+          slug: string
+          trial_ends_at: string | null
+        }
+        Insert: {
+          allowed_domains?: string[]
+          created_at?: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name: string
+          oauth_provisioning?: string
+          slug: string
+          trial_ends_at?: string | null
+        }
+        Update: {
+          allowed_domains?: string[]
+          created_at?: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name?: string
+          oauth_provisioning?: string
+          slug?: string
+          trial_ends_at?: string | null
+        }
+        Relationships: []
+      }
+      demo_requests: {
+        Row: {
+          company: string
+          created_at: string
+          email: string
+          id: string
+          message: string | null
+          name: string
+          phone: string | null
+          source: string | null
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          email: string
+          id?: string
+          message?: string | null
+          name: string
+          phone?: string | null
+          source?: string | null
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string | null
+          name?: string
+          phone?: string | null
+          source?: string | null
         }
         Relationships: []
       }
@@ -51,9 +131,11 @@ export type Database = {
         Row: {
           assigned_to: string | null
           created_at: string
+          deleted_at: string | null
           equipment_type: Database["public"]["Enums"]["equipment_type"]
           id: string
           label: string
+          nameplate: Json
           project_id: string
           scope_item_id: string
           seq_number: number
@@ -63,9 +145,11 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           created_at?: string
+          deleted_at?: string | null
           equipment_type: Database["public"]["Enums"]["equipment_type"]
           id?: string
           label: string
+          nameplate?: Json
           project_id: string
           scope_item_id: string
           seq_number: number
@@ -75,9 +159,11 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           created_at?: string
+          deleted_at?: string | null
           equipment_type?: Database["public"]["Enums"]["equipment_type"]
           id?: string
           label?: string
+          nameplate?: Json
           project_id?: string
           scope_item_id?: string
           seq_number?: number
@@ -97,6 +183,53 @@ export type Database = {
             columns: ["scope_item_id"]
             isOneToOne: false
             referencedRelation: "scope_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instruments: {
+        Row: {
+          calibration_due_at: string | null
+          company_id: string | null
+          created_at: string
+          id: string
+          last_calibrated_at: string | null
+          make: string | null
+          model: string | null
+          owned_by: string | null
+          serial_number: string
+          type: string
+        }
+        Insert: {
+          calibration_due_at?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          last_calibrated_at?: string | null
+          make?: string | null
+          model?: string | null
+          owned_by?: string | null
+          serial_number: string
+          type: string
+        }
+        Update: {
+          calibration_due_at?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          last_calibrated_at?: string | null
+          make?: string | null
+          model?: string | null
+          owned_by?: string | null
+          serial_number?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instruments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -141,30 +274,44 @@ export type Database = {
       }
       profiles: {
         Row: {
+          company_id: string | null
           created_at: string
           email: string
           id: string
           is_active: boolean
           name: string
+          oauth_pending: boolean
           updated_at: string
         }
         Insert: {
+          company_id?: string | null
           created_at?: string
           email: string
           id: string
           is_active?: boolean
           name: string
+          oauth_pending?: boolean
           updated_at?: string
         }
         Update: {
+          company_id?: string | null
           created_at?: string
           email?: string
           id?: string
           is_active?: boolean
           name?: string
+          oauth_pending?: boolean
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_test_scope: {
         Row: {
@@ -210,12 +357,16 @@ export type Database = {
       }
       projects: {
         Row: {
+          ai_report_generated_at: string | null
+          ai_report_generating_at: string | null
           approved_at: string | null
           approved_by: string | null
           assigned_to: string | null
           client: string | null
+          company_id: string | null
           created_at: string
           created_by: string
+          deleted_at: string | null
           end_date: string | null
           id: string
           project_number: string
@@ -226,12 +377,16 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_report_generated_at?: string | null
+          ai_report_generating_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
           assigned_to?: string | null
           client?: string | null
+          company_id?: string | null
           created_at?: string
           created_by: string
+          deleted_at?: string | null
           end_date?: string | null
           id?: string
           project_number: string
@@ -242,12 +397,16 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_report_generated_at?: string | null
+          ai_report_generating_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
           assigned_to?: string | null
           client?: string | null
+          company_id?: string | null
           created_at?: string
           created_by?: string
+          deleted_at?: string | null
           end_date?: string | null
           id?: string
           project_number?: string
@@ -265,7 +424,32 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      rate_limits: {
+        Row: {
+          bucket_key: string
+          count: number
+          window_start: string
+        }
+        Insert: {
+          bucket_key: string
+          count?: number
+          window_start: string
+        }
+        Update: {
+          bucket_key?: string
+          count?: number
+          window_start?: string
+        }
+        Relationships: []
       }
       scope_items: {
         Row: {
@@ -302,6 +486,65 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          cancel_at: string | null
+          company_id: string
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_id: string | null
+          provider: string
+          provider_customer_id: string | null
+          provider_subscription_id: string | null
+          raw_provider_payload: Json | null
+          seat_count: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cancel_at?: string | null
+          company_id: string
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id?: string | null
+          provider?: string
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
+          raw_provider_payload?: Json | null
+          seat_count?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cancel_at?: string | null
+          company_id?: string
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id?: string | null
+          provider?: string
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
+          raw_provider_payload?: Json | null
+          seat_count?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supervisor_assignments: {
         Row: {
           created_at: string
@@ -331,6 +574,7 @@ export type Database = {
           ambient: Json | null
           created_at: string
           created_by: string
+          deleted_at: string | null
           id: string
           instrument_id: string | null
           pass_fail: string | null
@@ -343,6 +587,7 @@ export type Database = {
           ambient?: Json | null
           created_at?: string
           created_by: string
+          deleted_at?: string | null
           id?: string
           instrument_id?: string | null
           pass_fail?: string | null
@@ -355,6 +600,7 @@ export type Database = {
           ambient?: Json | null
           created_at?: string
           created_by?: string
+          deleted_at?: string | null
           id?: string
           instrument_id?: string | null
           pass_fail?: string | null
@@ -367,7 +613,7 @@ export type Database = {
           {
             foreignKeyName: "test_records_test_task_id_fkey"
             columns: ["test_task_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "test_tasks"
             referencedColumns: ["id"]
           },
@@ -468,30 +714,60 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          company_id: string | null
           created_at: string
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
+          company_id?: string | null
           created_at?: string
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
+          company_id?: string | null
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      approve_oauth_user: {
+        Args: { _role?: string; _user_id: string }
+        Returns: undefined
+      }
+      claim_ai_report_lock: { Args: { _project_id: string }; Returns: boolean }
+      clone_project: {
+        Args: {
+          _new_project_number: string
+          _new_site_address: string
+          _new_site_name: string
+          _source_project_id: string
+        }
+        Returns: string
+      }
+      generate_project_equipment: {
+        Args: { _project_id: string }
+        Returns: Json
+      }
+      has_feature: { Args: { _flag: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -499,6 +775,49 @@ export type Database = {
         }
         Returns: boolean
       }
+      my_company_id: { Args: never; Returns: string }
+      offboard_user: {
+        Args: { _from_user: string; _to_user: string }
+        Returns: Json
+      }
+      rate_limit_check: {
+        Args: { _key: string; _limit: number; _window_minutes: number }
+        Returns: boolean
+      }
+      rate_limit_gc: { Args: never; Returns: undefined }
+      reject_oauth_user: { Args: { _user_id: string }; Returns: undefined }
+      release_ai_report_lock: {
+        Args: { _project_id: string; _success: boolean }
+        Returns: undefined
+      }
+      restore_project: { Args: { _project_id: string }; Returns: Json }
+      set_company_active: {
+        Args: { p_company_id: string; p_is_active: boolean }
+        Returns: undefined
+      }
+      set_company_oauth_config: {
+        Args: {
+          _allowed_domains: string[]
+          _company_id: string
+          _oauth_provisioning: string
+        }
+        Returns: undefined
+      }
+      upsert_subscription: {
+        Args: {
+          _company_id: string
+          _period_end: string
+          _period_start: string
+          _plan_id: string
+          _provider_cust_id: string
+          _provider_sub_id: string
+          _raw: Json
+          _seat_count: number
+          _status: string
+        }
+        Returns: string
+      }
+      user_workload_summary: { Args: { _user_id: string }; Returns: Json }
     }
     Enums: {
       app_role: "SUPERADMIN" | "GM" | "SUPERVISOR" | "ENGINEER"

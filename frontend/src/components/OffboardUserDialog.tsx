@@ -55,7 +55,7 @@ export function OffboardUserDialog({ open, onOpenChange, user, onSuccess }: Offb
       if (!user) return null;
       const { data, error } = await supabase.rpc('user_workload_summary', { _user_id: user.id });
       if (error) throw error;
-      return data as Workload;
+      return data as unknown as Workload;
     },
     enabled: !!user && open,
   });

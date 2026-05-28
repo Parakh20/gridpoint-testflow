@@ -131,7 +131,7 @@ export function ProjectTestsTab({ projectId, onAllApproved }: ProjectTestsTabPro
           ? { status: 'APPROVED', approved_at: new Date().toISOString(), rework_reason: null }
           : { status: 'REWORK', approved_at: null, rework_reason: reason || null };
 
-      const { error } = await supabase.from('test_tasks').update(update).eq('id', task.id);
+      const { error } = await supabase.from('test_tasks').update(update as any).eq('id', task.id);
       if (error) throw error;
 
       if (task.equipment_instance?.id) {

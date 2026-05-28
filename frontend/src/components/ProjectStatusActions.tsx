@@ -96,7 +96,7 @@ export function ProjectStatusActions({ project, onStatusChange, onOptimisticUpda
         .from('projects')
         .update({ status: newStatus as any, ...additionalFields })
         .eq('id', project.id)
-        .eq('status', project.status)
+        .eq('status', project.status as any)
         .select('id');
 
       if (error) throw error;

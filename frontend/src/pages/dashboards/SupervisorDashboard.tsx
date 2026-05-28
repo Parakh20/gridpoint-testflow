@@ -153,7 +153,7 @@ export default function SupervisorDashboard() {
 
       const { error } = await supabase
         .from('test_tasks')
-        .update(update)
+        .update(update as any)
         .eq('id', task.id);
 
       if (error) throw error;

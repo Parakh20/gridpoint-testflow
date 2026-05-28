@@ -17,7 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
-import { NAMEPLATE_FIELDS } from '@/lib/nameplateFields';
+import { NAMEPLATE_FIELDS, NameplateFieldDef } from '@/lib/nameplateFields';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -188,7 +188,7 @@ export default function EngineerProjectDetail() {
     [tasks, selectedInstanceId]
   );
 
-  const nameplateFields: NameplateField[] = selectedInstance
+  const nameplateFields: NameplateFieldDef[] = selectedInstance
     ? NAMEPLATE_FIELDS[selectedInstance.equipment_type] ?? []
     : [];
 

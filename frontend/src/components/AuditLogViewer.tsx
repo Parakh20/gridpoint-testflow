@@ -29,10 +29,10 @@ interface AuditRow {
   created_at: string;
   actor_id: string | null;
   action: string;
-  table_name: string;
-  record_id: string;
-  before: Record<string, unknown> | null;
-  after: Record<string, unknown> | null;
+  entity_type: string;
+  entity_id: string;
+  before_data: Record<string, unknown> | null;
+  after_data: Record<string, unknown> | null;
 }
 
 interface ProfileLite {
@@ -53,10 +53,10 @@ export function AuditLogViewer() {
     queryFn: async () => {
       let q = supabase
         .from('audit_logs')
-        .select('id, created_at, actor_id, action, table_name, record_id, before, after')
+        .select('id, created_at, actor_id, action, entity_type, entity_id, before_data, after_data')
         .order('created_at', { ascending: false })
         .limit(500);
-      if (tableFilter !== 'all') q = q.eq('table_name', tableFilter);
+      if (tableFilter !== 'all') q = q.eq('entity_type', tableFilter);
       if (actionFilter !== 'all') q = q.eq('action', actionFilter);
       const { data, error } = await q;
       if (error) throw error;
@@ -86,9 +86,9 @@ export function AuditLogViewer() {
     const q = searchQuery.toLowerCase();
     const actor = l.actor_id ? actorMap[l.actor_id] : null;
     return (
-      l.table_name.toLowerCase().includes(q) ||
+      l.entity_type.toLowerCase().includes(q) ||
       l.action.toLowerCase().includes(q) ||
-      l.record_id.toLowerCase().includes(q) ||
+      l.entity_id.toLowerCase().includes(q) ||
       (actor?.name?.toLowerCase().includes(q) ?? false) ||
       (actor?.email?.toLowerCase().includes(q) ?? false)
     );
@@ -172,8 +172,8 @@ export function AuditLogViewer() {
                           'text-amber-500 font-mono text-xs'
                         }>{log.action}</span>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{log.table_name}</TableCell>
-                      <TableCell className="font-mono text-xs truncate max-w-[200px]">{log.record_id}</TableCell>
+                      <TableCell className="font-mono text-xs">{log.entity_type}</TableCell>
+                      <TableCell className="font-mono text-xs truncate max-w-[200px]">{log.entity_id}</TableCell>
                     </TableRow>
                     {expanded && (
                       <TableRow className="bg-muted/30">
@@ -181,11 +181,11 @@ export function AuditLogViewer() {
                           <div className="grid grid-cols-2 gap-4 p-2 text-xs">
                             <div>
                               <div className="font-semibold mb-1 text-muted-foreground">Before</div>
-                              <pre className="bg-background border rounded p-2 overflow-auto max-h-60">{log.before ? JSON.stringify(log.before, null, 2) : '—'}</pre>
+                              <pre className="bg-background border rounded p-2 overflow-auto max-h-60">{log.before_data ? JSON.stringify(log.before_data, null, 2) : '—'}</pre>
                             </div>
                             <div>
                               <div className="font-semibold mb-1 text-muted-foreground">After</div>
-                              <pre className="bg-background border rounded p-2 overflow-auto max-h-60">{log.after ? JSON.stringify(log.after, null, 2) : '—'}</pre>
+                              <pre className="bg-background border rounded p-2 overflow-auto max-h-60">{log.after_data ? JSON.stringify(log.after_data, null, 2) : '—'}</pre>
                             </div>
                           </div>
                         </TableCell>

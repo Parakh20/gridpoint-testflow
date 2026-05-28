@@ -141,7 +141,7 @@ export default function ReportProjectDetail() {
           record: recordMap[t.id]
             ? { ...recordMap[t.id], payload: (recordMap[t.id].payload as Record<string, any>) || {} }
             : null,
-        }));
+        })) as unknown as ReportTask[];
         setTasks(enriched);
 
         const engineerIds = [...new Set(enriched.map(t => t.assigned_to).filter(Boolean) as string[])];
@@ -265,7 +265,7 @@ export default function ReportProjectDetail() {
           ? { status: 'APPROVED', approved_at: new Date().toISOString(), rework_reason: null }
           : { status: 'REWORK', approved_at: null, rework_reason: reason ?? null };
 
-      const { error } = await supabase.from('test_tasks').update(update).eq('id', task.id);
+      const { error } = await supabase.from('test_tasks').update(update as any).eq('id', task.id);
       if (error) throw error;
 
       setTasks(prev => prev.map(t =>
