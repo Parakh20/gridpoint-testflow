@@ -1,6 +1,10 @@
 \documentclass[12pt,a4paper]{article}
 
-\usepackage[margin=2.5cm]{geometry}
+% ── Engine: pdfLaTeX ─────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm, headheight=15pt]{geometry}
 \usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{longtable}
@@ -8,35 +12,53 @@
 \usepackage{xcolor}
 \usepackage{titlesec}
 \usepackage{enumitem}
-\usepackage{fontenc}
-\usepackage{inputenc}
 \usepackage{microtype}
 \usepackage{parskip}
 \usepackage{fancyhdr}
+\usepackage{newunicodechar}
+\usepackage{amssymb}    % \checkmark
 
-% Colours
+% ── Indian Rupee sign (drawn, pdfLaTeX-compatible) ───────────────────────────
+\newcommand{\Rs}{%
+  \mbox{%
+    \sffamily\bfseries
+    \setbox0=\hbox{R}%
+    R\kern-\wd0
+    \raisebox{0.42em}{\rule{0.55em}{0.07em}}%
+    \kern-\wd0
+    \raisebox{0.25em}{\rule{0.55em}{0.07em}}%
+    \kern\wd0
+  }%
+}
+\newunicodechar{₹}{\texorpdfstring{\Rs}{Rs.}}
+
+% ── Colours ──────────────────────────────────────────────────────────────────
 \definecolor{accent}{RGB}{30, 80, 160}
-\definecolor{milestonegreen}{RGB}{34, 139, 34}
-\definecolor{tablegray}{RGB}{245, 245, 245}
+\definecolor{mgreen}{RGB}{34, 139, 34}
 
-% Section formatting
+% ── Section formatting ───────────────────────────────────────────────────────
 \titleformat{\section}{\large\bfseries\color{accent}}{}{0em}{}[\titlerule]
 \titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
 
-% Header / footer
+% ── Header / footer ──────────────────────────────────────────────────────────
 \pagestyle{fancy}
 \fancyhf{}
-\rhead{\textcolor{gray}{\small TestFlow — Pricing Financial Plan}}
+\rhead{\textcolor{gray}{\small TestFlow --- Pricing Financial Plan}}
 \lhead{\textcolor{gray}{\small 2026-05-28}}
 \rfoot{\textcolor{gray}{\small Page \thepage}}
 \renewcommand{\headrulewidth}{0.4pt}
 
-% Table column types
+% ── Column types ─────────────────────────────────────────────────────────────
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 \newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
-\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
 
+% ── Helpers ──────────────────────────────────────────────────────────────────
+\newcommand{\tild}{\raisebox{0.17ex}{$\scriptstyle\sim$}}
+\newcommand{\milestone}[1]{\textcolor{mgreen}{\textbf{#1}}}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \begin{document}
+% ─────────────────────────────────────────────────────────────────────────────
 
 % ── Title block ──────────────────────────────────────────────────────────────
 \begin{center}
@@ -56,97 +78,104 @@
 % ── Overview ─────────────────────────────────────────────────────────────────
 \section{Overview}
 
-This document models unit economics, infrastructure costs, break-even thresholds, and 36-month ARR scenarios for TestFlow (Optimus Testing). It is the financial companion to the pricing strategy in \texttt{PRICING.md}. Numbers should be reviewed every quarter and updated when actuals become available.
+This document models unit economics, infrastructure costs, break-even thresholds,
+and 36-month ARR scenarios for TestFlow (Optimus Testing). It is the financial
+companion to the pricing strategy in \texttt{PRICING.md}. Numbers should be
+reviewed every quarter and updated when actuals become available.
 
 \textbf{Pricing model recap:} Per-workspace flat annual fee.
 \begin{itemize}[noitemsep]
-  \item Team --- \rupee2,40,000/year
-  \item Business --- \rupee6,00,000/year
+  \item Team --- ₹2,40,000/year
+  \item Business --- ₹6,00,000/year
   \item Enterprise --- custom
 \end{itemize}
 No per-user or per-test metering. Annual upfront payment is the default.
 
-\newcommand{\rupee}{\text{\texorpdfstring{₹}{\string₹}}}
-
 % ── Section 1: Cost Baseline ─────────────────────────────────────────────────
 \section{Cost Baseline --- Three Phases}
 
-Costs are structured in phases keyed to customer count, not calendar time. Each phase boundary triggers a meaningful spend jump.
+Costs are structured in phases keyed to customer count, not calendar time.
+Each phase boundary triggers a meaningful spend jump.
 
 \subsection{Phase 0 --- Pre-revenue (current state)}
 
-\begin{tabular}{@{}L{7cm}R{4cm}L{4.5cm}@{}}
+\begin{tabular}{@{}L{6cm}R{3.5cm}L{5cm}@{}}
   \toprule
   \textbf{Line item} & \textbf{Monthly cost} & \textbf{Notes} \\
   \midrule
-  Supabase           & Free tier             & — \\
-  Vercel             & Hobby (free)          & — \\
-  EAS (Expo)         & Free                  & Limited builds \\
-  Email              & Supabase built-in     & Free \\
-  Claude (dev)       & ₹1,700                & Pro plan \\
-  Domain (amortised) & ₹85                   & — \\
-  Sentry             & Free tier             & — \\
+  Supabase           & Free tier    & --- \\
+  Vercel             & Hobby (free) & --- \\
+  EAS (Expo)         & Free         & Limited builds \\
+  Email              & Free         & Supabase built-in SMTP \\
+  Claude (dev)       & ₹1,700       & Pro plan \\
+  Domain (amortised) & ₹85          & --- \\
+  Sentry             & Free         & --- \\
   \midrule
-  \textbf{Total}     & \textbf{{\raise.17ex\hbox{$\scriptstyle\sim$}}₹1,800/mo} & — \\
+  \textbf{Total}     & \textbf{\tild{}₹1,800/mo} & --- \\
   \bottomrule
 \end{tabular}
 
-\subsection{Phase 1 --- First through \texttildelow4 customers}
+\subsection{Phase 1 --- First through \tild{}4 customers}
 
-Infra is upgraded on the day the first payment lands. Treat this as a one-time step-up, not a gradual ramp.
+Infra is upgraded on the day the first payment lands.
+Treat this as a one-time step-up, not a gradual ramp.
 
-\begin{tabular}{@{}L{5.5cm}R{2.8cm}L{6cm}@{}}
+\begin{tabular}{@{}L{5cm}R{3cm}L{7cm}@{}}
   \toprule
   \textbf{Line item} & \textbf{Monthly cost} & \textbf{Notes} \\
   \midrule
-  Supabase Pro          & ₹2,100  & \$25/mo · 8 GB DB, 100 K MAU, daily backups \\
-  Vercel Pro            & ₹1,700  & \$20/mo · commercial domains, more build minutes \\
-  EAS Production        & ₹8,300  & \$99/mo · unlimited builds, OTA updates \\
-  Email                 & ₹0      & Included in Supabase Pro SMTP \\
-  Claude Max 5×         & ₹11,000 & \$100/mo · upgrade from Pro \\
-  Domain (amortised)    & ₹85     & — \\
-  Sentry                & ₹0      & Free tier \\
+  Supabase Pro          & ₹2,100   & \$25/mo $\cdot$ 8\,GB DB, 100\,K MAU, daily backups \\
+  Vercel Pro            & ₹1,700   & \$20/mo $\cdot$ commercial domains, more build minutes \\
+  EAS Production        & ₹8,300   & \$99/mo $\cdot$ unlimited builds, OTA updates \\
+  Email                 & ₹0       & Included in Supabase Pro SMTP \\
+  Claude Max 5\texttimes{}& ₹11,000  & \$100/mo $\cdot$ upgrade from Pro \\
+  Domain (amortised)    & ₹85      & --- \\
+  Sentry                & ₹0       & Free tier \\
   \midrule
-  Subtotal              & ₹23,185 & — \\
-  +10\% misc buffer     & ₹2,315  & Misc SaaS, tooling, Razorpay dashboard \\
+  Subtotal              & ₹23,185  & --- \\
+  +10\% misc buffer     & ₹2,315   & Misc SaaS, tooling, Razorpay dashboard \\
   \midrule
-  \textbf{Phase 1 total} & \textbf{{\raise.17ex\hbox{$\scriptstyle\sim$}}₹25,500/mo} & — \\
+  \textbf{Phase 1 total} & \textbf{\tild{}₹25,500/mo} & --- \\
   \bottomrule
 \end{tabular}
 
 \subsection{Phase 2 --- 4+ customers}
 
-Claude Max upgrade and monitoring tier are the main drivers. Supabase stays on Pro through \texttildelow15 customers; add a compute add-on (\texttildelow₹1,000/mo) at 10+ customers.
+Claude Max upgrade and Sentry Team are the main new drivers.
+Supabase stays on Pro through \tild{}15 customers; add a compute add-on
+(\tild{}₹1,000/mo) around 10+ customers.
 
-\begin{tabular}{@{}L{5.5cm}R{2.8cm}L{6cm}@{}}
+\begin{tabular}{@{}L{5cm}R{3cm}L{7cm}@{}}
   \toprule
   \textbf{Line item} & \textbf{Monthly cost} & \textbf{Notes} \\
   \midrule
-  Supabase Pro          & ₹2,100  & +₹1,000 compute add-on at 10+ customers \\
-  Vercel Pro            & ₹1,700  & — \\
-  EAS Production        & ₹8,300  & — \\
-  Email (Resend paid)   & ₹1,700  & \$20/mo · when invite volume exceeds Supabase SMTP \\
-  Claude Max 20×        & ₹20,000 & \$200/mo · unlocked after 4--5 paying customers \\
-  Domain                & ₹85     & — \\
-  Sentry Team           & ₹2,200  & \$26/mo · required for production error tracking \\
+  Supabase Pro          & ₹2,100   & +₹1,000 compute add-on at 10+ customers \\
+  Vercel Pro            & ₹1,700   & --- \\
+  EAS Production        & ₹8,300   & --- \\
+  Email (Resend paid)   & ₹1,700   & \$20/mo $\cdot$ when invite volume exceeds Supabase SMTP \\
+  Claude Max 20\texttimes{}& ₹20,000  & \$200/mo $\cdot$ unlocked after 4--5 paying customers \\
+  Domain                & ₹85      & --- \\
+  Sentry Team           & ₹2,200   & \$26/mo $\cdot$ production error tracking \\
   \midrule
-  Subtotal              & ₹36,085 & — \\
-  +10\% misc buffer     & ₹3,615  & — \\
+  Subtotal              & ₹36,085  & --- \\
+  +10\% misc buffer     & ₹3,615   & --- \\
   \midrule
-  \textbf{Phase 2 total} & \textbf{{\raise.17ex\hbox{$\scriptstyle\sim$}}₹40,000/mo} & Rises to ₹43,000 with Supabase compute add-on \\
+  \textbf{Phase 2 total} & \textbf{\tild{}₹40,000/mo} & Rises to ₹43,000 with Supabase compute add-on \\
   \bottomrule
 \end{tabular}
 
 \subsection{Phase 3 --- 15+ customers (planning horizon)}
 
-At this scale consider the Supabase Team plan (\$599/mo~$\approx$~₹50,000) for SOC\,2 compliance evidence required by enterprise buyers. First support/sales hire likely needed. Budget ₹80,000--₹1,20,000/mo total opex before payroll.
+At this scale consider the Supabase Team plan (\$599/mo~$\approx$~₹50,000) for
+SOC\,2 compliance evidence required by enterprise buyers. First support/sales
+hire likely needed. Budget ₹80,000--₹1,20,000/mo total opex before payroll.
 
 % ── Section 2: Unit Economics ─────────────────────────────────────────────────
 \section{Unit Economics}
 
 \subsection{Revenue per customer}
 
-\begin{tabular}{@{}L{3.5cm}R{3cm}R{3cm}R{4cm}@{}}
+\begin{tabular}{@{}L{3cm}R{3.2cm}R{3.2cm}R{4.5cm}@{}}
   \toprule
   \textbf{Tier} & \textbf{Annual fee} & \textbf{MRR equiv.} & \textbf{Cash on signing} \\
   \midrule
@@ -157,197 +186,221 @@ At this scale consider the Supabase Team plan (\$599/mo~$\approx$~₹50,000) for
 \end{tabular}
 
 \vspace{0.5em}
-\textbf{Cash timing note:} Payments are annual upfront. A new Team customer means ₹2.4~L cash arrives on day~1 — not ₹20~K/month. The ``MRR equivalent'' column is for ARR tracking only; it is not a cash flow figure.
+\textbf{Cash timing note:} Payments are annual upfront. A new Team customer
+means ₹2.4\,L cash arrives on day~1, not ₹20\,K/month. The ``MRR equivalent''
+column is for ARR tracking only; it is not a cash flow figure.
 
 \subsection{Variable COGS per customer per month (Team tier)}
 
-\begin{tabular}{@{}L{7cm}R{3.5cm}L{4.5cm}@{}}
+\begin{tabular}{@{}L{7cm}R{3cm}L{5cm}@{}}
   \toprule
   \textbf{Cost driver} & \textbf{Per customer/mo} & \textbf{Basis} \\
   \midrule
-  Razorpay 2\% fee (amortised)        & ₹400 & 2\% × ₹2.4~L ÷ 12 \\
-  Supabase incremental (DB, storage)  & ₹200 & Estimated; low at this data volume \\
-  Anthropic API (AI reports)          & ₹0   & PDF export is client-side; no API call \\
-  Email (incremental)                 & ₹0   & Included in flat email plan \\
+  Razorpay 2\% fee (amortised)       & ₹400 & 2\% $\times$ ₹2.4\,L $\div$ 12 \\
+  Supabase incremental (DB, storage) & ₹200 & Estimated; low at this data volume \\
+  Anthropic API (AI reports)         & ₹0   & PDF is client-side React PDF; no API call \\
+  Email (incremental)                & ₹0   & Included in flat email plan \\
   \midrule
-  \textbf{Total variable COGS}        & \textbf{₹600} & Team tier \\
+  \textbf{Total variable COGS}       & \textbf{₹600} & Team tier \\
   \bottomrule
 \end{tabular}
 
 \vspace{0.5em}
-Business and Enterprise tiers carry \texttildelow₹800--1,000/mo variable COGS (higher Razorpay fee on larger contracts, more storage).
+Business and Enterprise tiers carry \tild{}₹800--1,000/mo variable COGS
+(higher Razorpay fee on larger contracts, more storage).
 
 \subsection{Gross margin by tier}
 
-\begin{tabular}{@{}L{3.5cm}R{3cm}R{3cm}R{3cm}@{}}
+\begin{tabular}{@{}L{3.5cm}R{3cm}R{3.5cm}R{3cm}@{}}
   \toprule
   \textbf{Tier} & \textbf{MRR equiv.} & \textbf{Variable COGS} & \textbf{Gross margin} \\
   \midrule
-  Team       & ₹20,000    & ₹600   & \textbf{97.0\%} \\
-  Business   & ₹50,000    & ₹800   & \textbf{98.4\%} \\
-  Enterprise & ₹1,00,000  & ₹1,000 & \textbf{99.0\%} \\
+  Team       & ₹20,000   & ₹600   & \textbf{97.0\%} \\
+  Business   & ₹50,000   & ₹800   & \textbf{98.4\%} \\
+  Enterprise & ₹1,00,000 & ₹1,000 & \textbf{99.0\%} \\
   \bottomrule
 \end{tabular}
 
 \vspace{0.5em}
-These are \emph{contribution margins} — each additional customer's contribution before fixed costs. Fixed costs are covered by the break-even table in Section~\ref{sec:breakeven}.
+These are \emph{contribution margins} --- each additional customer's revenue
+minus variable costs, before fixed costs. Fixed costs are covered in
+Section~\ref{sec:breakeven}.
 
 % ── Section 3: Break-even ─────────────────────────────────────────────────────
 \section{Break-even \& Milestone Table}
 \label{sec:breakeven}
 
-All figures assume Team tier (₹20~K MRR equivalent) for conservatism. Mixed Business/Enterprise deals improve the numbers.
+All figures assume Team tier (₹20\,K MRR equivalent) for conservatism.
+Mixed Business/Enterprise deals improve every number.
 
-\begin{longtable}{@{}R{2.5cm}R{2.8cm}R{2.8cm}R{2.8cm}L{4.5cm}@{}}
+\begin{longtable}{@{}R{2.2cm}R{2.8cm}R{2.8cm}R{3.2cm}L{4.3cm}@{}}
   \toprule
   \textbf{Customers} & \textbf{MRR equiv.} & \textbf{Phase costs} & \textbf{Monthly net} & \textbf{Milestone} \\
   \midrule
   \endfirsthead
+  \multicolumn{5}{l}{\small\textit{(continued from previous page)}} \\[0.3em]
   \toprule
   \textbf{Customers} & \textbf{MRR equiv.} & \textbf{Phase costs} & \textbf{Monthly net} & \textbf{Milestone} \\
   \midrule
   \endhead
-  0  & ₹0          & ₹1,800   & $-$₹1,800             & Pre-revenue baseline \\
-  1  & ₹20,000     & ₹25,500  & $-$₹5,500             & Phase~1 step-up; first month net negative \\
-  2  & ₹40,000     & ₹25,500  & \textcolor{milestonegreen}{+₹14,500}  & \textcolor{milestonegreen}{✓ Default alive} \\
-  3  & ₹60,000     & ₹25,500  & \textcolor{milestonegreen}{+₹34,500}  & Positive cash flow \\
-  5  & ₹1,00,000   & ₹40,000  & \textcolor{milestonegreen}{+₹60,000}  & \textcolor{milestonegreen}{✓ Ramen profitable} \\
-  8  & ₹1,60,000   & ₹40,000  & \textcolor{milestonegreen}{+₹1,20,000} & Solid income, no financial pressure \\
-  10 & ₹2,00,000   & ₹43,000  & \textcolor{milestonegreen}{+₹1,57,000} & \textcolor{milestonegreen}{✓ GST registration threshold} \\
-  15 & ₹3,00,000   & ₹43,000  & \textcolor{milestonegreen}{+₹2,57,000} & ₹36~L ARR --- Year~1 goal \\
-  20 & ₹4,00,000   & ₹48,000  & \textcolor{milestonegreen}{+₹3,52,000} & Strong PMF signal; begin hiring plan \\
-  30 & ₹6,00,000   & ₹55,000  & \textcolor{milestonegreen}{+₹5,45,000} & \textcolor{milestonegreen}{✓ First hire signal} \\
-  50 & ₹10,00,000  & ₹65,000  & \textcolor{milestonegreen}{+₹9,35,000} & ₹1.2~Cr ARR --- pre-seed territory \\
   \bottomrule
+  \endlastfoot
+  0  & ₹0         & ₹1,800  & $-$₹1,800                      & Pre-revenue baseline \\
+  1  & ₹20,000    & ₹25,500 & $-$₹5,500                      & Phase 1 step-up; net negative \\
+  2  & ₹40,000    & ₹25,500 & \milestone{+₹14,500}           & \milestone{$\checkmark$ Default alive} \\
+  3  & ₹60,000    & ₹25,500 & \milestone{+₹34,500}           & Positive cash flow \\
+  5  & ₹1,00,000  & ₹40,000 & \milestone{+₹60,000}           & \milestone{$\checkmark$ Ramen profitable} \\
+  8  & ₹1,60,000  & ₹40,000 & \milestone{+₹1,20,000}         & Solid income \\
+  10 & ₹2,00,000  & ₹43,000 & \milestone{+₹1,57,000}         & \milestone{$\checkmark$ GST threshold (\tild{}₹20\,L ARR)} \\
+  15 & ₹3,00,000  & ₹43,000 & \milestone{+₹2,57,000}         & ₹36\,L ARR --- Year 1 goal \\
+  20 & ₹4,00,000  & ₹48,000 & \milestone{+₹3,52,000}         & Strong PMF; begin hiring plan \\
+  30 & ₹6,00,000  & ₹55,000 & \milestone{+₹5,45,000}         & \milestone{$\checkmark$ First hire signal} \\
+  50 & ₹10,00,000 & ₹65,000 & \milestone{+₹9,35,000}         & ₹1.2\,Cr ARR --- pre-seed territory \\
 \end{longtable}
 
-\textbf{Key insight:} Break-even requires only 2 customers. The business becomes default-alive very quickly. The primary risk is not unit economics --- it is sales cycle length.
+\textbf{Key insight:} Break-even requires only 2 customers. The business becomes
+default-alive very quickly. The primary risk is sales cycle length, not unit
+economics.
 
 % ── Section 4: Scenario Model ─────────────────────────────────────────────────
 \section{Three-Scenario ARR Model (36 months)}
 
 \subsection{Scenario assumptions}
 
-\begin{tabular}{@{}L{5cm}L{3.5cm}L{3.5cm}L{3.5cm}@{}}
+\begin{tabular}{@{}L{4.5cm}L{3.5cm}L{3.5cm}L{3.5cm}@{}}
   \toprule
   & \textbf{Bear} & \textbf{Base} & \textbf{Bull} \\
   \midrule
   Driver
-    & Long enterprise cycles, few pilot conversions
-    & \texttt{PRICING.md} Year~1 goal achieved and continued
-    & Tier~2 buyer mandates TestFlow in contractor RFQs \\[0.5em]
-  Pilot conversion rate & 30\% & 50\% & 70\% \\
-  Avg new customers/mo  & 0.5  & 1.5  & 3.5  \\
-  Annual churn          & 10\% & 5\%  & 3\%  \\
+    & Long enterprise cycles; few pilot conversions
+    & \texttt{PRICING.md} Year 1 goal achieved and continued
+    & Tier 2 buyer mandates TestFlow in contractor RFQs \\[0.4em]
+  Pilot conversion  & 30\%  & 50\%  & 70\%  \\
+  New customers/mo  & 0.5   & 1.5   & 3.5   \\
+  Annual churn      & 10\%  & 5\%   & 3\%   \\
   \bottomrule
 \end{tabular}
 
 \subsection{ARR projection}
 
-\begin{tabular}{@{}R{1.5cm}R{2cm}R{2.5cm}R{2cm}R{2.5cm}R{2cm}R{2.5cm}@{}}
+\begin{tabular}{@{}R{1.5cm}R{1.8cm}R{2.5cm}R{1.8cm}R{2.5cm}R{1.8cm}R{2.5cm}@{}}
   \toprule
   \textbf{Month}
-    & \textbf{Bear} \newline \textbf{cust.}
-    & \textbf{Bear ARR}
-    & \textbf{Base} \newline \textbf{cust.}
-    & \textbf{Base ARR}
-    & \textbf{Bull} \newline \textbf{cust.}
-    & \textbf{Bull ARR} \\
+    & \multicolumn{2}{c}{\textbf{Bear}}
+    & \multicolumn{2}{c}{\textbf{Base}}
+    & \multicolumn{2}{c}{\textbf{Bull}} \\
+  \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+  & \textbf{Cust.} & \textbf{ARR}
+  & \textbf{Cust.} & \textbf{ARR}
+  & \textbf{Cust.} & \textbf{ARR} \\
   \midrule
-  3  & 0  & ₹0      & 1  & ₹2.4~L    & 3  & ₹7.2~L   \\
-  6  & 1  & ₹2.4~L  & 3  & ₹7.2~L    & 6  & ₹14.4~L  \\
-  12 & 3  & ₹7.2~L  & 8  & ₹19.2~L   & 20 & ₹48~L    \\
-  18 & 6  & ₹14.4~L & 15 & ₹36~L     & 35 & ₹84~L    \\
-  24 & 10 & ₹24~L   & 25 & ₹60~L     & 55 & ₹1.32~Cr \\
-  30 & 15 & ₹36~L   & 38 & ₹91.2~L   & 78 & ₹1.87~Cr \\
-  36 & 20 & ₹48~L   & 50 & ₹1.2~Cr   & 100& ₹2.5~Cr  \\
+  3  & 0  & ₹0       & 1  & ₹2.4\,L   & 3   & ₹7.2\,L   \\
+  6  & 1  & ₹2.4\,L  & 3  & ₹7.2\,L   & 6   & ₹14.4\,L  \\
+  12 & 3  & ₹7.2\,L  & 8  & ₹19.2\,L  & 20  & ₹48\,L    \\
+  18 & 6  & ₹14.4\,L & 15 & ₹36\,L    & 35  & ₹84\,L    \\
+  24 & 10 & ₹24\,L   & 25 & ₹60\,L    & 55  & ₹1.32\,Cr \\
+  30 & 15 & ₹36\,L   & 38 & ₹91.2\,L  & 78  & ₹1.87\,Cr \\
+  36 & 20 & ₹48\,L   & 50 & ₹1.2\,Cr  & 100 & ₹2.5\,Cr  \\
   \bottomrule
 \end{tabular}
 
 \subsection{What moves you between scenarios}
 
 \begin{itemize}[noitemsep]
-  \item \textbf{Bear $\to$ Base:} Converting one pilot every 6 weeks instead of every 3 months. Requires a sharper demo and a reference customer to cite.
-  \item \textbf{Base $\to$ Bull:} A single Tier~2 enterprise (e.g.\ Adani, Tata Power) mandates TestFlow in their contractor RFQs. One such win can add 10--20 workspaces at once. This is the asymmetric upside.
+  \item \textbf{Bear $\to$ Base:} Converting one pilot every 6 weeks instead of
+    every 3 months. Requires a sharper demo and a reference customer to cite.
+  \item \textbf{Base $\to$ Bull:} A single Tier 2 enterprise (e.g.\ Adani,
+    Tata Power) mandates TestFlow in contractor RFQs. One such win can add
+    10--20 workspaces at once. This is the asymmetric upside.
 \end{itemize}
 
 % ── Section 5: GST & Tax ─────────────────────────────────────────────────────
 \section{GST \& Tax Notes}
 
 \begin{itemize}[noitemsep]
-  \item \textbf{Registration threshold:} ₹20~L cumulative revenue in a financial year. At Team tier, this is \texttildelow10 customers (10~×~₹2.4~L~=~₹24~L). Register proactively 30 days before crossing this.
-  \item \textbf{GST rate:} 18\% on software/SaaS services. Invoice as ₹2,40,000 + ₹43,200 GST = ₹2,83,200 total. The ₹43,200 is collected and remitted --- it is not your revenue.
-  \item \textbf{Input tax credit (ITC):} Supabase, Vercel, and EAS are billed in USD by US entities and likely carry no ITC. Claude Max billed via Anthropic US --- no ITC. Budget these costs as gross, not net of ITC.
-  \item \textbf{Razorpay GST:} Razorpay's 2\% fee attracts 18\% GST on the fee itself (effective rate: 2.36\%). Adjust cost estimates upward by \texttildelow0.36\% of each transaction value.
+  \item \textbf{Registration threshold:} ₹20\,L cumulative revenue in a
+    financial year. At Team tier, this is \tild{}10 customers
+    (10~$\times$~₹2.4\,L~$=$~₹24\,L). Register proactively 30 days before crossing.
+  \item \textbf{GST rate:} 18\% on software/SaaS services. Invoice as
+    ₹2,40,000 + ₹43,200 GST = ₹2,83,200 total. The ₹43,200 is collected
+    and remitted --- it is not your revenue.
+  \item \textbf{Input tax credit (ITC):} Supabase, Vercel, and EAS are billed
+    by US entities and carry no ITC. Claude Max billed via Anthropic US ---
+    no ITC. Treat these costs as gross.
+  \item \textbf{Razorpay GST:} Razorpay's 2\% fee attracts 18\% GST on the
+    fee itself (effective rate: 2.36\%). Adjust cost estimates upward by
+    \tild{}0.36\% of each transaction value.
 \end{itemize}
 
 % ── Section 6: Key Metrics ────────────────────────────────────────────────────
 \section{Key Metrics to Track Monthly}
 
-\begin{tabular}{@{}L{4.5cm}L{3.5cm}L{7cm}@{}}
+\begin{tabular}{@{}L{4cm}L{3.5cm}L{7.5cm}@{}}
   \toprule
   \textbf{Metric} & \textbf{Target} & \textbf{What it tells you} \\
   \midrule
   ARR per workspace
-    & $\geq$~₹2~L
-    & Discount discipline. Below ₹1.4~L = stop discounting (per \texttt{PRICING.md}). \\[0.4em]
+    & $\geq$\,₹2\,L
+    & Discount discipline. Below ₹1.4\,L = stop discounting (per \texttt{PRICING.md}). \\[0.4em]
   Monthly burn
     & vs.\ phase threshold
-    & Phase~1: ₹25.5~K · Phase~2: ₹40~K. Creep above threshold without customer growth = investigate. \\[0.4em]
+    & Phase 1: ₹25.5\,K $\cdot$ Phase 2: ₹40\,K. Creep above threshold without customer growth = investigate. \\[0.4em]
   Active pilots
-    & $\leq$ 5 at once
-    & Per \texttt{PRICING.md} cap. More than 5 concurrent = distraction. \\[0.4em]
-  Pilot → paid conversion
-    & $\geq$ 50\%
+    & $\leq$\,5 at once
+    & More than 5 concurrent = distraction from real sales. \\[0.4em]
+  Pilot $\to$ paid conversion
+    & $\geq$\,50\%
     & Below 40\% = product/onboarding problem, not a pricing problem. \\[0.4em]
   Net Revenue Retention
-    & $\geq$ 100\%
-    & Track from Year~2. NRR~>~100\% means expansions offset churn. \\[0.4em]
+    & $\geq$\,100\%
+    & Track from Year 2. NRR $>$ 100\% means expansions offset churn. \\[0.4em]
   Cash in bank
-    & $\geq$ 6 months Phase~2 costs
-    & Minimum buffer: 6~×~₹40~K~=~₹2.4~L. One annual signing can refill this immediately. \\
+    & $\geq$\,6 months Phase 2
+    & Minimum buffer: 6~$\times$~₹40\,K~$=$~₹2.4\,L. One annual signing can refill immediately. \\
   \bottomrule
 \end{tabular}
 
 % ── Section 7: Financial Milestones ──────────────────────────────────────────
 \section{Financial Milestones Summary}
 
-\begin{longtable}{@{}L{4.5cm}L{4cm}L{6.5cm}@{}}
+\begin{longtable}{@{}L{4cm}L{4cm}L{7cm}@{}}
   \toprule
   \textbf{Milestone} & \textbf{Trigger} & \textbf{Action} \\
   \midrule
   \endfirsthead
+  \multicolumn{3}{l}{\small\textit{(continued from previous page)}} \\[0.3em]
   \toprule
   \textbf{Milestone} & \textbf{Trigger} & \textbf{Action} \\
   \midrule
   \endhead
-  Upgrade infra        & 1st payment received   & Supabase Pro + Vercel Pro + EAS Production on the same day \\[0.3em]
-  Default alive        & 2nd customer pays      & Business survives indefinitely on current trajectory \\[0.3em]
-  Ramen profitable     & 5th customer pays      & Founder draws ₹60~K/mo personal income \\[0.3em]
-  GST registration     & \texttildelow10th customer or ₹20~L ARR & File 30 days before crossing threshold \\[0.3em]
-  Claude Max 20×       & 4th--5th customer      & Reinvest margin into faster product velocity \\[0.3em]
-  Sentry Team          & 4th--5th customer      & Production error monitoring for enterprise conversations \\[0.3em]
-  First marketing spend & 8th customer          & Budget ₹20~K/mo for LinkedIn Sales Navigator + outreach tooling \\[0.3em]
-  First hire evaluation & 20--25 customers      & Sales + onboarding support; budget ₹80--₹1.2~L/mo \\[0.3em]
-  Pricing review        & 12 months from first paid customer & Raise Team to ₹3~L/yr per \texttt{PRICING.md} Year~2 plan \\
   \bottomrule
+  \endlastfoot
+  Upgrade infra          & 1st payment          & Supabase Pro + Vercel Pro + EAS Production same day \\[0.3em]
+  Default alive          & 2nd customer         & Business survives on current trajectory \\[0.3em]
+  Ramen profitable       & 5th customer         & Founder draws ₹60\,K/mo personal income \\[0.3em]
+  GST registration       & \tild{}10th customer or ₹20\,L ARR & File 30 days before crossing threshold \\[0.3em]
+  Claude Max 20\texttimes{} & 4th--5th customer & Reinvest margin into product velocity \\[0.3em]
+  Sentry Team            & 4th--5th customer    & Production monitoring for enterprise conversations \\[0.3em]
+  First marketing spend  & 8th customer         & ₹20\,K/mo for LinkedIn Sales Navigator + outreach tooling \\[0.3em]
+  First hire evaluation  & 20--25 customers     & Sales + onboarding; budget ₹80\,K--₹1.2\,L/mo \\[0.3em]
+  Pricing review         & 12 months from first paid customer & Raise Team to ₹3\,L/yr per \texttt{PRICING.md} Year 2 plan \\
 \end{longtable}
 
 % ── Appendix ─────────────────────────────────────────────────────────────────
 \appendix
 \section{Infra Upgrade Costs (one-time on first customer)}
 
-\begin{tabular}{@{}L{3.5cm}L{6cm}R{4cm}@{}}
+\begin{tabular}{@{}L{3.2cm}L{6cm}R{4.5cm}@{}}
   \toprule
   \textbf{Item} & \textbf{One-time action} & \textbf{Recurring from that month} \\
   \midrule
-  Supabase      & Upgrade plan in dashboard         & ₹2,100/mo \\
-  Vercel        & Upgrade plan in dashboard         & ₹1,700/mo \\
-  EAS           & Enable Production plan            & ₹8,300/mo \\
-  Claude Max 5× & Change subscription               & ₹11,000/mo \\
-  Email         & Configure Supabase SMTP or Resend & ₹0--₹1,700/mo \\
+  Supabase        & Upgrade plan in dashboard          & ₹2,100/mo \\
+  Vercel          & Upgrade plan in dashboard          & ₹1,700/mo \\
+  EAS             & Enable Production plan             & ₹8,300/mo \\
+  Claude Max 5\texttimes{} & Change subscription       & ₹11,000/mo \\
+  Email           & Configure Supabase SMTP or Resend  & ₹0--₹1,700/mo \\
   \midrule
-  \textbf{Total step-up} & — & \textbf{+₹23,700/mo vs.\ Phase~0} \\
+  \textbf{Total step-up} & --- & \textbf{+₹23,100/mo vs.\ Phase 0} \\
   \bottomrule
 \end{tabular}
 
