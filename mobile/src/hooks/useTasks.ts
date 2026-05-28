@@ -13,6 +13,7 @@ export type TaskRow = {
   templateTab: string;
   equipmentType: string;
   seq: number;
+  instanceId: string;
   instanceLabel: string;
 };
 
@@ -50,6 +51,7 @@ async function fetchTasks(userId: string, projectId: string): Promise<TaskRow[]>
         templateTab: r.test_template.tab,
         equipmentType: eq,
         seq,
+        instanceId: r.equipment_instance.id as string,
         instanceLabel: `${prefix}-${String(seq).padStart(3, '0')}`,
       };
     });

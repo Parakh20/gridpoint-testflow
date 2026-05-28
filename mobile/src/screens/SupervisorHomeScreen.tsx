@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo, useState } from 'react';
+import React, { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -29,7 +29,7 @@ type Tab = 'projects' | 'reviews';
 
 export default function SupervisorHomeScreen() {
   const nav = useNavigation<Nav>();
-  const { userId } = useAuth();
+  const { userId, profile } = useAuth();
   const toast = useToast();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('reviews');
@@ -47,6 +47,23 @@ export default function SupervisorHomeScreen() {
     pendingStart: projects.filter((p) => p.status === 'APPROVED').length,
     pendingReview: pendingTests.length,
   }), [projects, pendingTests]);
+
+  const initials = (profile?.full_name ?? 'U')
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  useLayoutEffect(() => {
+    nav.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={() => nav.navigate('Profile')} style={s.avatar}>
+          <Text style={s.avatarText}>{initials}</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [nav, initials]);
 
   // Rework modal state
   const [reworkTask, setReworkTask] = useState<PendingReview | null>(null);
@@ -578,4 +595,16 @@ const s = StyleSheet.create({
     marginTop: 20,
   },
   allClearText: { color: theme.success, fontWeight: '600', fontSize: 15 },
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+  avatarText: { color: theme.primary, fontWeight: '800', fontSize: 13 },
 });

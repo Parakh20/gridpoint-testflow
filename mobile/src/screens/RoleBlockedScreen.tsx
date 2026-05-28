@@ -9,10 +9,8 @@ export default function RoleBlockedScreen() {
 
   const message =
     role === null
-      ? 'Your account does not have a role assigned yet. Ask your company admin to set you up as an Engineer.'
-      : 'This mobile app is for Field Engineers. Your role is ' +
-        role +
-        ' — please use the web dashboard at testflow.io instead.';
+      ? 'Your account does not have a role assigned yet. Ask your company admin to set you up.'
+      : 'The ' + role + ' role is web-only. Please use the web dashboard at testflow.io instead.';
 
   return (
     <SafeAreaView style={s.root}>

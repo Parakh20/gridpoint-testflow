@@ -1,5 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { AppState, PanResponder, type PanResponderInstance } from 'react-native';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
@@ -29,12 +28,9 @@ type AuthState = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-  touch: () => void;
 };
 
 const AuthCtx = createContext<AuthState | undefined>(undefined);
-
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -43,8 +39,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [oauthPending, setOauthPending] = useState(false);
 
-  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setRole(null);
@@ -52,14 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOauthPending(false);
     setUserContext(null);
   }, []);
-
-  const touch = useCallback(() => {
-    if (idleTimer.current) clearTimeout(idleTimer.current);
-    if (!session) return;
-    idleTimer.current = setTimeout(() => {
-      void signOut();
-    }, IDLE_TIMEOUT_MS);
-  }, [session, signOut]);
 
   const provisionOAuthUser = useCallback(async (accessToken: string, userId: string) => {
     try {
@@ -172,20 +158,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [session?.user?.id, provisionOAuthUser]);
 
-  useEffect(() => {
-    if (!session) {
-      if (idleTimer.current) clearTimeout(idleTimer.current);
-      return;
-    }
-    touch();
-    const appSub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') touch();
-    });
-    return () => {
-      appSub.remove();
-      if (idleTimer.current) clearTimeout(idleTimer.current);
-    };
-  }, [session, touch]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -239,7 +211,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signInWithGoogle,
         signOut,
-        touch,
       }}
     >
       {children}
@@ -253,14 +224,3 @@ export function useAuth() {
   return ctx;
 }
 
-export function useIdleResetResponder(): PanResponderInstance {
-  const { touch } = useAuth();
-  const ref = useRef<PanResponderInstance | null>(null);
-  if (!ref.current) {
-    ref.current = PanResponder.create({
-      onStartShouldSetPanResponderCapture: () => { touch(); return false; },
-      onMoveShouldSetPanResponderCapture: () => { touch(); return false; },
-    });
-  }
-  return ref.current;
-}

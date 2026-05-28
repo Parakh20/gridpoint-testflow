@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -23,8 +23,15 @@ import { useRealtimeChannel, usePollingFallback } from '@/lib/realtime';
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Tasks'>;
 type R = RouteProp<RootStackParamList, 'Tasks'>;
 
-const FILTERS = ['ALL', 'DRAFT', 'IN_PROGRESS', 'REWORK', 'SUBMITTED', 'APPROVED'] as const;
-type Filter = (typeof FILTERS)[number];
+type InstanceGroup = {
+  instanceId: string;
+  instanceLabel: string;
+  equipmentType: string;
+  tasks: TaskRow[];
+  totalCount: number;
+  doneCount: number;
+  hasRework: boolean;
+};
 
 export default function TaskListScreen() {
   const nav = useNavigation<Nav>();
@@ -34,14 +41,10 @@ export default function TaskListScreen() {
   const qc = useQueryClient();
   const q = useTasks(userId, params.projectId);
 
-  const [filter, setFilter] = useState<Filter>('ALL');
-
   useEffect(() => {
     if (q.error) toast.error(explainSupabaseError(q.error));
   }, [q.error, toast]);
 
-  // Realtime: supervisor approving / sending back / re-assigning shows up here
-  // within seconds. Debounced so a burst of changes coalesces.
   const invalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedInvalidate = () => {
     if (invalidateTimer.current) clearTimeout(invalidateTimer.current);
@@ -56,12 +59,7 @@ export default function TaskListScreen() {
       if (!userId) return;
       channel.on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'test_tasks',
-          filter: `assigned_to=eq.${userId}`,
-        },
+        { event: '*', schema: 'public', table: 'test_tasks', filter: `assigned_to=eq.${userId}` },
         debouncedInvalidate
       );
     },
@@ -75,22 +73,38 @@ export default function TaskListScreen() {
 
   const rows = q.data ?? [];
 
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { ALL: rows.length };
-    for (const r of rows) c[r.status] = (c[r.status] ?? 0) + 1;
-    return c;
+  // Group tasks by equipment instance
+  const instanceGroups = useMemo<InstanceGroup[]>(() => {
+    const map = new Map<string, InstanceGroup>();
+    for (const task of rows) {
+      const existing = map.get(task.instanceId);
+      if (existing) {
+        existing.tasks.push(task);
+        existing.totalCount++;
+        if (task.status === 'SUBMITTED' || task.status === 'APPROVED') existing.doneCount++;
+        if (task.status === 'REWORK') existing.hasRework = true;
+      } else {
+        map.set(task.instanceId, {
+          instanceId: task.instanceId,
+          instanceLabel: task.instanceLabel,
+          equipmentType: task.equipmentType,
+          tasks: [task],
+          totalCount: 1,
+          doneCount: task.status === 'SUBMITTED' || task.status === 'APPROVED' ? 1 : 0,
+          hasRework: task.status === 'REWORK',
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.instanceLabel.localeCompare(b.instanceLabel)
+    );
   }, [rows]);
 
-  const progress = useMemo(() => {
+  const overallProgress = useMemo(() => {
     if (rows.length === 0) return 0;
-    const done = rows.filter((r) => r.status === 'APPROVED' || r.status === 'SUBMITTED').length;
+    const done = rows.filter((r) => r.status === 'SUBMITTED' || r.status === 'APPROVED').length;
     return Math.round((done / rows.length) * 100);
   }, [rows]);
-
-  const visible = useMemo(
-    () => (filter === 'ALL' ? rows : rows.filter((r) => r.status === filter)),
-    [rows, filter]
-  );
 
   if (q.isLoading) {
     return (
@@ -104,42 +118,20 @@ export default function TaskListScreen() {
     <View style={s.root}>
       <View style={s.header}>
         <Text style={s.title}>{params.projectNumber}</Text>
-        <Text style={s.subtitle}>{rows.length} tests assigned to you</Text>
+        <Text style={s.subtitle}>
+          {instanceGroups.length} equipment unit{instanceGroups.length !== 1 ? 's' : ''} ·{' '}
+          {rows.length} tests assigned
+        </Text>
         <View style={s.progressTrack}>
-          <View style={[s.progressFill, { width: `${progress}%` }]} />
+          <View style={[s.progressFill, { width: `${overallProgress}%` as any }]} />
         </View>
-        <Text style={s.progressLabel}>{progress}% submitted or approved</Text>
-      </View>
-
-      <View style={s.filterBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {FILTERS.map((f) => {
-            const active = filter === f;
-            return (
-              <TouchableOpacity
-                key={f}
-                style={[s.chip, active && s.chipActive]}
-                onPress={() => setFilter(f)}
-              >
-                <Text style={[s.chipText, active && s.chipTextActive]}>
-                  {f.replace('_', ' ')}
-                  {counts[f] ? ` · ${counts[f]}` : ''}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <Text style={s.progressLabel}>{overallProgress}% submitted or approved</Text>
       </View>
 
       <FlatList
-        data={visible}
-        keyExtractor={taskKey}
-        extraData={filter}
-        initialNumToRender={12}
-        maxToRenderPerBatch={12}
-        windowSize={11}
-        removeClippedSubviews
-        contentContainerStyle={{ padding: theme.pad, paddingTop: 0 }}
+        data={instanceGroups}
+        keyExtractor={(g) => g.instanceId}
+        contentContainerStyle={{ padding: theme.pad, paddingTop: 8 }}
         refreshControl={
           <RefreshControl
             refreshing={q.isFetching && !q.isLoading}
@@ -149,20 +141,19 @@ export default function TaskListScreen() {
         }
         ListEmptyComponent={
           <View style={s.empty}>
-            <Text style={s.emptyTitle}>No tasks</Text>
-            <Text style={s.emptyBody}>Nothing matches this filter.</Text>
+            <Text style={s.emptyTitle}>No tasks assigned</Text>
+            <Text style={s.emptyBody}>Your supervisor hasn't assigned any tests yet.</Text>
           </View>
         }
         renderItem={({ item }) => (
-          <TaskRowCard
-            item={item}
+          <InstanceCard
+            group={item}
             onPress={() =>
-              nav.navigate('TestForm', {
-                taskId: item.id,
-                templateId: item.templateId,
+              nav.navigate('EquipmentDetail', {
+                instanceId: item.instanceId,
                 instanceLabel: item.instanceLabel,
-                testName: item.templateName,
-                currentStatus: item.status,
+                equipmentType: item.equipmentType,
+                projectId: params.projectId,
               })
             }
           />
@@ -172,35 +163,44 @@ export default function TaskListScreen() {
   );
 }
 
-const taskKey = (r: TaskRow) => r.id;
-
-const TaskRowCard = memo(function TaskRowCard({
-  item,
+const InstanceCard = memo(function InstanceCard({
+  group,
   onPress,
 }: {
-  item: TaskRow;
+  group: InstanceGroup;
   onPress: () => void;
 }) {
+  const pct = group.totalCount > 0 ? Math.round((group.doneCount / group.totalCount) * 100) : 0;
+  const allDone = group.doneCount === group.totalCount && group.totalCount > 0;
+
   return (
-    <TouchableOpacity activeOpacity={0.7} style={s.card} onPress={onPress}>
-      <View style={s.row}>
-        <Text style={s.label}>{item.instanceLabel}</Text>
-        <View style={[s.badge, { borderColor: statusColor(item.status) }]}>
-          <Text style={[s.badgeText, { color: statusColor(item.status) }]}>
-            {item.status.replace('_', ' ')}
+    <TouchableOpacity activeOpacity={0.75} style={s.card} onPress={onPress}>
+      <View style={s.cardRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.cardLabel}>{group.instanceLabel}</Text>
+          <Text style={s.cardType}>{group.equipmentType.replace(/_/g, ' ')}</Text>
+        </View>
+        <View style={s.cardRight}>
+          <Text style={[s.pctText, { color: allDone ? theme.success : theme.primary }]}>
+            {pct}%
+          </Text>
+          <Text style={s.countText}>
+            {group.doneCount}/{group.totalCount} tests
           </Text>
         </View>
       </View>
-      <Text style={s.test}>{item.templateName}</Text>
-      <Text style={s.code}>
-        {item.templateCode} · {item.templateTab}
-      </Text>
-      {item.status === 'REWORK' && item.rework_reason ? (
-        <View style={s.reworkBox}>
-          <Text style={s.reworkLabel}>REWORK REASON</Text>
-          <Text style={s.reworkText}>{item.rework_reason}</Text>
+
+      <View style={s.miniTrack}>
+        <View style={[s.miniFill, { width: `${pct}%` as any, backgroundColor: allDone ? theme.success : theme.primary }]} />
+      </View>
+
+      {group.hasRework && (
+        <View style={s.reworkPill}>
+          <Text style={s.reworkPillText}>REWORK REQUIRED</Text>
         </View>
-      ) : null}
+      )}
+
+      <Text style={s.chevron}>›</Text>
     </TouchableOpacity>
   );
 });
@@ -210,28 +210,10 @@ const s = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   header: { padding: theme.pad, paddingBottom: 8 },
   title: { color: theme.text, fontSize: 22, fontWeight: '700' },
-  subtitle: { color: theme.textDim, marginTop: 2 },
-  progressTrack: {
-    height: 6,
-    backgroundColor: theme.card,
-    borderRadius: 3,
-    marginTop: 12,
-    overflow: 'hidden',
-  },
+  subtitle: { color: theme.textDim, marginTop: 2, fontSize: 13 },
+  progressTrack: { height: 5, backgroundColor: theme.card, borderRadius: 3, marginTop: 12, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: theme.primary },
   progressLabel: { color: theme.textDim, fontSize: 11, marginTop: 4 },
-  filterBar: { paddingLeft: theme.pad, paddingBottom: 10 },
-  chip: {
-    borderWidth: 1,
-    borderColor: theme.border,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginRight: 8,
-  },
-  chipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
-  chipText: { color: theme.textDim, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: theme.primaryText },
   card: {
     backgroundColor: theme.card,
     padding: theme.pad,
@@ -239,24 +221,29 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.border,
     marginBottom: 10,
+    position: 'relative',
   },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label: { color: theme.text, fontWeight: '700', fontSize: 14 },
-  badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  test: { color: theme.text, marginTop: 6, fontSize: 15 },
-  code: { color: theme.textDim, fontSize: 11, marginTop: 2 },
-  reworkBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderLeftWidth: 3,
-    borderLeftColor: theme.danger,
-    padding: 10,
+  cardRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
+  cardLabel: { color: theme.text, fontWeight: '700', fontSize: 16 },
+  cardType: { color: theme.textDim, fontSize: 12, marginTop: 2 },
+  cardRight: { alignItems: 'flex-end' },
+  pctText: { fontSize: 18, fontWeight: '700' },
+  countText: { color: theme.textDim, fontSize: 11, marginTop: 1 },
+  miniTrack: { height: 4, backgroundColor: theme.muted, borderRadius: 2, overflow: 'hidden' },
+  miniFill: { height: '100%', borderRadius: 2 },
+  reworkPill: {
     marginTop: 10,
+    backgroundColor: 'rgba(219, 57, 42, 0.12)',
+    borderWidth: 1,
+    borderColor: theme.danger,
     borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
   },
-  reworkLabel: { color: theme.danger, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  reworkText: { color: theme.text, marginTop: 4, fontSize: 13 },
+  reworkPillText: { color: theme.danger, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  chevron: { position: 'absolute', right: 14, top: '50%', color: theme.textDim, fontSize: 24 },
   empty: { paddingTop: 80, alignItems: 'center' },
   emptyTitle: { color: theme.text, fontSize: 16, fontWeight: '600' },
-  emptyBody: { color: theme.textDim, marginTop: 8 },
+  emptyBody: { color: theme.textDim, marginTop: 8, textAlign: 'center' },
 });

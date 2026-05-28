@@ -27,6 +27,7 @@ import {
   ENGINEER_EDITABLE_TEST_STATUSES,
   type FieldSchema,
 } from '@testflow/shared';
+import { TestFormV2Native, type V2Schema, type V2Section } from '@/components/TestFormV2Native';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'TestForm'>;
 type R = RouteProp<RootStackParamList, 'TestForm'>;
@@ -42,6 +43,7 @@ export default function TestFormScreen() {
   const headerHeight = useHeaderHeight();
 
   const [fields, setFields] = useState<FieldSchema[]>([]);
+  const [v2Sections, setV2Sections] = useState<V2Section[] | null>(null);
   const [values, setValues] = useState<Record<string, any>>({});
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState(params.currentStatus);
@@ -75,7 +77,13 @@ export default function TestFormScreen() {
         if (tplErr) throw tplErr;
         if (recErr) throw recErr;
 
-        setFields(normalizeFields(tpl?.fields));
+        const raw = tpl?.fields;
+        const parsed = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
+        if (parsed?.version === 2 && Array.isArray(parsed?.sections)) {
+          setV2Sections(parsed.sections as V2Section[]);
+        } else {
+          setFields(normalizeFields(raw));
+        }
         if (rec) {
           setRecordId(rec.id);
           setValues((rec.data as Record<string, any>) ?? {});
@@ -106,11 +114,23 @@ export default function TestFormScreen() {
   };
 
   const missing = useMemo(() => {
+    if (v2Sections !== null) {
+      // For V2, check required fields in 'fields'-type sections only.
+      const required: string[] = [];
+      for (const sec of v2Sections) {
+        if (sec.type === 'fields') {
+          for (const f of sec.fields ?? []) {
+            if (f.required) required.push(`${sec.id}__${f.key}`);
+          }
+        }
+      }
+      return required.filter((k) => values[k] === undefined || values[k] === '' || values[k] === null);
+    }
     return fields
       .filter((f) => f.required && f.name)
       .map((f) => f.name!)
       .filter((n) => values[n] === undefined || values[n] === '' || values[n] === null);
-  }, [fields, values]);
+  }, [fields, v2Sections, values]);
 
   const persistRecord = useCallback(
     async (silent: boolean): Promise<{ ok: boolean; recordId: string | null }> => {
@@ -333,7 +353,14 @@ export default function TestFormScreen() {
           )}
         </View>
 
-        {fields.length === 0 ? (
+        {v2Sections !== null ? (
+          <TestFormV2Native
+            sections={v2Sections}
+            formData={values}
+            onChange={setField}
+            isReadonly={readOnly}
+          />
+        ) : fields.length === 0 ? (
           <View style={s.card}>
             <Text style={s.empty}>
               This test template has no structured fields. Use the Notes field below to record
@@ -413,11 +440,8 @@ export default function TestFormScreen() {
                     value={v === undefined || v === null ? '' : String(v)}
                     onChangeText={(t) => {
                       if (f.type === 'number') {
-                        // Strip anything other than digits, single decimal, leading minus.
                         let cleaned = t.replace(/[^0-9.\-]/g, '');
-                        // Keep minus only at start.
                         cleaned = cleaned.replace(/(?!^)-/g, '');
-                        // Allow at most one decimal point.
                         const firstDot = cleaned.indexOf('.');
                         if (firstDot !== -1) {
                           cleaned =
@@ -429,8 +453,6 @@ export default function TestFormScreen() {
                           return;
                         }
                         const num = Number(cleaned);
-                        // Preserve the user's typing state (e.g. trailing dot or zero) by
-                        // storing the string when it isn't yet a clean number, otherwise the number.
                         const looksInProgress = /[.\-]$/.test(cleaned) || /\.0*$/.test(cleaned);
                         setField(f.name!, looksInProgress || Number.isNaN(num) ? cleaned : num);
                       } else {
