@@ -53,3 +53,13 @@ STUDY_GUIDE.md
 # ── Tool runtime state (Claude Code plugins, etc.) ─
 .remember/
 .claude/
+.playwright-mcp/
+.vite/
+
+# ── LaTeX build artifacts ────────────────────────
+*.aux
+*.fls
+*.fdb_latexmk
+*.out
+*.synctex.gz
+texput.log

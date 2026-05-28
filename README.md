@@ -60,21 +60,6 @@ npm run dev   # from root → http://localhost:8080
 
 ---
 
-## Auth Options & Email Rate Limit
-
-Supabase's shared SMTP has a hard rate limit (~2–4 emails/hour on free plan). Google OAuth is already implemented as the primary fix.
-
-| Solution | Cost/month | Status |
-|---|---|---|
-| Google OAuth | $0 | ✅ Implemented — needs Supabase Dashboard config |
-| Resend custom SMTP (free tier) | $0 | 🔲 3,000 emails/month free |
-| Brevo custom SMTP (free tier) | $0 | 🔲 9,000 emails/month free |
-| AWS SES | ~$0.01 | 🔲 $0.10/1k emails |
-
-See [EMAIL_RATE_LIMIT.md](./EMAIL_RATE_LIMIT.md) for setup guides and full provider comparison.
-
----
-
 ## Tech Stack
 
 | Layer | Technology |
@@ -104,12 +89,19 @@ See `.env.example` for full details and where to get each key.
 
 ## Documentation
 
+**Developer reference**
 | File | Contents |
 |---|---|
-| [CLAUDE.md](./CLAUDE.md) | Developer reference — stack, conventions, schema, gotchas |
-| [PROJECT.md](./PROJECT.md) | Domain description — roles, workflows, data model |
-| [DEVELOPMENT.md](./DEVELOPMENT.md) | Full setup guide, env vars, CI secrets, local Supabase |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | Deployment guide — Vercel, secrets, first-run checklist |
-| [IMPROVEMENTS.md](./IMPROVEMENTS.md) | Bug tracker and enhancement backlog (✅ fixed / 🔲 pending) |
-| [EMAIL_RATE_LIMIT.md](./EMAIL_RATE_LIMIT.md) | Email rate limit solutions — OAuth (✅ done), custom SMTP, pricing |
-| [skills/gridpoint-testflow/SKILL.md](./skills/gridpoint-testflow/SKILL.md) | Claude project skill — critical rules, quick reference |
+| [CLAUDE.md](./CLAUDE.md) | Stack, conventions, schema, gotchas (Claude Code project memory) |
+| [docs/dev/MIGRATIONS.md](./docs/dev/MIGRATIONS.md) | Migration playbook |
+| [docs/dev/IMPROVEMENTS.md](./docs/dev/IMPROVEMENTS.md) | Bug + enhancement tracker |
+| [skills/gridpoint-testflow/SKILL.md](./skills/gridpoint-testflow/SKILL.md) | Claude project skill — quick reference |
+
+**Business / go-to-market**
+| File | Contents |
+|---|---|
+| [docs/business/PRICING.md](./docs/business/PRICING.md) | Tier structure, INR pricing, payment terms |
+| [docs/business/SALES_TARGETS.md](./docs/business/SALES_TARGETS.md) | Tiered buyer list and outreach approach |
+| [docs/business/SEO_PLAN.md](./docs/business/SEO_PLAN.md) | Top-of-funnel SEO + content strategy |
+
+**Design specs and plans** live under [docs/superpowers/](./docs/superpowers/).
