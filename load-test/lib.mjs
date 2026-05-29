@@ -2,6 +2,16 @@
 // Reads config from load-test/.env and refuses to run against production.
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
+import { Agent, setGlobalDispatcher } from 'undici';
+
+// Slow/flaky link: the default 10s connect timeout fails repeatedly. Raise all
+// timeouts and let Node's Happy-Eyeballs fall back to IPv4 quickly.
+setGlobalDispatcher(new Agent({
+  connect: { timeout: 60_000 },
+  headersTimeout: 120_000,
+  bodyTimeout: 120_000,
+  connections: 16,
+}));
 
 const PROD_REF = 'hxfilijpaocogsgjrjnq'; // production project ref — never load-test this
 
