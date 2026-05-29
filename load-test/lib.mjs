@@ -22,14 +22,36 @@ export function assertSafeTarget() {
   console.log(`▶ target: ${URL}`);
 }
 
+// fetch wrapper that retries transient network failures (slow/flaky links
+// throw UND_ERR_CONNECT_TIMEOUT). Applied to every Supabase call below.
+async function resilientFetch(input, init = {}, tries = 6) {
+  let last;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    try {
+      return await fetch(input, init);
+    } catch (e) {
+      last = e;
+      if (attempt === tries - 1) throw e;
+      await sleep(600 * 2 ** attempt + Math.random() * 300);
+    }
+  }
+  throw last;
+}
+
 // Service-role client (bypasses RLS) — for seeding/admin only.
 export function admin() {
-  return createClient(URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createClient(URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: resilientFetch },
+  });
 }
 
 // Anon client (RLS applies) — for simulating a real signed-in user.
 export function anon() {
-  return createClient(URL, ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createClient(URL, ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: resilientFetch },
+  });
 }
 
 export const TEST_EMAIL_DOMAIN = 'loadtest.local';
