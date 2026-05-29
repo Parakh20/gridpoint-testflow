@@ -87,7 +87,7 @@ export default function EngineerAssignmentScreen() {
         ListEmptyComponent={
           <View style={s.empty}>
             <Text style={s.emptyTitle}>No equipment instances</Text>
-            <Text style={s.emptyBody}>Generate equipment first via Scope Management.</Text>
+            <Text style={s.emptyBody}>Generate equipment first via "Tests & Generate" on the project overview.</Text>
           </View>
         }
         renderItem={({ item }) => (

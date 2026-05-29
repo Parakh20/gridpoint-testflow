@@ -157,6 +157,11 @@ export default function ProjectOverviewScreen() {
                 disabled={data.status === 'CLOSED'}
               />
               <ActionButton
+                label="Tests & Generate"
+                onPress={() => nav.navigate('TestingScope', { projectId: params.projectId, projectNumber: params.projectNumber })}
+                disabled={data.status === 'CLOSED'}
+              />
+              <ActionButton
                 label="Assign Supervisor"
                 onPress={() => nav.navigate('AssignSupervisor', { projectId: params.projectId, projectNumber: params.projectNumber })}
               />

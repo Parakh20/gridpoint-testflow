@@ -19,6 +19,7 @@ import GMProjectsScreen from '@/screens/GMProjectsScreen';
 import CreateProjectScreen from '@/screens/CreateProjectScreen';
 import EditProjectScreen from '@/screens/EditProjectScreen';
 import ScopeManagementScreen from '@/screens/ScopeManagementScreen';
+import TestingScopeScreen from '@/screens/TestingScopeScreen';
 import AssignSupervisorScreen from '@/screens/AssignSupervisorScreen';
 import EngineerAssignmentScreen from '@/screens/EngineerAssignmentScreen';
 // SUPERADMIN only
@@ -122,6 +123,8 @@ export default function RootNavigator() {
               options={({ route }) => ({ title: `Edit ${route.params.projectNumber}` })} />
             <Stack.Screen name="ScopeManagement" component={ScopeManagementScreen}
               options={({ route }) => ({ title: `Scope — ${route.params.projectNumber}` })} />
+            <Stack.Screen name="TestingScope" component={TestingScopeScreen}
+              options={({ route }) => ({ title: `Tests — ${route.params.projectNumber}` })} />
             <Stack.Screen name="AssignSupervisor" component={AssignSupervisorScreen}
               options={{ title: 'Assign Supervisor' }} />
             <Stack.Screen name="EngineerAssignment" component={EngineerAssignmentScreen}

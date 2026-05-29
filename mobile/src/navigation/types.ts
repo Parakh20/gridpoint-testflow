@@ -22,6 +22,7 @@ export type RootStackParamList = {
   CreateProject: undefined;
   EditProject: { projectId: string; projectNumber: string };
   ScopeManagement: { projectId: string; projectNumber: string };
+  TestingScope: { projectId: string; projectNumber: string };
   AssignSupervisor: { projectId: string; projectNumber: string };
   // GM / SUPERADMIN / SUPERVISOR
   EngineerAssignment: { projectId: string; projectNumber: string };
