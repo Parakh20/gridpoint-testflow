@@ -73,16 +73,33 @@ export function useCreateUser() {
 
 // ── Update user role ──────────────────────────────────────────────────────────
 
-type UpdateRoleInput = { userId: string; newRole: string };
+type UpdateRoleInput = { userId: string; newRole: string; companyId: string };
 
 export function useUpdateUserRole() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ userId, newRole }: UpdateRoleInput) => {
-      // user_roles has UNIQUE(user_id, role) — delete old role first, then insert new
-      await supabase.from('user_roles').delete().eq('user_id', userId);
-      const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: newRole });
-      if (error) throw error;
+    mutationFn: async ({ userId, newRole, companyId }: UpdateRoleInput) => {
+      // The user_roles RLS policy requires WITH CHECK (company_id = my_company_id()),
+      // so the new row MUST carry company_id or the insert is rejected (which would
+      // leave the user role-less after the delete below). Insert first under the new
+      // (user_id, role) pair, then clear any other roles — that way a failure can
+      // never strip the user of a role.
+      const { error: insErr } = await supabase
+        .from('user_roles')
+        .upsert(
+          { user_id: userId, role: newRole, company_id: companyId },
+          { onConflict: 'user_id,role' }
+        );
+      if (insErr) throw insErr;
+
+      // user_roles has UNIQUE(user_id, role); a user holds one role here, so drop
+      // any stale roles other than the one we just set.
+      const { error: delErr } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId)
+        .neq('role', newRole);
+      if (delErr) throw delErr;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['company-users'] });

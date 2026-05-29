@@ -7,6 +7,7 @@ export default ({ config }) => ({
   version: '0.1.0',
   scheme: 'testflow',
   orientation: 'portrait',
+  plugins: ['expo-web-browser'],
   userInterfaceStyle: 'automatic',
   splash: {
     backgroundColor: '#232229',
@@ -16,9 +17,11 @@ export default ({ config }) => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'io.testflow.field',
+    buildNumber: '1',
   },
   android: {
     package: 'io.testflow.field',
+    versionCode: 1,
     adaptiveIcon: {
       backgroundColor: '#232229',
     },

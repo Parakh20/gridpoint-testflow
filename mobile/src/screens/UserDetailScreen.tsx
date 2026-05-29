@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { useCompanyUsers, useUpdateUserRole, useToggleUserActive } from '@/hooks/useCompanyUsers';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
 import { explainSupabaseError } from '@/lib/errors';
 import { theme, roleBadge } from '@/theme';
@@ -28,6 +29,7 @@ function fmt(d: string) {
 export default function UserDetailScreen() {
   const { params } = useRoute<R>();
   const toast = useToast();
+  const { profile } = useAuth();
 
   const usersQ = useCompanyUsers();
   const roleM = useUpdateUserRole();
@@ -42,8 +44,12 @@ export default function UserDetailScreen() {
 
   const handleRoleChange = async () => {
     if (!user || selectedRole === user.role) return;
+    if (!profile?.company_id) {
+      toast.error('Session error — please sign out and back in');
+      return;
+    }
     try {
-      await roleM.mutateAsync({ userId: user.id, newRole: selectedRole });
+      await roleM.mutateAsync({ userId: user.id, newRole: selectedRole, companyId: profile.company_id });
       toast.success('Role updated');
     } catch (err: any) {
       toast.error(explainSupabaseError(err));
