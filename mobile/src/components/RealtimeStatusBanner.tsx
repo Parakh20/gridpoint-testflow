@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRealtimeStatus } from '@/lib/realtime';
 import { theme } from '@/theme';
 
@@ -11,6 +12,7 @@ import { theme } from '@/theme';
  */
 export function RealtimeStatusBanner() {
   const status = useRealtimeStatus();
+  const insets = useSafeAreaInsets();
   if (status === 'connected' || status === 'connecting') return null;
 
   const isDisabled = status === 'disabled';
@@ -22,7 +24,7 @@ export function RealtimeStatusBanner() {
     <View
       style={[
         s.bar,
-        { backgroundColor: tone.bg, borderBottomColor: tone.border },
+        { backgroundColor: tone.bg, borderTopColor: tone.border, paddingBottom: insets.bottom + 6 },
       ]}
       accessibilityRole="alert"
     >
@@ -41,8 +43,8 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
+    paddingTop: 6,
+    borderTopWidth: 1,
   },
   dot: { fontSize: 10, marginRight: 8 },
   text: { fontSize: 11, fontWeight: '600', flex: 1 },

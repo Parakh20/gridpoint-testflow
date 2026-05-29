@@ -1,6 +1,8 @@
 import React from 'react';
+import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { theme } from '@/theme';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/context/AuthContext';
 import { ToastProvider } from '@/components/Toast';
@@ -16,13 +18,15 @@ initMonitoring();
 
 function AppShell() {
   useAppForegroundRefetch();
+  // Global status banners sit at the BOTTOM as a thin strip so they never
+  // collide with the status bar / notch and the navigation header stays clean.
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <StatusBar style="light" />
+      <RootNavigator />
       <NetworkBanner />
       <RealtimeStatusBanner />
-      <RootNavigator />
-    </>
+    </View>
   );
 }
 

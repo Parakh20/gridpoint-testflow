@@ -17,7 +17,7 @@ export function NetworkBanner() {
 
   if (online) return null;
   return (
-    <View style={[s.bar, { paddingTop: insets.top + 4 }]}>
+    <View style={[s.bar, { paddingBottom: insets.bottom + 6 }]}>
       <Text style={s.text}>Offline — submissions will fail until reconnected</Text>
     </View>
   );
@@ -27,7 +27,7 @@ const s = StyleSheet.create({
   bar: {
     backgroundColor: theme.danger,
     paddingHorizontal: 12,
-    paddingBottom: 6,
+    paddingTop: 6,
   },
   text: { color: '#fff', textAlign: 'center', fontSize: 12, fontWeight: '600' },
 });
