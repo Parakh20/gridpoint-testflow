@@ -6,7 +6,7 @@
 //
 // Re-runnable: it reuses the test company by slug and adds more data.
 import { writeFileSync } from 'fs';
-import { admin, assertSafeTarget, pool, num, EQUIPMENT_TYPES, TEST_EMAIL_DOMAIN, TEST_PASSWORD, TEST_COMPANY_SLUG } from './lib.mjs';
+import { admin, assertSafeTarget, pool, withRetry, num, EQUIPMENT_TYPES, TEST_EMAIL_DOMAIN, TEST_PASSWORD, TEST_COMPANY_SLUG } from './lib.mjs';
 
 assertSafeTarget();
 const db = admin();
@@ -32,15 +32,24 @@ async function ensureCompany() {
 async function createUser(companyId, i) {
   const email = `lt_${tag}_${i}@${TEST_EMAIL_DOMAIN}`;
   const role = roleFor(i);
-  const { data: created, error } = await db.auth.admin.createUser({
-    email, password: TEST_PASSWORD, email_confirm: true,
-    user_metadata: { name: `LT ${role} ${i}` },
-  });
-  if (error) throw new Error(`createUser ${email}: ${error.message}`);
+  const created = await withRetry(async () => {
+    const { data, error } = await db.auth.admin.createUser({
+      email, password: TEST_PASSWORD, email_confirm: true,
+      user_metadata: { name: `LT ${role} ${i}` },
+    });
+    if (error) throw new Error(`createUser ${email}: ${error.message}`);
+    return data;
+  }, { label: email });
   const uid = created.user.id;
   // Profile is auto-created by trigger with company_id NULL — attach to test company.
-  await db.from('profiles').update({ company_id: companyId, name: `LT ${role} ${i}`, is_active: true }).eq('id', uid);
-  await db.from('user_roles').upsert({ user_id: uid, role, company_id: companyId }, { onConflict: 'user_id,role' });
+  await withRetry(async () => {
+    const { error } = await db.from('profiles').update({ company_id: companyId, name: `LT ${role} ${i}`, is_active: true }).eq('id', uid);
+    if (error) throw new Error(`profile ${email}: ${error.message}`);
+  });
+  await withRetry(async () => {
+    const { error } = await db.from('user_roles').upsert({ user_id: uid, role, company_id: companyId }, { onConflict: 'user_id,role' });
+    if (error) throw new Error(`role ${email}: ${error.message}`);
+  });
   return { uid, role, email };
 }
 
@@ -107,7 +116,8 @@ async function main() {
   console.log(`company: ${companyId}`);
 
   console.log(`creating ${USERS} users…`);
-  const users = await pool([...Array(USERS).keys()], 8, (i) => createUser(companyId, i));
+  const userConc = num('USER_CONCURRENCY', 4);
+  const users = await pool([...Array(USERS).keys()], userConc, (i) => createUser(companyId, i));
   const superadmin = users.find((u) => u.role === 'SUPERADMIN') ?? users[0];
   const supervisors = users.filter((u) => u.role === 'SUPERVISOR').map((u) => u.uid);
   const engineers = users.filter((u) => u.role === 'ENGINEER').map((u) => u.uid);

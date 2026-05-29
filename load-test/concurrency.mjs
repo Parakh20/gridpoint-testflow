@@ -8,18 +8,22 @@ import { admin, assertSafeTarget, TEST_COMPANY_SLUG } from './lib.mjs';
 assertSafeTarget();
 const db = admin();
 
-async function getCompany() {
-  const { data } = await db.from('companies').select('id').eq('slug', TEST_COMPANY_SLUG).maybeSingle();
-  if (!data) throw new Error('Run seed.mjs first (no load-test company found).');
-  return data.id;
+async function getContext() {
+  const { data: company } = await db.from('companies').select('id').eq('slug', TEST_COMPANY_SLUG).maybeSingle();
+  if (!company) throw new Error('Run seed.mjs first (no load-test company found).');
+  // projects.created_by is NOT NULL — borrow any user from the test company.
+  const { data: user } = await db.from('profiles').select('id').eq('company_id', company.id).limit(1).maybeSingle();
+  if (!user) throw new Error('No users in the load-test company — run seed.mjs first.');
+  return { companyId: company.id, userId: user.id };
 }
 
 // 1) Optimistic status transition: app guards UPDATE with .eq('status', current).
 //    Fire 20 racers DRAFT->APPROVED; exactly ONE should win.
-async function testStatusGuard(companyId) {
-  const { data: proj } = await db.from('projects')
-    .insert({ project_number: `RACE-${Date.now()}`, site_name: 'Race', site_address: 'x', status: 'DRAFT', company_id: companyId })
+async function testStatusGuard(companyId, userId) {
+  const { data: proj, error } = await db.from('projects')
+    .insert({ project_number: `RACE-${Date.now()}`, site_name: 'Race', site_address: 'x', status: 'DRAFT', company_id: companyId, created_by: userId })
     .select('id').single();
+  if (error) throw new Error(`status-guard setup: ${error.message}`);
 
   const racers = Array.from({ length: 20 }, () =>
     db.from('projects').update({ status: 'APPROVED' }).eq('id', proj.id).eq('status', 'DRAFT').select('id')
@@ -32,10 +36,11 @@ async function testStatusGuard(companyId) {
 
 // 2) generate_project_equipment is idempotent under a race: many simultaneous
 //    calls -> exactly one generates, the rest get already_existed=true.
-async function testGenerateRace(companyId) {
-  const { data: proj } = await db.from('projects')
-    .insert({ project_number: `GEN-${Date.now()}`, site_name: 'Gen', site_address: 'x', status: 'APPROVED', company_id: companyId })
+async function testGenerateRace(companyId, userId) {
+  const { data: proj, error } = await db.from('projects')
+    .insert({ project_number: `GEN-${Date.now()}`, site_name: 'Gen', site_address: 'x', status: 'APPROVED', company_id: companyId, created_by: userId })
     .select('id').single();
+  if (error) throw new Error(`generate-race setup: ${error.message}`);
   await db.from('scope_items').insert({ project_id: proj.id, equipment_type: 'CT', quantity: 5 });
   const { data: tpls } = await db.from('test_templates').select('id').eq('equipment_type', 'CT').eq('is_active', true).limit(1);
   if (tpls?.length) await db.from('project_test_scope').insert({ project_id: proj.id, equipment_type: 'CT', test_template_id: tpls[0].id, is_enabled: true });
@@ -49,9 +54,9 @@ async function testGenerateRace(companyId) {
 }
 
 const out = [];
-const c = await getCompany();
-out.push(await testStatusGuard(c));
-out.push(await testGenerateRace(c));
+const { companyId, userId } = await getContext();
+out.push(await testStatusGuard(companyId, userId));
+out.push(await testGenerateRace(companyId, userId));
 
 let ok = true;
 for (const r of out) {

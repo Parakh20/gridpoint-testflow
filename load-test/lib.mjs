@@ -41,6 +41,23 @@ export const EQUIPMENT_TYPES = ['POWER_TRANSFORMER', 'CT', 'CVT', 'LA', 'SF6_BRE
 export const num = (name, dflt) => Number(process.env[name] ?? dflt);
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Retry transient network/rate-limit failures with exponential backoff.
+export async function withRetry(fn, { tries = 5, base = 600, label = 'op' } = {}) {
+  let last;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      const msg = e?.message ?? String(e);
+      const transient = /fetch failed|timeout|ECONN|ETIMEDOUT|UND_ERR|socket|network|429|rate limit/i.test(msg);
+      if (!transient || attempt === tries - 1) throw e;
+      await sleep(base * 2 ** attempt + Math.random() * 300);
+    }
+  }
+  throw last;
+}
+
 // Run async tasks with bounded concurrency.
 export async function pool(items, size, fn) {
   const results = [];
