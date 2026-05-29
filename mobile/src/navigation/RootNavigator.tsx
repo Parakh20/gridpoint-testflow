@@ -30,6 +30,8 @@ import UserDetailScreen from '@/screens/UserDetailScreen';
 import SupervisorHomeScreen from '@/screens/SupervisorHomeScreen';
 // Shared
 import ProjectOverviewScreen from '@/screens/ProjectOverviewScreen';
+import ReportsListScreen from '@/screens/ReportsListScreen';
+import ReportDetailScreen from '@/screens/ReportDetailScreen';
 import type { RootStackParamList } from './types';
 import { theme } from '@/theme';
 
@@ -137,6 +139,9 @@ export default function RootNavigator() {
               options={({ route }) => ({ title: route.params.userName })} />
             <Stack.Screen name="ProjectOverview" component={ProjectOverviewScreen}
               options={({ route }) => ({ title: route.params.projectNumber })} />
+            <Stack.Screen name="Reports" component={ReportsListScreen} options={{ title: 'Reports' }} />
+            <Stack.Screen name="ReportDetail" component={ReportDetailScreen}
+              options={({ route }) => ({ title: `Report — ${route.params.projectNumber}` })} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
             {platformScreens}
           </>
@@ -147,6 +152,9 @@ export default function RootNavigator() {
               options={{ title: 'Assign Engineers' }} />
             <Stack.Screen name="ProjectOverview" component={ProjectOverviewScreen}
               options={({ route }) => ({ title: route.params.projectNumber })} />
+            <Stack.Screen name="Reports" component={ReportsListScreen} options={{ title: 'Reports' }} />
+            <Stack.Screen name="ReportDetail" component={ReportDetailScreen}
+              options={({ route }) => ({ title: `Report — ${route.params.projectNumber}` })} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
             {platformScreens}
           </>

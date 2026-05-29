@@ -44,6 +44,9 @@ export default function GMProjectsScreen() {
     nav.setOptions({
       headerRight: () => (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity onPress={() => nav.navigate('Reports')} style={s.headerIcon}>
+            <Text style={s.headerIconText}>📊</Text>
+          </TouchableOpacity>
           {role === 'SUPERADMIN' && (
             <TouchableOpacity
               onPress={() => nav.navigate('UserManagement')}

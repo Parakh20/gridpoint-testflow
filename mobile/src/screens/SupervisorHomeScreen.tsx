@@ -58,9 +58,14 @@ export default function SupervisorHomeScreen() {
   useLayoutEffect(() => {
     nav.setOptions({
       headerRight: () => (
-        <TouchableOpacity onPress={() => nav.navigate('Profile')} style={s.avatar}>
-          <Text style={s.avatarText}>{initials}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity onPress={() => nav.navigate('Reports')} style={s.headerIcon}>
+            <Text style={s.headerIconText}>📊</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => nav.navigate('Profile')} style={s.avatar}>
+            <Text style={s.avatarText}>{initials}</Text>
+          </TouchableOpacity>
+        </View>
       ),
     });
   }, [nav, initials]);
@@ -595,6 +600,17 @@ const s = StyleSheet.create({
     marginTop: 20,
   },
   allClearText: { color: theme.success, fontWeight: '600', fontSize: 15 },
+  headerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIconText: { fontSize: 16 },
   avatar: {
     width: 34,
     height: 34,

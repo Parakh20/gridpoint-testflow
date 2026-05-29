@@ -171,6 +171,10 @@ export default function ProjectOverviewScreen() {
             label="Assign Engineers"
             onPress={() => nav.navigate('EngineerAssignment', { projectId: params.projectId, projectNumber: params.projectNumber })}
           />
+          <ActionButton
+            label="View Report"
+            onPress={() => nav.navigate('ReportDetail', { projectId: params.projectId, projectNumber: params.projectNumber })}
+          />
         </View>
       )}
 

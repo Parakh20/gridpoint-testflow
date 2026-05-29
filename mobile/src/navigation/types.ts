@@ -38,6 +38,9 @@ export type RootStackParamList = {
     projectNumber: string;
     siteName: string;
   };
+  // Reports — read-only viewing (GM / SUPERADMIN / SUPERVISOR)
+  Reports: undefined;
+  ReportDetail: { projectId: string; projectNumber: string };
   // Platform admin
   PlatformLogin: undefined;
   PlatformDashboard: undefined;
