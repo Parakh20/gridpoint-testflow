@@ -6,22 +6,29 @@ users, Realtime fan-out, and concurrency-correctness checks.
 > ⚠️ **Never run against production.** Every script reads `load-test/.env` and
 > aborts if `SUPABASE_URL` is the prod ref (override only with `ALLOW_PROD=1`).
 
-## 0. Stand up a staging project (one-time)
-
-```bash
-# create a new project in the Supabase dashboard (e.g. testflow-staging),
-# ideally on the same tier as prod, then from the repo root:
-supabase link --project-ref <staging-ref>
-supabase db push          # applies all migrations to staging
-```
-
-Copy `.env.example` → `.env` and fill in the staging URL + anon + service-role keys.
+## Quick start (one command)
 
 ```bash
 cd load-test
-cp .env.example .env       # edit it
+cp .env.example .env        # fill URL + anon + service-role key (+ ALLOW_PROD=1 if targeting prod)
 npm install
+
+SMOKE=1 npm run all         # tiny validation run (5 users / 2 projects), auto-cleans
+npm run all                 # full run: seed 100 -> concurrency -> k6 -> realtime -> cleanup
+KEEP=1 npm run all          # full run but keep the data to inspect in the app; cleanup later
 ```
+
+`npm run all` reads everything from `.env` (including injecting env into k6). Install
+[k6](https://grafana.com/docs/k6/latest/set-up/install-k6/) to include the traffic
+stage — it's skipped with a warning if k6 isn't on PATH.
+
+> If you're using a **staging** project: create it in the dashboard, then
+> `supabase link --project-ref <staging-ref> && supabase db push` before running.
+> Targeting **prod** (no customers): keep `ALLOW_PROD=1` in `.env`.
+
+---
+
+## Individual steps (if you don't want the runner)
 
 ## 1. Volume / query speed
 

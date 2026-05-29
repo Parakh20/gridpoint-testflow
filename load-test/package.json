@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "all": "node run-all.mjs",
     "seed": "node seed.mjs",
     "cleanup": "node cleanup.mjs",
     "realtime": "node realtime-fanout.mjs",
