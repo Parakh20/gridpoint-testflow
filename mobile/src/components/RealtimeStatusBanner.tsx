@@ -13,12 +13,12 @@ import { theme } from '@/theme';
 export function RealtimeStatusBanner() {
   const status = useRealtimeStatus();
   const insets = useSafeAreaInsets();
-  if (status === 'connected' || status === 'connecting') return null;
+  // Only surface genuine connection problems. The intentional "disabled" state
+  // (realtimeEnabled=false) polls every 30s and works fine, so a permanent
+  // strip would just be clutter.
+  if (status === 'connected' || status === 'connecting' || status === 'disabled') return null;
 
-  const isDisabled = status === 'disabled';
-  const tone = isDisabled
-    ? { bg: 'rgba(148, 163, 184, 0.12)', fg: theme.textDim, border: theme.border }
-    : { bg: 'rgba(245, 158, 11, 0.14)', fg: theme.warn, border: theme.warn };
+  const tone = { bg: 'rgba(245, 158, 11, 0.14)', fg: theme.warn, border: theme.warn };
 
   return (
     <View
@@ -30,9 +30,7 @@ export function RealtimeStatusBanner() {
     >
       <Text style={[s.dot, { color: tone.fg }]}>●</Text>
       <Text style={[s.text, { color: tone.fg }]} numberOfLines={1}>
-        {isDisabled
-          ? 'Live updates off — refreshing every 30s.'
-          : 'Live updates paused — refreshing every 30s.'}
+        Live updates paused — refreshing every 30s.
       </Text>
     </View>
   );
