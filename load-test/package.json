@@ -1,0 +1,16 @@
+{
+  "name": "testflow-load-test",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "node seed.mjs",
+    "cleanup": "node cleanup.mjs",
+    "realtime": "node realtime-fanout.mjs",
+    "concurrency": "node concurrency.mjs",
+    "k6": "k6 run load.k6.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5"
+  }
+}
