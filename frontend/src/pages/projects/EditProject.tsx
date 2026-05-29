@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
@@ -45,32 +45,44 @@ export default function EditProject() {
   const [testingScope, setTestingScope] = useState<Record<string, any[]>>({});
   const [savedEnabledIds, setSavedEnabledIds] = useState<Set<string> | undefined>(undefined);
 
+  // Hydrate the form from the DB exactly once. Without this guard, a background
+  // refetch (e.g. on window focus after the native date picker closes) would
+  // re-run setFormData and clobber the user's unsaved edits — which is why
+  // changing the end date appeared not to stick.
+  const hydratedRef = useRef(false);
+
   const { isLoading: loading } = useQuery({
     queryKey: ['edit-project', id],
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data: project, error: projectError } = await supabase
         .from('projects').select('*').eq('id', id!).single();
       if (projectError) throw projectError;
 
-      const toDateInput = (v: string | null) => (v ? v.slice(0, 10) : '');
-      setFormData({
-        project_number: project.project_number,
-        site_name: project.site_name,
-        site_address: project.site_address,
-        client: project.client || '',
-        start_date: toDateInput(project.start_date),
-        end_date: toDateInput(project.end_date),
-        assigned_to: project.assigned_to || null,
-      });
+      if (!hydratedRef.current) {
+        const toDateInput = (v: string | null) => (v ? v.slice(0, 10) : '');
+        setFormData({
+          project_number: project.project_number,
+          site_name: project.site_name,
+          site_address: project.site_address,
+          client: project.client || '',
+          start_date: toDateInput(project.start_date),
+          end_date: toDateInput(project.end_date),
+          assigned_to: project.assigned_to || null,
+        });
 
-      const { data: scope } = await supabase
-        .from('scope_items').select('equipment_type, quantity').eq('project_id', id!);
-      setScopeItems(scope || []);
+        const { data: scope } = await supabase
+          .from('scope_items').select('equipment_type, quantity').eq('project_id', id!);
+        setScopeItems(scope || []);
 
-      const { data: testScope } = await supabase
-        .from('project_test_scope').select('test_template_id').eq('project_id', id!);
-      if (testScope?.length) {
-        setSavedEnabledIds(new Set(testScope.map(r => r.test_template_id)));
+        const { data: testScope } = await supabase
+          .from('project_test_scope').select('test_template_id').eq('project_id', id!);
+        if (testScope?.length) {
+          setSavedEnabledIds(new Set(testScope.map(r => r.test_template_id)));
+        }
+
+        hydratedRef.current = true;
       }
 
       return project;
