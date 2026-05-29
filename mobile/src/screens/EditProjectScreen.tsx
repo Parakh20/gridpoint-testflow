@@ -19,12 +19,11 @@ import { useProjectDetail, useUpdateProject, useDeleteProject } from '@/hooks/us
 import { useToast } from '@/components/Toast';
 import { explainSupabaseError } from '@/lib/errors';
 import { theme, statusColor } from '@/theme';
+import { maskDateInput, isValidDate, toDateInput } from '@/lib/dateInput';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'EditProject'>;
 type R = RouteProp<RootStackParamList, 'EditProject'>;
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const STATUS_ORDER = ['DRAFT', 'APPROVED', 'ACTIVE', 'CLOSED'] as const;
 type ProjectStatus = typeof STATUS_ORDER[number];
 
@@ -55,8 +54,8 @@ export default function EditProjectScreen() {
     setSiteName(d.site_name);
     setSiteAddress(d.site_address);
     setClient(d.client ?? '');
-    setStartDate(d.start_date ?? '');
-    setEndDate(d.end_date ?? '');
+    setStartDate(toDateInput(d.start_date));
+    setEndDate(toDateInput(d.end_date));
     setStatus(d.status as ProjectStatus);
   }, [q.data]);
 
@@ -65,8 +64,11 @@ export default function EditProjectScreen() {
     if (!projectNumber.trim()) e.projectNumber = 'Required';
     if (!siteName.trim()) e.siteName = 'Required';
     if (!siteAddress.trim()) e.siteAddress = 'Required';
-    if (startDate && !DATE_RE.test(startDate)) e.startDate = 'Use YYYY-MM-DD format';
-    if (endDate && !DATE_RE.test(endDate)) e.endDate = 'Use YYYY-MM-DD format';
+    if (startDate && !isValidDate(startDate)) e.startDate = 'Enter a valid date';
+    if (endDate && !isValidDate(endDate)) e.endDate = 'Enter a valid date';
+    if (isValidDate(startDate) && isValidDate(endDate) && endDate < startDate) {
+      e.endDate = 'End date must be after start date';
+    }
     return e;
   };
 
@@ -179,10 +181,11 @@ export default function EditProjectScreen() {
             <TextInput
               style={[s.input, errors.startDate && s.inputError]}
               value={startDate}
-              onChangeText={(v) => { setStartDate(v); setErrors((p) => ({ ...p, startDate: '' })); }}
+              onChangeText={(v) => { setStartDate(maskDateInput(v)); setErrors((p) => ({ ...p, startDate: '' })); }}
               placeholder="YYYY-MM-DD"
               placeholderTextColor={theme.textDim}
-              keyboardType="numbers-and-punctuation"
+              keyboardType="number-pad"
+              maxLength={10}
             />
           </Field>
 
@@ -190,10 +193,11 @@ export default function EditProjectScreen() {
             <TextInput
               style={[s.input, errors.endDate && s.inputError]}
               value={endDate}
-              onChangeText={(v) => { setEndDate(v); setErrors((p) => ({ ...p, endDate: '' })); }}
+              onChangeText={(v) => { setEndDate(maskDateInput(v)); setErrors((p) => ({ ...p, endDate: '' })); }}
               placeholder="YYYY-MM-DD"
               placeholderTextColor={theme.textDim}
-              keyboardType="numbers-and-punctuation"
+              keyboardType="number-pad"
+              maxLength={10}
             />
           </Field>
 
