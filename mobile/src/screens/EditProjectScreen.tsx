@@ -19,7 +19,8 @@ import { useProjectDetail, useUpdateProject, useDeleteProject } from '@/hooks/us
 import { useToast } from '@/components/Toast';
 import { explainSupabaseError } from '@/lib/errors';
 import { theme, statusColor } from '@/theme';
-import { maskDateInput, isValidDate, toDateInput } from '@/lib/dateInput';
+import { isValidDate, toDateInput } from '@/lib/dateInput';
+import { DateField } from '@/components/DateField';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'EditProject'>;
@@ -177,29 +178,20 @@ export default function EditProjectScreen() {
             />
           </Field>
 
-          <Field label="Start Date (optional)" error={errors.startDate}>
-            <TextInput
-              style={[s.input, errors.startDate && s.inputError]}
-              value={startDate}
-              onChangeText={(v) => { setStartDate(maskDateInput(v)); setErrors((p) => ({ ...p, startDate: '' })); }}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={theme.textDim}
-              keyboardType="number-pad"
-              maxLength={10}
-            />
-          </Field>
+          <DateField
+            label="Start Date (optional)"
+            value={startDate}
+            error={errors.startDate}
+            onChange={(v) => { setStartDate(v); setErrors((p) => ({ ...p, startDate: '' })); }}
+          />
 
-          <Field label="End Date (optional)" error={errors.endDate}>
-            <TextInput
-              style={[s.input, errors.endDate && s.inputError]}
-              value={endDate}
-              onChangeText={(v) => { setEndDate(maskDateInput(v)); setErrors((p) => ({ ...p, endDate: '' })); }}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={theme.textDim}
-              keyboardType="number-pad"
-              maxLength={10}
-            />
-          </Field>
+          <DateField
+            label="End Date (optional)"
+            value={endDate}
+            error={errors.endDate}
+            minDate={isValidDate(startDate) ? startDate : undefined}
+            onChange={(v) => { setEndDate(v); setErrors((p) => ({ ...p, endDate: '' })); }}
+          />
 
           <Field label="Status">
             <View style={s.statusRow}>

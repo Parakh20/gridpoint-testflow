@@ -4,10 +4,10 @@ export default ({ config }) => ({
   ...config,
   name: 'TestFlow Field',
   slug: 'testflow-field',
-  version: '0.1.0',
+  version: '0.2.0',
   scheme: 'testflow',
   orientation: 'portrait',
-  plugins: ['expo-web-browser'],
+  plugins: ['expo-web-browser', '@react-native-community/datetimepicker'],
   userInterfaceStyle: 'automatic',
   splash: {
     backgroundColor: '#232229',
@@ -17,11 +17,11 @@ export default ({ config }) => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'io.testflow.field',
-    buildNumber: '1',
+    buildNumber: '2',
   },
   android: {
     package: 'io.testflow.field',
-    versionCode: 1,
+    versionCode: 2,
     adaptiveIcon: {
       backgroundColor: '#232229',
     },
