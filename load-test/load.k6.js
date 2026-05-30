@@ -34,6 +34,13 @@ export const options = {
   },
 };
 
+// Per-VU session cache. Real users log in once and then browse for a long time;
+// re-authenticating every iteration would just hammer (and trip) GoTrue's token
+// endpoint rate limit instead of exercising the app's read paths. Each k6 VU has
+// its own module scope, so these are per-VU.
+let vuToken = null;
+let vuUser = null;
+
 function login(u) {
   const res = http.post(
     `${URL}/auth/v1/token?grant_type=password`,
@@ -47,14 +54,19 @@ function login(u) {
 }
 
 export default function () {
-  const u = users[Math.floor(Math.random() * users.length)];
-  const token = login(u);
-  if (!token) { sleep(1); return; }
+  // Authenticate once per VU, then reuse the access token across iterations.
+  if (!vuToken) {
+    vuUser = users[Math.floor(Math.random() * users.length)];
+    vuToken = login(vuUser);
+    if (!vuToken) { sleep(1); return; } // rate-limited at login; back off and retry next iter
+  }
+  const token = vuToken;
   const headers = { apikey: ANON, Authorization: `Bearer ${token}`, tags: { name: 'rest' } };
 
   // Read mix — the hot paths the dashboards hit (RLS-filtered).
   const projects = http.get(`${URL}/rest/v1/projects?select=id,project_number,status&deleted_at=is.null&limit=50`, { headers });
   readTrend.add(projects.timings.duration);
+  if (projects.status === 401) { vuToken = null; return; } // token expired → re-login next iter
   errRate.add(!check(projects, { 'projects 200': (r) => r.status === 200 }));
 
   const list = projects.json();
