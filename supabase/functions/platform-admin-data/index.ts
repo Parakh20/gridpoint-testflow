@@ -426,6 +426,156 @@ serve(async (req) => {
       return respond({ success: true });
     }
 
+    // ── get_all_leads ──────────────────────────────────────────────────────────
+    // Optional filters: { stage, priority, search }. Each lead is augmented with
+    // last_activity_at + activity_count (aggregated client-side to avoid N+1).
+    if (action === 'get_all_leads') {
+      const stage = payload?.stage as string | undefined;
+      const priority = payload?.priority as number | undefined;
+      const search = payload?.search as string | undefined;
+
+      let query = adminClient
+        .from('leads')
+        .select('*')
+        .order('priority', { ascending: false, nullsFirst: false })
+        .order('updated_at', { ascending: false });
+
+      if (stage) query = query.eq('stage', stage);
+      if (typeof priority === 'number') query = query.eq('priority', priority);
+      if (search) query = query.ilike('company_name', `%${search}%`);
+
+      const { data: leads, error } = await query;
+      if (error) throw error;
+
+      const leadIds = (leads ?? []).map((l: { id: string }) => l.id);
+      const activityMap = new Map<string, { count: number; last: string }>();
+      if (leadIds.length > 0) {
+        const { data: acts, error: actErr } = await adminClient
+          .from('lead_activities')
+          .select('lead_id, occurred_at')
+          .in('lead_id', leadIds);
+        if (actErr) throw actErr;
+        for (const a of (acts ?? []) as { lead_id: string; occurred_at: string }[]) {
+          const cur = activityMap.get(a.lead_id);
+          if (!cur) {
+            activityMap.set(a.lead_id, { count: 1, last: a.occurred_at });
+          } else {
+            cur.count += 1;
+            if (a.occurred_at > cur.last) cur.last = a.occurred_at;
+          }
+        }
+      }
+
+      const enriched = (leads ?? []).map((l: { id: string }) => {
+        const agg = activityMap.get(l.id);
+        return { ...l, activity_count: agg?.count ?? 0, last_activity_at: agg?.last ?? null };
+      });
+
+      return respond({ leads: enriched });
+    }
+
+    // ── get_lead_detail ────────────────────────────────────────────────────────
+    if (action === 'get_lead_detail') {
+      const lead_id = payload?.lead_id as string | undefined;
+      if (!lead_id) return respond({ error: 'payload.lead_id is required' }, 400);
+
+      const [leadRes, actsRes] = await Promise.all([
+        adminClient.from('leads').select('*').eq('id', lead_id).single(),
+        adminClient
+          .from('lead_activities')
+          .select('*')
+          .eq('lead_id', lead_id)
+          .order('occurred_at', { ascending: false }),
+      ]);
+      if (leadRes.error) throw leadRes.error;
+      if (actsRes.error) throw actsRes.error;
+
+      return respond({ lead: leadRes.data, activities: actsRes.data ?? [] });
+    }
+
+    // ── create_lead ────────────────────────────────────────────────────────────
+    if (action === 'create_lead') {
+      const fields = (payload?.fields ?? {}) as Record<string, unknown>;
+      const company_name = fields.company_name as string | undefined;
+      if (!company_name || !company_name.trim()) {
+        return respond({ error: 'fields.company_name is required' }, 400);
+      }
+
+      const ALLOWED = [
+        'company_name', 'segment', 'region', 'size_signal', 'why_fit', 'buyer_title',
+        'contact_name', 'contact_phone', 'contact_email', 'outreach_approach',
+        'priority', 'confidence', 'source_url', 'stage', 'next_action_date', 'notes', 'company_id',
+      ];
+      const insert: Record<string, unknown> = {};
+      for (const k of ALLOWED) {
+        if (fields[k] !== undefined) insert[k] = fields[k];
+      }
+
+      const { data, error } = await adminClient.from('leads').insert(insert).select('*').single();
+      if (error) return respond({ error: error.message }, 400);
+      return respond({ lead: data });
+    }
+
+    // ── update_lead ────────────────────────────────────────────────────────────
+    if (action === 'update_lead') {
+      const lead_id = payload?.lead_id as string | undefined;
+      const fields = (payload?.fields ?? {}) as Record<string, unknown>;
+      if (!lead_id) return respond({ error: 'payload.lead_id is required' }, 400);
+
+      const ALLOWED = [
+        'segment', 'region', 'size_signal', 'why_fit', 'buyer_title',
+        'contact_name', 'contact_phone', 'contact_email', 'outreach_approach',
+        'priority', 'confidence', 'source_url', 'stage', 'next_action_date', 'notes', 'company_id',
+      ];
+      const update: Record<string, unknown> = {};
+      for (const k of ALLOWED) {
+        if (fields[k] !== undefined) update[k] = fields[k];
+      }
+      if (Object.keys(update).length === 0) {
+        return respond({ error: 'No updatable fields provided' }, 400);
+      }
+
+      const { data, error } = await adminClient
+        .from('leads')
+        .update(update)
+        .eq('id', lead_id)
+        .select('*')
+        .single();
+      if (error) return respond({ error: error.message }, 400);
+      return respond({ lead: data });
+    }
+
+    // ── add_lead_activity ──────────────────────────────────────────────────────
+    if (action === 'add_lead_activity') {
+      const lead_id = payload?.lead_id as string | undefined;
+      const channel = payload?.channel as string | undefined;
+      const body = payload?.body as string | undefined;
+      const occurred_at = payload?.occurred_at as string | undefined;
+
+      const VALID_CHANNELS = ['WHATSAPP', 'PHONE', 'LINKEDIN', 'EMAIL', 'IN_PERSON', 'EVENT', 'NOTE'];
+      if (!lead_id || !channel || !body || !body.trim()) {
+        return respond({ error: 'payload.lead_id, channel, and body are required' }, 400);
+      }
+      if (!VALID_CHANNELS.includes(channel)) {
+        return respond({ error: `Invalid channel. Must be one of: ${VALID_CHANNELS.join(', ')}` }, 400);
+      }
+
+      const insert: Record<string, unknown> = { lead_id, channel, body };
+      if (occurred_at) insert.occurred_at = occurred_at;
+
+      const { data, error } = await adminClient
+        .from('lead_activities')
+        .insert(insert)
+        .select('*')
+        .single();
+      if (error) return respond({ error: error.message }, 400);
+
+      // Bump the parent lead's updated_at so it surfaces as recently touched.
+      await adminClient.from('leads').update({ updated_at: new Date().toISOString() }).eq('id', lead_id);
+
+      return respond({ activity: data });
+    }
+
     return respond({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
