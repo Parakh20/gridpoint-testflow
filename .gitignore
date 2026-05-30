@@ -49,6 +49,12 @@ admin.env
 
 # ── Internal docs (not needed on GitHub) ─────────
 STUDY_GUIDE.md
+# Business/GTM strategy — competitively sensitive, keep off the public repo
+docs/business/
+# Internal Claude planning/spec artifacts
+docs/superpowers/
+# AI-tool memory/state
+.serena/
 
 # ── Tool runtime state (Claude Code plugins, etc.) ─
 .remember/
