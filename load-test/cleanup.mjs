@@ -33,11 +33,14 @@ async function main() {
     //    test_tasks / test_records, clearing their created_by / assigned_to
     //    references back to auth.users.
     await delBy('projects', 'company_id', cid);
-    // 2) Rows that reference companies(id) or auth.users(id) with no cascade.
-    await delBy('audit_logs', 'company_id', cid);
+    // 2) Other rows that reference companies(id) with no cascade.
     await delBy('instruments', 'company_id', cid);
     await delBy('subscriptions', 'company_id', cid);
     console.log('cleared company child data');
+    // NOTE: audit_logs is deliberately NOT cleared here. The deletes above (and
+    // the user/role deletes below) fire AFTER-DELETE audit triggers that insert
+    // fresh audit_logs rows tagged with this company. audit_logs must be cleared
+    // LAST, after every audited delete has run — see step 5 below.
   }
 
   // 3) Delete auth users in the test domain. With projects/audit_logs gone,
@@ -68,8 +71,12 @@ async function main() {
     // 4) Safety net: any profiles/user_roles still pinned to the company
     //    (e.g. a user whose auth delete failed above) would block the company.
     await delBy('profiles', 'company_id', company.id);
-    await delBy('user_roles', 'company_id', company.id);
-    // 5) Finally the company itself.
+    await delBy('user_roles', 'company_id', company.id); // audited — fires triggers
+    // 5) audit_logs LAST: every audited delete above (projects/equipment/tasks/
+    //    records via cascade, plus user_roles) wrote new audit_logs rows tagged
+    //    with this company. Clear them now, when nothing audited remains to run.
+    await delBy('audit_logs', 'company_id', company.id);
+    // 6) Finally the company itself (companies is not audited, so no new rows).
     const { error } = await db.from('companies').delete().eq('id', company.id);
     if (error) { console.error('✖ company delete still blocked:', error.message); process.exit(1); }
     console.log('deleted load-test company');
