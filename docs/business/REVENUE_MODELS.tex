@@ -1,0 +1,438 @@
+\documentclass[11pt,a4paper]{article}
+
+% ── Engine: pdfLaTeX ─────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.3cm, headheight=15pt]{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{newunicodechar}
+\usepackage{amssymb}
+\usepackage{tcolorbox}
+
+\hypersetup{colorlinks=true, linkcolor=accent, urlcolor=accent}
+
+% Absorb long unbreakable \texttt{} tokens into interword space instead of
+% letting them run into the right margin.
+\emergencystretch=3em
+
+% ── Indian Rupee sign (drawn, pdfLaTeX-compatible) ───────────────────────────
+\newcommand{\Rs}{%
+  \mbox{%
+    \sffamily\bfseries
+    \setbox0=\hbox{R}%
+    R\kern-\wd0
+    \raisebox{0.42em}{\rule{0.55em}{0.07em}}%
+    \kern-\wd0
+    \raisebox{0.25em}{\rule{0.55em}{0.07em}}%
+    \kern\wd0
+  }%
+}
+\newunicodechar{₹}{\texorpdfstring{\Rs}{Rs.}}
+
+% ── Colours ──────────────────────────────────────────────────────────────────
+\definecolor{accent}{RGB}{30, 80, 160}
+\definecolor{mgreen}{RGB}{34, 139, 34}
+\definecolor{mgrey}{RGB}{90, 90, 90}
+\definecolor{boxbg}{RGB}{238, 243, 250}
+
+% ── Section formatting ───────────────────────────────────────────────────────
+\titleformat{\section}{\large\bfseries\color{accent}}{\thesection.}{0.5em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+
+% ── Header / footer ──────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\textcolor{mgrey}{\small TestFlow --- Revenue Architecture}}
+\lhead{\textcolor{mgrey}{\small 2026-05-30}}
+\rfoot{\textcolor{mgrey}{\small Page \thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Column types ─────────────────────────────────────────────────────────────
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+% ── Helpers ──────────────────────────────────────────────────────────────────
+\newcommand{\tild}{\raisebox{0.17ex}{$\scriptstyle\sim$}}
+\newcommand{\plan}[1]{\texttt{\textcolor{accent}{#1}}}
+\newcommand{\flag}[1]{\texttt{#1}}
+\newcommand{\yes}{\textcolor{mgreen}{\checkmark}}
+\newcommand{\no}{\textcolor{mgrey}{--}}
+
+\newtcolorbox{keybox}{colback=boxbg, colframe=accent, boxrule=0.6pt,
+  left=6pt, right=6pt, top=5pt, bottom=5pt, arc=2pt}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\begin{center}
+  {\LARGE\bfseries TestFlow Revenue Architecture}\\[0.4em]
+  {\large\color{accent} Subscription Plans \& Revenue Models}\\[1.2em]
+  \begin{tabular}{ll}
+    \textbf{Date}    & 2026-05-30 \\
+    \textbf{Author}  & Parakh Sharma (solo founder) \\
+    \textbf{Status}  & Draft for review \\
+    \textbf{Related} & \texttt{PRICING.md}, \texttt{SALES\_TARGETS.md}, financial-plan \texttt{.tex} \\
+  \end{tabular}
+\end{center}
+\vspace{0.8em}
+\hrule
+\vspace{1.2em}
+
+% ── Overview ─────────────────────────────────────────────────────────────────
+\section{Why this document}
+
+\texttt{PRICING.md} commits to one sound idea: a \textbf{flat per-workspace annual
+fee}, no per-seat metering. Keep that as the \emph{spine}. But a single flat fee
+leaves money --- and customers --- on the table at both ends of the market: the
+seasonal two-substation contractor who will never sign an annual contract, and
+the utility that wants a framework license for 40 sites.
+
+This document layers \textbf{seven revenue models} onto that spine so every buyer
+has a way in and every customer has a way to spend more over time. It is grounded
+in what the database already supports: \texttt{subscriptions.plan\_id} (free-text
+SKU), \texttt{subscriptions.seat\_count}, \texttt{companies.features} (JSONB
+feature flags read by \texttt{has\_feature()} / \texttt{useFeature()}), and the
+Razorpay webhook (\texttt{upsert\_subscription}).
+
+\begin{keybox}
+\textbf{Design principle --- Land, Expand, Monetize the edges.}
+The annual subscription is the \emph{land}. Metered add-ons and seat-free
+capacity tiers are the \emph{expand}. Consumption packs, outcome pricing,
+white-label, and utility framework deals \emph{monetize the edges} of the market
+the flat fee cannot reach.
+\end{keybox}
+
+% ── The revenue stack ────────────────────────────────────────────────────────
+\section{The revenue stack at a glance}
+
+\begin{center}
+\begin{tabular}{@{}C{0.5cm} L{3.9cm} L{5.7cm} L{3.5cm}@{}}
+  \toprule
+  \textbf{\#} & \textbf{Revenue model} & \textbf{What the customer buys} & \textbf{Recurring?} \\
+  \midrule
+  1 & Core subscription ladder   & Annual workspace access \& tier features      & Yes (annual) \\
+  2 & Hybrid metered add-ons     & Usage beyond fair-use (AI, storage, comms)    & Yes (variable) \\
+  3 & Consumption / project packs& Prepaid ``project credits'', no contract      & No (repeat) \\
+  4 & Outcome / value pricing    & Per signed handover / commissioned bay        & Yes (variable) \\
+  5 & Channel \& white-label     & OEM/EPC resells to subcontractors             & Yes (wholesale) \\
+  6 & Utility framework license  & Multi-site, multi-year, on-prem option        & Yes (multi-yr) \\
+  7 & Services \& data products  & Onboarding, migration, benchmarks, training   & Mixed \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent A customer typically starts in one model and accretes others. A mid-size
+contractor lands on \plan{team\_annual} (1), buys AI-report overages (2), takes a
+white-label add-on (7), and three years later signs a utility framework (6) when
+they win a PowerGrid package.
+
+% ── Model 1 ──────────────────────────────────────────────────────────────────
+\section{Model 1 --- Core subscription ladder}
+
+The spine. Five rungs instead of the current four, adding a downmarket
+\plan{starter\_annual} so small contractors are not forced to choose between
+``\Rs 2.4L'' and ``nothing''.
+
+\begin{center}
+\begin{longtable}{@{}L{2.0cm} L{3.9cm} R{2.3cm} L{1.6cm} L{3.4cm}@{}}
+  \toprule
+  \textbf{Tier} & \textbf{\texttt{plan\_id}} & \textbf{Annual (INR)} & \textbf{Active projects} & \textbf{Headline gating} \\
+  \midrule
+  \endhead
+  Free trial   & \plan{trial}            & \Rs 0 / 14 days    & 1         & All templates, mobile, no AI \\
+  Starter      & \plan{starter\_annual}  & \Rs 60{,}000       & 3         & Mobile + reports; no AI, no SSO \\
+  Team         & \plan{team\_annual}     & \Rs 2{,}40{,}000   & unlimited & + AI reports, audit-log UI, SLA 1\,d \\
+  Business     & \plan{business\_annual} & \Rs 6{,}00{,}000   & unlimited & + custom templates, SSO, 4\,h SLA \\
+  Enterprise   & \plan{enterprise\_custom}& \Rs 12{,}00{,}000+ & unlimited & + CSM, on-prem, custom RBAC \\
+  \bottomrule
+\end{longtable}
+\end{center}
+
+\noindent\textbf{Unchanged rules from \texttt{PRICING.md}:} priced per workspace,
+not per seat; annual upfront is default; multi-tenancy, mobile, soft-delete and
+export are \emph{never} gated. \plan{starter\_annual} deliberately excludes AI and
+SSO so it cannot cannibalise Team.
+
+\subsection{Billing cadence as a price lever}
+Cadence is sold, not given. Each step toward upfront cash earns the customer a
+discount and earns you working capital.
+
+\begin{center}
+\begin{tabular}{@{}L{4.5cm} L{4.0cm} L{6.0cm}@{}}
+  \toprule
+  \textbf{Cadence} & \textbf{Adjustment} & \textbf{Notes} \\
+  \midrule
+  Annual upfront      & list price        & Default. Best margin + float. \\
+  Quarterly           & \textbf{+5\%}     & Paid concession for cash-flow-shy buyers. \\
+  Monthly bridge      & +0\%, 90 days max & Trial$\rightarrow$annual ramp only, never permanent. \\
+  2-year prepaid      & \textbf{$-$20\%}  & Locks logo + reduces churn risk. \\
+  3-year prepaid      & \textbf{$-$30\%}  & Floor; never discount deeper without a concession. \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+% ── Model 2 ──────────────────────────────────────────────────────────────────
+\section{Model 2 --- Hybrid metered add-ons}
+
+Flat platform fee \emph{plus} a meter on the few resources whose cost scales with
+heavy use. This is the single biggest change to the revenue shape: it turns
+power users into more revenue without raising the headline price that wins deals.
+
+\begin{center}
+\begin{tabular}{@{}L{4.0cm} L{3.2cm} R{2.6cm} L{4.6cm}@{}}
+  \toprule
+  \textbf{Metered SKU} & \textbf{\texttt{plan\_id} suffix} & \textbf{Unit price} & \textbf{Fair-use included} \\
+  \midrule
+  AI handover reports   & \plan{ai\_report}    & \Rs 500 / report  & 50/mo Team, unltd Business+ \\
+  Document retention    & \plan{storage\_gb}   & \Rs 100 / GB-yr   & 25 GB Team, 100 GB Business \\
+  SMS/WhatsApp alerts   & \plan{comms\_pack}   & \Rs 1 / message   & email always free \\
+  Extra workspace       & \plan{extra\_ws}     & \Rs 90{,}000 / yr  & 1 per contract \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Mechanics.} Meters are counted against the \texttt{rate\_limits} table
+that already backs \texttt{rate\_limit\_check}. AI reports are a natural meter ---
+each generation is already concurrency-locked and rate-limited (10/hr). At
+month close, sum overages above fair-use and raise a Razorpay invoice line.
+Crucially, \textbf{fair-use is generous} so the meter is invisible to 90\% of
+customers and only bites genuine power users --- the ones who can afford it.
+
+\begin{keybox}
+\textbf{Guardrail.} Never meter a \emph{measurement}. Metering test records or
+equipment instances makes engineers under-report to dodge the meter --- it
+corrupts the data you exist to protect. Meter only outputs (reports, storage,
+notifications) and capacity (workspaces), never field input.
+\end{keybox}
+
+% ── Model 3 ──────────────────────────────────────────────────────────────────
+\section{Model 3 --- Consumption / project packs}
+
+For the seasonal contractor who refuses an annual commitment: sell prepaid
+\textbf{project credits}. One credit unlocks one project workspace (full Team
+features) for the life of that commissioning job. Credits never expire.
+
+\begin{center}
+\begin{tabular}{@{}L{2.6cm} L{2.8cm} R{1.8cm} R{2.6cm} L{2.6cm}@{}}
+  \toprule
+  \textbf{Pack} & \textbf{\texttt{plan\_id}} & \textbf{Credits} & \textbf{Price (INR)} & \textbf{Per project} \\
+  \midrule
+  Single  & \plan{pack\_1}  & 1  & \Rs 35{,}000   & \Rs 35{,}000 \\
+  Crew    & \plan{pack\_5}  & 5  & \Rs 1{,}50{,}000 & \Rs 30{,}000 \\
+  Fleet   & \plan{pack\_20} & 20 & \Rs 5{,}00{,}000 & \Rs 25{,}000 \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Why it works.} It converts the ``I'll wait until next month to
+start'' objection into a purchase today, and it is a natural \emph{on-ramp to
+annual}: a contractor who burns 8+ credits a year is shown the math --- ``you have
+spent \Rs 2.0L on packs; \plan{team\_annual} is \Rs 2.4L for unlimited.'' The pack
+price per project is deliberately \emph{higher} than the annual-implied rate so
+the upgrade always looks rational.
+
+\textbf{Schema fit.} Credits live as a balance in \texttt{companies.features}
+(e.g. \flag{project\_credits: 5}); generating a project decrements it. No new
+table required for v1.
+
+% ── Model 4 ──────────────────────────────────────────────────────────────────
+\section{Model 4 --- Outcome / value pricing (selective)}
+
+Tie a slice of price to the value event itself: a \textbf{signed, approved
+handover}. Offered only where a buyer resists fixed fees and wants
+``pay-for-results''. Two shapes:
+
+\begin{itemize}[noitemsep, leftmargin=1.4em]
+  \item \textbf{Per commissioned bay} --- \Rs 1{,}500 per equipment instance that
+        reaches \texttt{APPROVED}. Predictable for the buyer, scales with their
+        real workload. Cap it at the Team annual so it can never exceed the flat
+        alternative --- the cap is the upsell.
+  \item \textbf{Per handover report delivered} --- \Rs 2{,}000 per
+        \texttt{CLOSED} project's final report. Aligns spend with the deliverable
+        the client actually pays \emph{them} for.
+\end{itemize}
+
+\noindent Use sparingly. Outcome pricing maximises trust on the first deal but
+makes revenue lumpy and harder to forecast; migrate these accounts to flat annual
+once they trust the product (typically renewal 1).
+
+% ── Model 5 ──────────────────────────────────────────────────────────────────
+\section{Model 5 --- Channel \& white-label (B2B2B)}
+
+Let EPC majors and switchgear OEMs resell TestFlow to \emph{their}
+subcontractors under their own brand. You sell wholesale; they own the
+relationship.
+
+\begin{center}
+\begin{tabular}{@{}L{4.3cm} L{4.0cm} L{6.0cm}@{}}
+  \toprule
+  \textbf{Lever} & \textbf{Terms} & \textbf{Rationale} \\
+  \midrule
+  Wholesale rate     & list $\times$ \textbf{0.6}  & Partner keeps the margin + does the selling. \\
+  White-label add-on & \Rs 1{,}00{,}000 / yr        & Custom domain, logo, colours (\flag{white\_label}). \\
+  Minimum commit     & 10 workspaces / yr          & Filters out tyre-kickers; guarantees volume. \\
+  Co-marketing       & case study + logo rights    & Lowers your CAC on the next direct deal. \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Schema fit.} Each reseller is a parent \texttt{company} record;
+sub-tenants carry \plan{partner\_wholesale} as \texttt{plan\_id} and inherit the
+\flag{white\_label} feature flag. Razorpay bills the \emph{partner} a single
+consolidated invoice, not each sub-tenant. This is the highest-leverage channel
+because one signed OEM can deliver 20--50 workspaces with near-zero direct CAC.
+
+% ── Model 6 ──────────────────────────────────────────────────────────────────
+\section{Model 6 --- Utility framework licensing}
+
+The top of the market: PowerGrid, NTPC, state transcos. They do not buy
+``a workspace'' --- they buy a \textbf{framework agreement} covering many sites for
+several years, often with on-prem or private-cloud requirements.
+
+\begin{itemize}[noitemsep, leftmargin=1.4em]
+  \item \textbf{Site-block license} --- published Enterprise rate $\times$ 0.7 for
+        20+ sites bought together (matches \texttt{SALES\_TARGETS} volume play).
+  \item \textbf{Multi-year} --- 3--5 year terms, annual escalation clause (CPI or
+        flat 5\%/yr) written in.
+  \item \textbf{On-prem / private cloud} --- premium of \Rs 5{,}00{,}000+/yr for a
+        dedicated Supabase project or self-hosted deployment; gated by the
+        \flag{on\_prem} flag and a separate deployment SKU.
+  \item \textbf{Contractual SLA \& security review} --- priced into the deal, not
+        given away (each costs real founder/engineer time).
+\end{itemize}
+
+\noindent These are slow (6--12 month sales cycles) but anchor ARR and create
+reference logos that close everything below them.
+
+% ── Model 7 ──────────────────────────────────────────────────────────────────
+\section{Model 7 --- Services \& data products}
+
+Non-subscription revenue that improves margin and stickiness.
+
+\begin{center}
+\begin{tabular}{@{}L{5.2cm} R{3.2cm} L{5.5cm}@{}}
+  \toprule
+  \textbf{Item} & \textbf{Price (INR)} & \textbf{Type} \\
+  \midrule
+  Onboarding / setup fee        & \Rs 25{,}000 one-time  & Team \& Business; waivable as ``discount'' \\
+  Data migration / import       & \Rs 25{,}000 one-time  & Legacy Excel $\rightarrow$ TestFlow \\
+  Custom report template        & \Rs 50{,}000 each      & Per template (\flag{custom\_templates}) \\
+  On-site training (8\,h)       & \Rs 50{,}000 + travel  & Per session \\
+  Premium support (4\,h resp.)  & \Rs 2{,}00{,}000 / yr  & Upsell below Business SLA \\
+  \textit{Benchmark / analytics pack} & \textit{future}  & Anonymised, opt-in failure/throughput data \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The \emph{data product} is the long-game option: with enough tenants,
+anonymised, opt-in commissioning benchmarks (mean time-to-handover, failure rates
+by equipment type) become a sellable industry report --- a revenue stream with
+\emph{zero} marginal delivery cost. Strictly opt-in; multi-tenancy isolation
+(RLS) is never compromised for it.
+
+% ── Packaging matrix ─────────────────────────────────────────────────────────
+\section{Feature-gating matrix (maps to \texttt{companies.features})}
+
+Every gate below is a boolean key in the \texttt{companies.features} JSONB,
+enforced by \texttt{has\_feature()} server-side and \texttt{useFeature()} in the
+UI. Flags default \texttt{TRUE} unless a downgrade sets them false --- so a missing
+flag never accidentally locks a paying customer out.
+
+\begin{center}
+\begin{tabular}{@{}L{4.6cm} C{1.8cm} C{1.8cm} C{1.9cm} C{2.2cm}@{}}
+  \toprule
+  \textbf{Feature flag} & \textbf{Starter} & \textbf{Team} & \textbf{Business} & \textbf{Enterprise} \\
+  \midrule
+  \flag{ai\_reports}        & \no  & \yes & \yes & \yes \\
+  \flag{audit\_log\_ui}     & \no  & \yes & \yes & \yes \\
+  \flag{custom\_templates}  & \no  & \no  & \yes & \yes \\
+  \flag{sso}                & \no  & \no  & \yes & \yes \\
+  \flag{white\_label}       & \no  & add-on & add-on & \yes \\
+  \flag{priority\_support}  & \no  & \no  & \yes & \yes \\
+  \flag{advanced\_analytics}& \no  & \no  & \no  & \yes \\
+  \flag{on\_prem}           & \no  & \no  & \no  & \yes \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Never gated (in every tier):} all test templates, mobile app,
+multi-tenant RLS isolation, real-time / 30\,s polling sync, soft-delete \& restore,
+PDF + Excel export. Audit-log \emph{capture} is always on (triggers); only the
+\emph{viewer UI} is gated.
+
+% ── Expansion / NRR ──────────────────────────────────────────────────────────
+\section{Expansion levers \& the metric that matters}
+
+A flat annual fee alone gives \tild{}100\% net revenue retention at best (you
+only ever lose, never grow, within an account). The layered models above create
+\textbf{negative churn} --- accounts that grow without re-negotiating the base:
+
+\begin{enumerate}[noitemsep, leftmargin=1.6em]
+  \item \textbf{Tier upgrades} --- Starter $\rightarrow$ Team when project cap bites.
+  \item \textbf{Metered overages} --- AI/storage creep as usage deepens.
+  \item \textbf{Extra workspaces} --- new business unit / region.
+  \item \textbf{Pack$\rightarrow$annual conversion} --- the consumption on-ramp.
+  \item \textbf{Add-ons} --- white-label, templates, premium support.
+\end{enumerate}
+
+\begin{keybox}
+\textbf{The single number to track: ARR per workspace} (from \texttt{PRICING.md}),
+now paired with \textbf{Net Revenue Retention}. If NRR $>$ 100\%, the expansion
+models are working and you can grow ARR \emph{without} adding logos. Target NRR
+$\geq$ 110\% by end of year 2.
+\end{keybox}
+
+% ── Implementation ───────────────────────────────────────────────────────────
+\section{Implementation notes (what the code already supports)}
+
+\begin{center}
+\begin{tabular}{@{}L{5.0cm} L{9.5cm}@{}}
+  \toprule
+  \textbf{Need} & \textbf{Already in schema / what to add} \\
+  \midrule
+  Plan identity        & \texttt{subscriptions.plan\_id} (TEXT) --- use the slugs above. \\
+  Feature gating       & \texttt{companies.features} JSONB + \texttt{has\_feature()} / \texttt{useFeature()}. \\
+  Trial                & \texttt{companies.trial\_ends\_at} (14-day default trigger). \\
+  Metering             & \texttt{rate\_limits} table + \texttt{rate\_limit\_check} RPC; sum overages monthly. \\
+  Billing sync         & \texttt{razorpay-webhook} $\rightarrow$ \texttt{upsert\_subscription()} (idempotent). \\
+  Seat count (optional)& \texttt{subscriptions.seat\_count} exists but stays 0 --- we do \emph{not} price per seat. \\
+  \midrule
+  \textbf{To build}    & project-credit balance in \texttt{features}; overage invoicing job; Razorpay plan objects per \texttt{plan\_id}; partner/parent-company billing roll-up. \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+% ── Anti-patterns ────────────────────────────────────────────────────────────
+\section{Anti-patterns (carry-over + new)}
+
+\begin{itemize}[noitemsep, leftmargin=1.4em]
+  \item Never meter test records or equipment instances --- corrupts field data.
+  \item Never gate multi-tenancy, mobile, or audit \emph{capture} --- core trust.
+  \item Don't ship a permanent free tier; the trial + free template library is the lure.
+  \item Don't let \plan{starter\_annual} include AI/SSO --- it would cannibalise Team.
+  \item Don't price packs \emph{below} the annual-implied rate --- the upgrade must always look rational.
+  \item Don't tag Enterprise ``most popular'' --- Team is the workhorse.
+  \item Don't run outcome pricing forever --- migrate to flat annual by renewal 1.
+\end{itemize}
+
+\vspace{1em}
+\hrule
+\vspace{0.5em}
+\noindent\textcolor{mgrey}{\small Companion docs: \texttt{PRICING.md} (strategy \&
+display), \texttt{SALES\_TARGETS.md} (named accounts), financial-plan \texttt{.tex}
+(unit economics \& 36-month ARR). Review quarterly; update slugs here when Razorpay
+plan objects are created.}
+
+\end{document}

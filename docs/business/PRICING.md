@@ -2,6 +2,8 @@
 
 A pricing framework + recommended numbers for the Indian commissioning-contractor market in year 1. Numbers will move as you learn — that's expected. The shape of the model should stay stable.
 
+> **See also:** `REVENUE_MODELS.tex` / `.pdf` — the full revenue architecture that layers seven revenue models (subscription ladder, hybrid metering, consumption packs, outcome pricing, channel/white-label, utility framework, services & data products) on top of the flat per-workspace spine described here.
+
 ---
 
 ## The model: per-workspace flat fee, annual
