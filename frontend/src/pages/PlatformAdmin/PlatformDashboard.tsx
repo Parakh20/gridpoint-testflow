@@ -57,8 +57,11 @@ import {
   LogIn,
   PowerOff,
   Power,
+  TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { platformFetch } from './platformFetch';
+import { SalesTab } from './SalesTab';
 
 const BASE_DOMAIN = 'optimustesting.com';
 
@@ -266,21 +269,6 @@ function OAuthConfigPanel({
     </div>
   );
 }
-
-// ─── Secure platform data fetcher ────────────────────────────────────────────
-const platformFetch = async (action: string, payload?: object) => {
-  const token = import.meta.env.VITE_PLATFORM_ADMIN_TOKEN;
-  if (!token) throw new Error('VITE_PLATFORM_ADMIN_TOKEN is not configured');
-  const { data, error } = await supabase.functions.invoke('platform-admin-data', {
-    body: { action, payload },
-    headers: { 'X-Platform-Token': token },
-  });
-  // Non-2xx: the Supabase client swallows the body — throw the SDK error directly.
-  if (error) throw error;
-  // 200 with an error field: the function returned a structured error — surface it.
-  if (data?.error) throw new Error(data.error);
-  return data;
-};
 
 export default function PlatformDashboard() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -658,6 +646,9 @@ export default function PlatformDashboard() {
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <Users className="h-3.5 w-3.5" /> All Users
+            </TabsTrigger>
+            <TabsTrigger value="sales" className="gap-2">
+              <TrendingUp className="h-3.5 w-3.5" /> Sales
             </TabsTrigger>
           </TabsList>
 
@@ -1215,6 +1206,11 @@ export default function PlatformDashboard() {
                 </Table>
               )}
             </div>
+          </TabsContent>
+
+          {/* ── Sales tab ─────────────────────────────────────────────────── */}
+          <TabsContent value="sales">
+            <SalesTab active={activeTab === 'sales'} />
           </TabsContent>
 
         </Tabs>

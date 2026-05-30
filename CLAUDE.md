@@ -74,6 +74,8 @@ supervisor_assignments
 companies            trial_ends_at (default NOW()+14d), features JSONB
 subscriptions        Razorpay scaffold, one per company
 rate_limits          backs rate_limit_check RPC
+leads                platform-internal sales CRM; stage pipeline; RLS no-policy (service-role only)
+lead_activities      append-only outreach log per lead; FK ON DELETE CASCADE
 ```
 
 `my_company_id()` SECURITY DEFINER fn used in every RLS policy. NULL → user sees nothing.
@@ -98,6 +100,7 @@ rate_limits          backs rate_limit_check RPC
 - **Bulk approve:** Supervisor dashboard checkboxes; UPDATE guarded by `.eq('status','SUBMITTED')`.
 - **Idle timeout:** 30 min in AuthContext (`IDLE_TIMEOUT_MS`).
 - **Company-scoped login:** `AuthContext` compares `profiles.company_id` to subdomain's `company.id`; mismatch → sign out + `companyMismatch=true`. Skipped on localhost.
+- **Sales tracker (platform admin):** Internal outreach CRM in the admin panel's **Sales** tab. `leads` + `lead_activities` tables (RLS enabled, **no policies** → service-role-only via `platform-admin-data`). Seeded from the GTM target list (migration `20260530000004`). 7-stage pipeline `NEW→CONTACTED→DEMO_BOOKED→PILOT→WON|LOST|PARKED`. Edge actions: `get_all_leads`, `get_lead_detail`, `create_lead`, `update_lead`, `add_lead_activity`. UI in `pages/PlatformAdmin/SalesTab.tsx` + `LeadDetailDrawer.tsx`; shared `platformFetch.ts`. Tracking-only — automations (reminders/sending/auto-park/KPIs) are a deferred phase. Regenerate seed via `scripts/gen_leads_seed.py`.
 
 ## Conventions
 
