@@ -1,8 +1,8 @@
 # TestFlow — Electrical Testing Management
 
-TestFlow is an internal web application for managing electrical substation commissioning projects. It digitizes test planning, field execution, review/approval workflows, and AI-powered report generation.
+TestFlow is an internal web application for managing electrical substation commissioning projects. It digitizes test planning, field execution, review/approval workflows, and report generation.
 
-**4 roles** · **8 equipment types** · **46 test templates** · **4 dashboards** · **AI reports via Claude API**
+**4 roles** · **8 equipment types** · **46 test templates** · **4 dashboards** 
 
 ---
 
