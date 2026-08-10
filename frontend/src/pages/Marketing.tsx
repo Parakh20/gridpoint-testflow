@@ -313,7 +313,6 @@ const Nav = () => (
         <a href="#cta" className="hover:text-white">Contact</a>
       </nav>
       <div className="flex items-center gap-2.5">
-        <a href="/auth" className="hidden sm:inline text-[13.5px] text-white/70 hover:text-white px-3 py-1.5">Sign in</a>
         <a href="#cta" className="btn-primary text-[13.5px] font-medium px-3.5 py-2 rounded-md text-white">Request access</a>
       </div>
     </div>
@@ -827,6 +826,20 @@ function DemoRequestForm() {
     });
     if (error) console.error('[DemoRequestForm] submit failed:', error);
     setStatus(error ? 'error' : 'success');
+
+    if (!error) {
+      supabase.functions.invoke('notify-demo-request', {
+        body: {
+          name: form.name.trim(),
+          email: form.email.trim(),
+          company: form.company.trim(),
+          phone: form.phone.trim() || null,
+          message: form.message.trim() || null,
+        },
+      }).catch((notifyError) => {
+        console.error('[DemoRequestForm] notify failed:', notifyError);
+      });
+    }
   };
 
   if (status === 'success') {
