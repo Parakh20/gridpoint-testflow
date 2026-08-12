@@ -38,6 +38,16 @@ DECLARE
   fallback_slug TEXT;
   result JSONB;
 BEGIN
+  -- Reject a caller-supplied _company_id that doesn't match the caller's own
+  -- company. my_company_id() returns NULL for service-role callers (no
+  -- auth.uid() session), so `_company_id != NULL` evaluates to NULL (not
+  -- TRUE) and this never fires for the service-role call path used by the
+  -- create-user Edge Function (Task 5) — only an authenticated user
+  -- impersonating another company's UUID is blocked.
+  IF _company_id IS NOT NULL AND _company_id != my_company_id() THEN
+    RAISE EXCEPTION 'Not authorized to view entitlements for this company';
+  END IF;
+
   IF target_company IS NULL THEN
     RETURN '{}'::JSONB;
   END IF;
@@ -114,6 +124,12 @@ DECLARE
   max_users INT;
   current_users INT;
 BEGIN
+  -- See get_company_entitlements() above for why this is safe for the
+  -- service-role call path used by the create-user Edge Function (Task 5).
+  IF _company_id IS NOT NULL AND _company_id != my_company_id() THEN
+    RAISE EXCEPTION 'Not authorized to check entitlements for this company';
+  END IF;
+
   IF target_company IS NULL THEN RETURN FALSE; END IF;
 
   entitlements := get_company_entitlements(target_company);
@@ -155,6 +171,12 @@ DECLARE
   max_projects INT;
   current_projects INT;
 BEGIN
+  -- See get_company_entitlements() above for why this is safe for the
+  -- service-role call path used by the create-user Edge Function (Task 5).
+  IF _company_id IS NOT NULL AND _company_id != my_company_id() THEN
+    RAISE EXCEPTION 'Not authorized to check entitlements for this company';
+  END IF;
+
   IF target_company IS NULL THEN RETURN FALSE; END IF;
 
   entitlements := get_company_entitlements(target_company);
