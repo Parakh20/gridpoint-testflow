@@ -60,6 +60,22 @@ Deno.serve(async (req) => {
 
     if (!callerProfile?.company_id) return json({ error: 'Caller has no company assigned' }, 400);
 
+    // Seat check: block user creation once the company's plan limit is reached.
+    const supabaseAdminForEntitlements = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    const { data: canInvite, error: entitlementError } = await supabaseAdminForEntitlements
+      .rpc('can_invite_user', { _company_id: callerProfile.company_id });
+    if (entitlementError) return json({ error: `Entitlement check failed: ${entitlementError.message}` }, 500);
+    if (!canInvite) {
+      return json({
+        code: 'PLAN_LIMIT_REACHED',
+        resource: 'users',
+        error: 'No seats available on your current plan. Upgrade to add more users.',
+      }, 403);
+    }
+
     // 4. Parse and validate request body
     const { name, email, password, role } = await req.json();
     if (!name || !email || !password || !role) {
