@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
       _company_id: companyId,
       _provider_sub_id: sub.id,
       _provider_cust_id: sub.customer_id ?? null,
-      _plan_id: sub.plan_id ?? null,
+      _provider_plan_id: sub.plan_id ?? null,
       _status: mapRazorpayStatus(sub.status),
       _period_start: sub.current_start ? new Date(sub.current_start * 1000).toISOString() : null,
       _period_end:   sub.current_end   ? new Date(sub.current_end   * 1000).toISOString() : null,
