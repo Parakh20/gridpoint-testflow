@@ -14,9 +14,13 @@
 -- Logic:
 -- 1. If company has a subscription with status IN ('trialing', 'active', 'past_due'),
 --    use that plan's ID.
--- 2. Otherwise, check if company.trial_ends_at > NOW() (active trial):
---    - If trial active: use 'professional' plan
---    - If trial expired: use 'starter' plan
+-- 2. Otherwise, resolve from trial_ends_at (see 20260519000003 for the
+--    original meaning of this column: NULL means "no trial — existing,
+--    grandfathered customer", NOT "no trial, treat as unlimited-free"):
+--    - trial_ends_at IS NOT NULL AND trial_ends_at > NOW(): active trial -> 'professional'
+--    - trial_ends_at IS NOT NULL AND trial_ends_at <= NOW(): trial expired -> 'starter'
+--    - trial_ends_at IS NULL: grandfathered existing customer, no seat/project
+--      cap was ever intended for these tenants -> 'enterprise' (unlimited)
 -- 3. Return JSONB with plan_slug, plan_name, max_users, max_active_projects,
 --    is_custom, and features (JSONB mapping feature_key → enabled).
 
@@ -30,7 +34,8 @@ AS $$
 DECLARE
   target_company UUID := COALESCE(_company_id, my_company_id());
   resolved_plan_id UUID;
-  trial_active BOOLEAN;
+  company_trial_ends_at TIMESTAMPTZ;
+  fallback_slug TEXT;
   result JSONB;
 BEGIN
   IF target_company IS NULL THEN
@@ -44,15 +49,23 @@ BEGIN
     AND s.status IN ('trialing', 'active', 'past_due')
   LIMIT 1;
 
-  -- 2. If no subscription, resolve from trial status
+  -- 2. If no subscription, resolve from trial status. trial_ends_at IS NULL
+  -- means "no trial — grandfathered, active customer" (see comment on this
+  -- column in 20260519000003_ratelimit_trial_billing.sql), so it must map
+  -- to the unlimited 'enterprise' plan, not the capped 'starter' plan.
   IF resolved_plan_id IS NULL THEN
-    SELECT (trial_ends_at IS NOT NULL AND trial_ends_at > NOW())
-      INTO trial_active
+    SELECT trial_ends_at INTO company_trial_ends_at
       FROM companies WHERE id = target_company;
+
+    fallback_slug := CASE
+      WHEN company_trial_ends_at IS NULL THEN 'enterprise'       -- grandfathered, unlimited
+      WHEN company_trial_ends_at > NOW() THEN 'professional'     -- active trial
+      ELSE 'starter'                                             -- trial expired
+    END;
 
     SELECT id INTO resolved_plan_id
     FROM plans
-    WHERE slug = CASE WHEN trial_active THEN 'professional' ELSE 'starter' END;
+    WHERE slug = fallback_slug;
   END IF;
 
   -- 3. Build and return JSONB with plan details + features
