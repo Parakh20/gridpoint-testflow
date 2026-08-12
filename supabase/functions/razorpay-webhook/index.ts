@@ -109,6 +109,12 @@ Deno.serve(async (req) => {
       });
       if (error) {
         console.error('upsert_subscription error:', error.message);
+        // Compensating delete: undo the dedupe-gate insert so a legitimate
+        // Razorpay retry isn't silently swallowed as "already processed" —
+        // this event never actually completed.
+        await supabase.from('billing_events').delete()
+          .eq('provider', 'razorpay')
+          .eq('provider_event_id', eventId);
         return json({ error: error.message }, 500);
       }
       return json({ ok: true, event: eventType, company_id: companyId });
@@ -132,6 +138,12 @@ Deno.serve(async (req) => {
         });
         if (error) {
           console.error('upsert_order error:', error.message);
+          // Compensating delete: undo the dedupe-gate insert so a legitimate
+          // Razorpay retry isn't silently swallowed as "already processed" —
+          // this event never actually completed.
+          await supabase.from('billing_events').delete()
+            .eq('provider', 'razorpay')
+            .eq('provider_event_id', eventId);
           return json({ error: error.message }, 500);
         }
       }
