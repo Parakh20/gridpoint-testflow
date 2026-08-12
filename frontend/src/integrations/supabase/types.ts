@@ -763,8 +763,20 @@ export type Database = {
         }
         Returns: string
       }
+      can_create_project: {
+        Args: { _company_id?: string | null }
+        Returns: boolean
+      }
+      can_invite_user: {
+        Args: { _company_id?: string | null }
+        Returns: boolean
+      }
       generate_project_equipment: {
         Args: { _project_id: string }
+        Returns: Json
+      }
+      get_company_entitlements: {
+        Args: { _company_id?: string | null }
         Returns: Json
       }
       has_feature: { Args: { _flag: string }; Returns: boolean }

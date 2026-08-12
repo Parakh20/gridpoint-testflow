@@ -26,7 +26,7 @@ export function useEntitlements(): { entitlements: Entitlements | null; isLoadin
         _company_id: company.id,
       });
       if (error) throw error;
-      return parseEntitlements(data as EntitlementsRpcResponse);
+      return parseEntitlements(data as unknown as EntitlementsRpcResponse);
     },
     enabled: !!company,
     staleTime: 5 * 60 * 1000,
