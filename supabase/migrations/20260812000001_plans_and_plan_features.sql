@@ -28,9 +28,11 @@ ALTER TABLE plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE plan_features ENABLE ROW LEVEL SECURITY;
 
 -- Plans are public catalog data (pricing page needs anon read of is_public rows).
+DROP POLICY IF EXISTS "plans_public_read" ON plans;
 CREATE POLICY "plans_public_read" ON plans
   FOR SELECT USING (is_public = TRUE AND is_active = TRUE);
 
+DROP POLICY IF EXISTS "plan_features_public_read" ON plan_features;
 CREATE POLICY "plan_features_public_read" ON plan_features
   FOR SELECT USING (
     plan_id IN (SELECT id FROM plans WHERE is_public = TRUE AND is_active = TRUE)
