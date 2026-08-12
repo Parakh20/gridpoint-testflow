@@ -41,3 +41,8 @@ BEGIN
   RETURN inserted > 0;
 END;
 $$;
+
+-- Restrict to service_role only (webhook handler via Edge Function).
+-- Prevents authenticated users from calling this RPC via PostgREST to forge events.
+REVOKE ALL ON FUNCTION record_billing_event(TEXT, TEXT, TEXT, UUID, JSONB) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION record_billing_event(TEXT, TEXT, TEXT, UUID, JSONB) TO service_role;
