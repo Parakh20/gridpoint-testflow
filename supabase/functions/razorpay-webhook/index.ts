@@ -61,11 +61,18 @@ Deno.serve(async (req) => {
 
     const event = JSON.parse(rawBody);
     const eventType: string = event.event;
-    const eventId: string = event.id ?? `${eventType}:${rawBody.length}:${Date.now()}`;
 
     const sub = event.payload?.subscription?.entity;
     const payment = event.payload?.payment?.entity;
     const companyId: string | undefined = sub?.notes?.company_id ?? payment?.notes?.company_id;
+
+    // Razorpay delivers the event id via the X-Razorpay-Event-Id header, not
+    // a top-level `id` field in the body (that field doesn't exist in
+    // Razorpay's payload). Headers.get() is case-insensitive. Fall back to a
+    // payload-derived (not time-derived) key so retries of the same delivery
+    // still collide instead of Date.now() guaranteeing uniqueness.
+    const eventId = req.headers.get('x-razorpay-event-id')
+      ?? `${eventType}:${event.created_at ?? ''}:${sub?.id ?? payment?.id ?? ''}`;
 
     if (!companyId) {
       console.warn('Razorpay event missing notes.company_id', eventType, sub?.id ?? payment?.id);

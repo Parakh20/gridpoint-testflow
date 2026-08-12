@@ -76,6 +76,9 @@ subscriptions        Razorpay scaffold, one per company
 rate_limits          backs rate_limit_check RPC
 leads                platform-internal sales CRM; stage pipeline; RLS no-policy (service-role only)
 lead_activities      append-only outreach log per lead; FK ON DELETE CASCADE
+billing_events       Razorpay webhook idempotency ledger; RLS no-policy (service-role only)
+orders               one-time implementation/addon/custom_development/training fees; RLS no-policy (service-role only)
+plan_provider_mapping  razorpay_plan_id_monthly/_annual → plans.id; RLS no-policy (service-role only)
 ```
 
 `my_company_id()` SECURITY DEFINER fn used in every RLS policy. NULL → user sees nothing.
@@ -101,6 +104,8 @@ lead_activities      append-only outreach log per lead; FK ON DELETE CASCADE
 - **Idle timeout:** 30 min in AuthContext (`IDLE_TIMEOUT_MS`).
 - **Company-scoped login:** `AuthContext` compares `profiles.company_id` to subdomain's `company.id`; mismatch → sign out + `companyMismatch=true`. Skipped on localhost.
 - **Sales tracker (platform admin):** Internal outreach CRM in the admin panel's **Sales** tab. `leads` + `lead_activities` tables (RLS enabled, **no policies** → service-role-only via `platform-admin-data`). Seeded from the GTM target list (migration `20260530000004`). 7-stage pipeline `NEW→CONTACTED→DEMO_BOOKED→PILOT→WON|LOST|PARKED`. Edge actions: `get_all_leads`, `get_lead_detail`, `create_lead`, `update_lead`, `add_lead_activity`. UI in `pages/PlatformAdmin/SalesTab.tsx` + `LeadDetailDrawer.tsx`; shared `platformFetch.ts`. Tracking-only — automations (reminders/sending/auto-park/KPIs) are a deferred phase. Regenerate seed via `scripts/gen_leads_seed.py`.
+- **Billing webhooks:** `razorpay-webhook` Edge Function verifies HMAC signature, dedupes by `X-Razorpay-Event-Id` header (not `event.id` — that field doesn't exist in Razorpay's payload) via `record_billing_event` RPC against `billing_events`, then upserts `subscriptions` (via `upsert_subscription`, service-role-only) or `orders` (via `upsert_order`). `subscriptions.plan_id` is resolved by `upsert_subscription` from Razorpay's provider plan id via the service-role-only `plan_provider_mapping` table (not `plans` — those columns were removed from `plans` since it's anon-readable). Shared provider abstraction: `supabase/functions/_shared/billing_provider.ts` (`BillingProvider` interface, `RazorpayBillingProvider`).
+- **Past-due grace period:** a `past_due` subscription keeps full access for 7 days after `current_period_end` (`GRACE_PERIOD_DAYS` in `is_past_due_grace_expired`, service-role-only), after which `can_invite_user`/`can_create_project` block new writes until payment succeeds or the subscription is cancelled. Existing data stays readable — this only gates INSERT-path checks.
 
 ## Conventions
 
@@ -127,6 +132,7 @@ lead_activities      append-only outreach log per lead; FK ON DELETE CASCADE
 | `ANTHROPIC_API_KEY` | Edge Function | `supabase secrets set`, never in `.env` |
 | `PLATFORM_ADMIN_TOKEN` | Edge Function | guards `create-tenant`, `platform-admin-data` |
 | `RAZORPAY_WEBHOOK_SECRET` | Edge Function | required for `razorpay-webhook` |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Edge Function | `supabase secrets set`; used by `RazorpayBillingProvider` (`_shared/billing_provider.ts`) |
 | GH Actions | CI | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `SUPABASE_DB_PASSWORD`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` |
 
 Frontend env: `frontend/.env` (not root). Edge Functions auto-get `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`.
