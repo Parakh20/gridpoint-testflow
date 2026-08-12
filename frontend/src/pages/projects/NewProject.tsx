@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useEntitlements } from '@/lib/entitlements';
 
 type EquipmentType = 'POWER_TRANSFORMER' | 'SF6_BREAKER' | 'VCB' | 'CT' | 'CVT' | 'LA' | 'ISOLATOR' | 'EARTH_PIT' | 'VT';
 
@@ -35,6 +36,7 @@ export default function NewProject() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { company } = useCompany();
+  const { entitlements } = useEntitlements();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -124,7 +126,20 @@ export default function NewProject() {
         .select()
         .single();
 
-      if (projectError) throw projectError;
+      if (projectError) {
+        if (projectError.message.includes('row-level security')) {
+          toast({
+            title: 'Project limit reached',
+            description: entitlements
+              ? `Your ${entitlements.planName} plan allows ${entitlements.maxActiveProjects} active projects. Close an existing project or upgrade your plan.`
+              : 'Your plan has reached its active project limit.',
+            variant: 'destructive',
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        throw projectError;
+      }
 
       // Create scope items
       const scopeInserts = scopeItems.map(item => ({

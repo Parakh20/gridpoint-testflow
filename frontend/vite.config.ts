@@ -10,7 +10,14 @@ export default defineConfig({
     host: "localhost",
     port: 8080,
   },
-  plugins: [react(), nodePolyfills({ include: ["buffer"] })],
+  // Skip the Node polyfill plugin under Vitest: it injects a bare
+  // "vite-plugin-node-polyfills/shims/buffer" import into every transformed
+  // module, including source-only workspace packages like
+  // `packages/shared` that live outside `frontend/`'s node_modules
+  // resolution tree — that import fails to resolve under Vitest's
+  // transform pipeline (though it resolves fine for `vite build`, which
+  // stays in-root). Tests run in Node, which already has a real Buffer.
+  plugins: [react(), ...(process.env.VITEST ? [] : [nodePolyfills({ include: ["buffer"] })])],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
