@@ -68,3 +68,43 @@ export interface UpgradeReason {
   limit: number | null;
   required_plan: PlanSlug | null;
 }
+
+/**
+ * Add-on keys, matching subscription_addons.addon_key's CHECK constraint in
+ * supabase/migrations/20260813000013_enterprise_contracts_and_addons.sql.
+ */
+export const ADDON_KEYS = [
+  'extra_users',
+  'extra_projects',
+  'api_access',
+  'sso',
+  'dedicated_environment',
+  'priority_sla',
+  'custom_integration',
+] as const;
+
+export type AddonKey = (typeof ADDON_KEYS)[number];
+
+export interface EnterpriseContract {
+  id: string;
+  companyId: string;
+  customMonthlyPriceInr: number | null;
+  customAnnualPriceInr: number | null;
+  maxUsers: number | null;
+  maxActiveProjects: number | null;
+  maxStorageGb: number | null;
+  contractStart: string;
+  contractEnd: string | null;
+  slaLevel: string | null;
+  supportLevel: string | null;
+  customFeatures: Partial<Record<FeatureKey, boolean>>;
+}
+
+export interface SubscriptionAddon {
+  id: string;
+  subscriptionId: string;
+  addonKey: AddonKey;
+  quantity: number;
+  unitPriceInr: number | null;
+  status: 'active' | 'cancelled';
+}
