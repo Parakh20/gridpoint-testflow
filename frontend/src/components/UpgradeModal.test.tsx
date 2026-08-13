@@ -38,4 +38,22 @@ describe('UpgradeModal', () => {
     expect(await screen.findByText(/3 active projects/i)).toBeInTheDocument();
     expect(await screen.findByText(/Professional/i)).toBeInTheDocument();
   });
+
+  it('renders without a suggested plan when required_plan is null (e.g. past-due grace expired)', async () => {
+    // QA-matrix scenario 5: once is_past_due_grace_expired() trips,
+    // get_resource_limit_status() returns required_plan: null (see the
+    // 20260814000001 migration fix and docs/dev/BILLING_QA_MATRIX.md scenario 5)
+    // because upgrading plans doesn't fix an unpaid invoice. The modal must
+    // degrade gracefully instead of crashing or showing a bogus "Upgrade to null".
+    const reason: UpgradeReason = {
+      code: 'PLAN_LIMIT_REACHED',
+      resource: 'users',
+      current: 8,
+      limit: 10,
+      required_plan: null,
+    };
+    renderWithClient(<UpgradeModal reason={reason} onOpenChange={() => {}} />);
+    expect(await screen.findByText(/10 active users/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Upgrade to/i)).not.toBeInTheDocument();
+  });
 });
