@@ -576,6 +576,50 @@ serve(async (req) => {
       return respond({ activity: data });
     }
 
+    // ── get_billing_overview ────────────────────────────────────────────────────
+    // Aggregate MRR/ARR/status counts across all subscriptions. MRR sums the
+    // monthly-equivalent of every active/trialing sub (annual subs divide by 12).
+    if (action === 'get_billing_overview') {
+      const { data: subs, error } = await adminClient
+        .from('subscriptions')
+        .select('status, billing_interval, plan_id, plans:plan_id(monthly_price_inr, annual_price_inr)');
+      if (error) throw error;
+
+      let mrr = 0;
+      let active_count = 0, trialing_count = 0, past_due_count = 0, cancelled_count = 0;
+      for (const s of (subs ?? []) as any[]) {
+        if (s.status === 'active') active_count++;
+        else if (s.status === 'trialing') trialing_count++;
+        else if (s.status === 'past_due') past_due_count++;
+        else if (s.status === 'cancelled') cancelled_count++;
+
+        if ((s.status === 'active' || s.status === 'past_due') && s.plans) {
+          const monthly = s.billing_interval === 'annual'
+            ? (s.plans.annual_price_inr ?? 0) / 12
+            : (s.plans.monthly_price_inr ?? 0);
+          mrr += monthly;
+        }
+      }
+
+      return respond({ mrr, arr: mrr * 12, active_count, trialing_count, past_due_count, cancelled_count });
+    }
+
+    // ── get_all_subscriptions ───────────────────────────────────────────────────
+    if (action === 'get_all_subscriptions') {
+      const { data, error } = await adminClient
+        .from('subscriptions')
+        .select(`
+          id, company_id, status, billing_interval, current_period_end,
+          seat_count, discount_pct, credit_balance_inr,
+          companies:company_id(name, slug),
+          plans:plan_id(slug, name, monthly_price_inr, annual_price_inr, max_users, max_active_projects)
+        `)
+        .order('current_period_end', { ascending: true, nullsFirst: false });
+      if (error) throw error;
+
+      return respond({ subscriptions: data ?? [] });
+    }
+
     return respond({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
