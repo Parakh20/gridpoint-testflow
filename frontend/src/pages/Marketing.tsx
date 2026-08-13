@@ -722,12 +722,12 @@ const Field = () => (
    ============================================================ */
 const Security = () => {
   const items: [LucideIcon, string, string][] = [
-    [DatabaseZap, "Your data, isolated", "Each customer's data lives in its own private space."],
-    [ScrollText, "Complete history", "Every action is logged and available for review."],
+    [DatabaseZap, "Your data, isolated", "Every organization operates within its own tenant boundary, enforced at the database layer via row-level security."],
+    [LockKeyhole, "Encrypted in transit", "All traffic runs over HTTPS/TLS, and data at rest is encrypted through our infrastructure providers."],
+    [ScrollText, "Complete history", "Administrative and workflow actions are recorded for traceability."],
     [KeyRound, "Clear permissions", "People only see and approve what's relevant to their role."],
     [Undo2, "Restore in a click", "Accidentally removed something? It's recoverable."],
-    [HardDriveDownload, "Daily backups", "Your work is safely backed up around the clock."],
-    [LockKeyhole, "Account safeguards", "Configurable sign-in rules and session policies."],
+    [HardDriveDownload, "Nightly backups", "Database backups run automatically every night and are retained for 30 days."],
   ];
   return (
     <section id="security" className="relative py-20 md:py-24 overflow-hidden">
@@ -737,7 +737,7 @@ const Security = () => {
       <div className="relative max-w-7xl mx-auto px-6">
         <Reveal>
           <div className="font-mono text-[11px] uppercase tracking-widest text-white/40">Security &amp; compliance</div>
-          <h2 className="mt-3 text-3xl md:text-5xl font-semibold tracking-tight max-w-3xl">Compliance controls, by design.</h2>
+          <h2 className="mt-3 text-3xl md:text-5xl font-semibold tracking-tight max-w-3xl">Security controls, by design.</h2>
         </Reveal>
         <div className="grid md:grid-cols-3 gap-3 mt-12">
           {items.map(([I, t, d], i) => (
@@ -756,11 +756,11 @@ const Security = () => {
         </div>
         <Reveal delay={300}>
           <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 font-mono text-[11px] text-white/45">
-            <span>SOC2 Type I</span>
+            <span>Row-level tenant isolation</span>
             <span className="text-white/20">·</span>
-            <span>ISO 27001 (in audit)</span>
+            <span>Rate-limited admin APIs</span>
             <span className="text-white/20">·</span>
-            <span>DPDP compliant</span>
+            <span>Encrypted in transit</span>
           </div>
         </Reveal>
       </div>
