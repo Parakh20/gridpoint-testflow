@@ -65,13 +65,16 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
-    const { data: canInvite, error: entitlementError } = await supabaseAdminForEntitlements
-      .rpc('can_invite_user', { _company_id: callerProfile.company_id });
+    const { data: seatStatus, error: entitlementError } = await supabaseAdminForEntitlements
+      .rpc('get_resource_limit_status', { _resource: 'users', _company_id: callerProfile.company_id });
     if (entitlementError) return json({ error: `Entitlement check failed: ${entitlementError.message}` }, 500);
-    if (!canInvite) {
+    if (!seatStatus?.allowed) {
       return json({
         code: 'PLAN_LIMIT_REACHED',
         resource: 'users',
+        current: seatStatus?.current ?? null,
+        limit: seatStatus?.limit ?? null,
+        required_plan: seatStatus?.required_plan ?? null,
         error: 'No seats available on your current plan. Upgrade to add more users.',
       }, 403);
     }
