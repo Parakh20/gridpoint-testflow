@@ -68,3 +68,33 @@ export interface UpgradeReason {
   limit: number | null;
   required_plan: PlanSlug | null;
 }
+
+/** A resource that would exceed the target plan's limit if downgraded now. */
+export interface DowngradeBlocker {
+  resource: 'users' | 'active_projects';
+  current: number;
+  targetLimit: number;
+}
+
+/** Shape returned by check_plan_downgrade_feasibility() / request_plan_downgrade(). */
+export interface DowngradeFeasibilityRpcResponse {
+  feasible?: boolean;
+  scheduled?: boolean;
+  blockers: Array<{ resource: 'users' | 'active_projects'; current: number; target_limit: number }>;
+}
+
+export interface DowngradeFeasibility {
+  allowed: boolean;
+  blockers: DowngradeBlocker[];
+}
+
+export function parseDowngradeFeasibility(raw: DowngradeFeasibilityRpcResponse): DowngradeFeasibility {
+  return {
+    allowed: raw.feasible ?? raw.scheduled ?? false,
+    blockers: raw.blockers.map((b) => ({
+      resource: b.resource,
+      current: b.current,
+      targetLimit: b.target_limit,
+    })),
+  };
+}
