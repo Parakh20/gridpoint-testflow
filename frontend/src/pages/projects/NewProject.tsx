@@ -152,8 +152,14 @@ export default function NewProject() {
         if (projectError.message.includes('row-level security')) {
           setUpgradeReason({
             code: 'PLAN_LIMIT_REACHED',
+            // This TOCTOU fallback only fires if the pre-check RPC above
+            // raced with an insert somewhere else and RLS rejected anyway —
+            // the actual current usage count isn't known here (only the
+            // plan's limit is), so `current` stays null rather than being
+            // set to the limit value, which would render as a false "at
+            // capacity" count that happens to equal the limit.
             resource: 'projects',
-            current: entitlements?.maxActiveProjects ?? null,
+            current: null,
             limit: entitlements?.maxActiveProjects ?? null,
             required_plan: null,
           });

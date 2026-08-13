@@ -53,7 +53,11 @@ export function UpgradeModal({ reason, onOpenChange }: UpgradeModalProps) {
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
           <Button asChild>
-            <a href="/pricing">View plans</a>
+            {/* /pricing has no route on the tenant host — the pricing
+                section lives on the marketing site, forced via the
+                ?marketing query override (App.tsx) regardless of which
+                host this modal is rendered on. */}
+            <a href="/?marketing#pricing">View plans</a>
           </Button>
         </DialogFooter>
       </DialogContent>
