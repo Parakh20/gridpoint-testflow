@@ -272,6 +272,54 @@ export type Database = {
           },
         ]
       }
+      plans: {
+        Row: {
+          annual_price_inr: number | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_custom: boolean
+          is_public: boolean
+          max_active_projects: number | null
+          max_users: number | null
+          monthly_price_inr: number | null
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          annual_price_inr?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_custom?: boolean
+          is_public?: boolean
+          max_active_projects?: number | null
+          max_users?: number | null
+          monthly_price_inr?: number | null
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          annual_price_inr?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_custom?: boolean
+          is_public?: boolean
+          max_active_projects?: number | null
+          max_users?: number | null
+          monthly_price_inr?: number | null
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company_id: string | null
@@ -770,6 +818,18 @@ export type Database = {
       can_invite_user: {
         Args: { _company_id?: string | null }
         Returns: boolean
+      }
+      check_can_create_project: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      find_cheapest_plan_for: {
+        Args: { _required_count: number; _resource: string }
+        Returns: string
+      }
+      get_resource_limit_status: {
+        Args: { _company_id?: string | null; _resource: string }
+        Returns: Json
       }
       generate_project_equipment: {
         Args: { _project_id: string }
