@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { SubscriptionActions } from './SubscriptionActions';
 
 const invokeMock = vi.fn();
@@ -13,6 +14,36 @@ describe('SubscriptionActions', () => {
     invokeMock.mockResolvedValueOnce({
       data: { scheduled: false, blockers: [{ resource: 'users', current: 15, target_limit: 10 }] },
       error: null,
+    });
+
+    render(
+      <SubscriptionActions
+        currentPlanName="Business"
+        planOptions={[{ slug: 'starter', name: 'Starter' }]}
+        onChanged={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /change plan/i }));
+    fireEvent.change(screen.getByLabelText(/new plan/i), { target: { value: 'starter' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirm downgrade/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/reduce/i)).toBeInTheDocument();
+      expect(screen.getByText(/15/)).toBeInTheDocument();
+      expect(screen.getByText(/10/)).toBeInTheDocument();
+    });
+  });
+
+  it('shows blockers when manage-subscription rejects with the real 409 FunctionsHttpError shape', async () => {
+    // Regression test: supabase-js throws FunctionsHttpError for ANY
+    // non-2xx response (manage-subscription returns 409 for a blocked
+    // downgrade) — data is null and the JSON body lives on error.context.
+    const body = { scheduled: false, blockers: [{ resource: 'users', current: 15, target_limit: 10 }] };
+    const context = new Response(JSON.stringify(body), { status: 409 });
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: new FunctionsHttpError(context),
     });
 
     render(

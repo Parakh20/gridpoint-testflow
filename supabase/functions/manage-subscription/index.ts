@@ -78,6 +78,7 @@ Deno.serve(async (req) => {
         .select('id')
         .eq('slug', targetSlug)
         .eq('is_active', true)
+        .eq('is_public', true)
         .single();
 
       if (planError || !targetPlan) return json({ error: `Unknown plan: ${targetSlug}` }, 400);

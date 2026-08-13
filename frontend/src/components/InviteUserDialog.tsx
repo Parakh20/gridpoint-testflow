@@ -31,6 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { UpgradeModal } from '@/components/UpgradeModal';
+import { parseFunctionsErrorBody } from '@/lib/functionsError';
 import type { UpgradeReason } from '@testflow/shared';
 
 const inviteUserSchema = z.object({
@@ -95,18 +96,21 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
         body: { name: data.name, email: data.email, password: data.password, role: data.role },
       });
 
-      if (error) throw error;
-      if (result?.code === 'PLAN_LIMIT_REACHED') {
+      // supabase-js throws on any non-2xx (e.g. the 403 PLAN_LIMIT_REACHED
+      // body) — the structured body lives on error.context, not `result`.
+      const effectiveResult = error ? await parseFunctionsErrorBody(error) : result;
+      if (effectiveResult?.code === 'PLAN_LIMIT_REACHED') {
         setUpgradeReason({
           code: 'PLAN_LIMIT_REACHED',
-          resource: result.resource,
-          current: result.current ?? null,
-          limit: result.limit ?? null,
-          required_plan: result.required_plan ?? null,
+          resource: effectiveResult.resource as UpgradeReason['resource'],
+          current: (effectiveResult.current as number | null) ?? null,
+          limit: (effectiveResult.limit as number | null) ?? null,
+          required_plan: (effectiveResult.required_plan as UpgradeReason['required_plan']) ?? null,
         });
         setIsLoading(false);
         return;
       }
+      if (error) throw error;
       if (result?.error) throw new Error(result.error);
 
       toast.success('User created successfully', {

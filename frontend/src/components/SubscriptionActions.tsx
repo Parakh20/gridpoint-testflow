@@ -22,7 +22,8 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { parseDowngradeFeasibility, type DowngradeFeasibility } from '@testflow/shared';
+import { parseDowngradeFeasibility, type DowngradeFeasibility, type DowngradeFeasibilityRpcResponse } from '@testflow/shared';
+import { parseFunctionsErrorBody } from '@/lib/functionsError';
 
 type PlanOption = { slug: string; name: string };
 
@@ -70,8 +71,11 @@ export function SubscriptionActions({ currentPlanName, planOptions, onChanged }:
       const { data, error } = await supabase.functions.invoke('manage-subscription', {
         body: { action: 'downgrade', target_plan_slug: targetSlug },
       });
-      if (error) throw error;
-      const parsed = parseDowngradeFeasibility(data);
+      // supabase-js throws on any non-2xx — a 409 "blockers" response is
+      // still valid data for this flow, just delivered via error.context.
+      const effectiveData = error ? await parseFunctionsErrorBody(error) : data;
+      if (!effectiveData) throw error ?? new Error('Failed to schedule downgrade');
+      const parsed = parseDowngradeFeasibility(effectiveData as unknown as DowngradeFeasibilityRpcResponse);
       setFeasibility(parsed);
       if (parsed.allowed) {
         toast({ title: 'Downgrade scheduled', description: 'It takes effect at the start of your next billing period.' });

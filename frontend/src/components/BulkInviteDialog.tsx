@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { UpgradeModal } from '@/components/UpgradeModal';
+import { parseFunctionsErrorBody } from '@/lib/functionsError';
 import type { UpgradeReason } from '@testflow/shared';
 
 // Supabase auth rate limits cap admin-API user creation when SMTP sends are
@@ -112,14 +113,16 @@ export function BulkInviteDialog({ open, onOpenChange, onSuccess }: BulkInviteDi
         const { data: result, error } = await supabase.functions.invoke('create-user', {
           body: { name: row.name, email: row.email, password, role },
         });
-        if (error) throw error;
-        if (result?.code === 'PLAN_LIMIT_REACHED') {
+        // supabase-js throws on any non-2xx (e.g. the 403 PLAN_LIMIT_REACHED
+        // body) — the structured body lives on error.context, not `result`.
+        const effectiveResult = error ? await parseFunctionsErrorBody(error) : result;
+        if (effectiveResult?.code === 'PLAN_LIMIT_REACHED') {
           setUpgradeReason({
             code: 'PLAN_LIMIT_REACHED',
-            resource: result.resource,
-            current: result.current ?? null,
-            limit: result.limit ?? null,
-            required_plan: result.required_plan ?? null,
+            resource: effectiveResult.resource as UpgradeReason['resource'],
+            current: (effectiveResult.current as number | null) ?? null,
+            limit: (effectiveResult.limit as number | null) ?? null,
+            required_plan: (effectiveResult.required_plan as UpgradeReason['required_plan']) ?? null,
           });
           failures += 1;
           setRowStates(prev => {
@@ -133,6 +136,7 @@ export function BulkInviteDialog({ open, onOpenChange, onSuccess }: BulkInviteDi
           });
           break;
         }
+        if (error) throw error;
         if (result?.error) throw new Error(result.error);
 
         credentials.push({ email: row.email, password });
