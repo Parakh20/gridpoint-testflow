@@ -58,10 +58,12 @@ import {
   PowerOff,
   Power,
   TrendingUp,
+  CreditCard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { platformFetch } from './platformFetch';
 import { SalesTab } from './SalesTab';
+import { BillingTab } from './BillingTab';
 
 const BASE_DOMAIN = 'optimustesting.com';
 
@@ -650,6 +652,9 @@ export default function PlatformDashboard() {
             <TabsTrigger value="sales" className="gap-2">
               <TrendingUp className="h-3.5 w-3.5" /> Sales
             </TabsTrigger>
+            <TabsTrigger value="billing" className="gap-2">
+              <CreditCard className="h-3.5 w-3.5" /> Billing
+            </TabsTrigger>
           </TabsList>
 
           {/* ── Companies tab ─────────────────────────────────────────────── */}
@@ -1211,6 +1216,11 @@ export default function PlatformDashboard() {
           {/* ── Sales tab ─────────────────────────────────────────────────── */}
           <TabsContent value="sales">
             <SalesTab active={activeTab === 'sales'} />
+          </TabsContent>
+
+          {/* ── Billing tab ───────────────────────────────────────────────── */}
+          <TabsContent value="billing">
+            <BillingTab active={activeTab === 'billing'} />
           </TabsContent>
 
         </Tabs>

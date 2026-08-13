@@ -576,6 +576,290 @@ serve(async (req) => {
       return respond({ activity: data });
     }
 
+    // ── get_billing_overview ────────────────────────────────────────────────────
+    // Aggregate MRR/ARR/status counts across all subscriptions. MRR sums the
+    // monthly-equivalent of every active/trialing sub (annual subs divide by 12).
+    if (action === 'get_billing_overview') {
+      const { data: subs, error } = await adminClient
+        .from('subscriptions')
+        .select('status, billing_interval, plan_id, plans:plan_id(monthly_price_inr, annual_price_inr)');
+      if (error) throw error;
+
+      let mrr = 0;
+      let active_count = 0, trialing_count = 0, past_due_count = 0, cancelled_count = 0;
+      for (const s of (subs ?? []) as any[]) {
+        if (s.status === 'active') active_count++;
+        else if (s.status === 'trialing') trialing_count++;
+        else if (s.status === 'past_due') past_due_count++;
+        else if (s.status === 'cancelled') cancelled_count++;
+
+        if ((s.status === 'active' || s.status === 'past_due') && s.plans) {
+          const monthly = s.billing_interval === 'annual'
+            ? (s.plans.annual_price_inr ?? 0) / 12
+            : (s.plans.monthly_price_inr ?? 0);
+          mrr += monthly;
+        }
+      }
+
+      return respond({ mrr, arr: mrr * 12, active_count, trialing_count, past_due_count, cancelled_count });
+    }
+
+    // ── get_all_subscriptions ───────────────────────────────────────────────────
+    if (action === 'get_all_subscriptions') {
+      const { data, error } = await adminClient
+        .from('subscriptions')
+        .select(`
+          id, company_id, status, billing_interval, current_period_end,
+          seat_count, discount_pct, credit_balance_inr,
+          companies:company_id(name, slug),
+          plans:plan_id(slug, name, monthly_price_inr, annual_price_inr, max_users, max_active_projects)
+        `)
+        .order('current_period_end', { ascending: true, nullsFirst: false });
+      if (error) throw error;
+
+      return respond({ subscriptions: data ?? [] });
+    }
+
+    // ── admin_change_plan ───────────────────────────────────────────────────────
+    if (action === 'admin_change_plan') {
+      const company_id = payload?.company_id as string | undefined;
+      const plan_slug = payload?.plan_slug as string | undefined;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id || !plan_slug) {
+        return respond({ error: 'payload.company_id and payload.plan_slug are required' }, 400);
+      }
+
+      const { data: plan, error: planErr } = await adminClient
+        .from('plans').select('id, slug').eq('slug', plan_slug).single();
+      if (planErr || !plan) return respond({ error: `Unknown plan slug: ${plan_slug}` }, 400);
+
+      const { data: before } = await adminClient
+        .from('subscriptions').select('plan_id, plans:plan_id(slug)').eq('company_id', company_id).maybeSingle();
+
+      const { data: updated, error } = await adminClient
+        .from('subscriptions')
+        .update({ plan_id: plan.id, updated_at: new Date().toISOString() })
+        .eq('company_id', company_id)
+        .select('*')
+        .maybeSingle();
+      if (error) return respond({ error: error.message }, 400);
+      if (!updated) return respond({ error: 'No subscription row exists for this company yet' }, 404);
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'PLAN_CHANGED',
+        old_value: { plan_slug: (before as any)?.plans?.slug ?? null },
+        new_value: { plan_slug },
+      });
+
+      return respond({ subscription: updated });
+    }
+
+    // ── admin_grant_trial ───────────────────────────────────────────────────────
+    if (action === 'admin_grant_trial') {
+      const company_id = payload?.company_id as string | undefined;
+      const days = (payload?.days as number | undefined) ?? 14;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+      if (typeof days !== 'number' || days <= 0 || days > 365) {
+        return respond({ error: 'payload.days must be a positive number, max 365' }, 400);
+      }
+
+      const { data: before } = await adminClient.from('companies').select('trial_ends_at').eq('id', company_id).single();
+      const newTrialEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+      const { error } = await adminClient.from('companies').update({ trial_ends_at: newTrialEnd }).eq('id', company_id);
+      if (error) return respond({ error: error.message }, 400);
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'TRIAL_GRANTED',
+        old_value: { trial_ends_at: before?.trial_ends_at ?? null },
+        new_value: { trial_ends_at: newTrialEnd },
+        metadata: { days },
+      });
+
+      return respond({ trial_ends_at: newTrialEnd });
+    }
+
+    // ── admin_extend_trial ──────────────────────────────────────────────────────
+    if (action === 'admin_extend_trial') {
+      const company_id = payload?.company_id as string | undefined;
+      const additional_days = (payload?.additional_days as number | undefined) ?? 7;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+      if (typeof additional_days !== 'number' || additional_days <= 0 || additional_days > 365) {
+        return respond({ error: 'payload.additional_days must be a positive number, max 365' }, 400);
+      }
+
+      const { data: before, error: beforeErr } = await adminClient
+        .from('companies').select('trial_ends_at').eq('id', company_id).single();
+      if (beforeErr) return respond({ error: beforeErr.message }, 400);
+
+      // Extend from the LATER of (current trial_ends_at, now) — extending an
+      // already-expired trial should start counting from today, not compound
+      // onto a past date.
+      const base = before?.trial_ends_at && new Date(before.trial_ends_at).getTime() > Date.now()
+        ? new Date(before.trial_ends_at)
+        : new Date();
+      const newTrialEnd = new Date(base.getTime() + additional_days * 24 * 60 * 60 * 1000).toISOString();
+
+      const { error } = await adminClient.from('companies').update({ trial_ends_at: newTrialEnd }).eq('id', company_id);
+      if (error) return respond({ error: error.message }, 400);
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'TRIAL_EXTENDED',
+        old_value: { trial_ends_at: before?.trial_ends_at ?? null },
+        new_value: { trial_ends_at: newTrialEnd },
+        metadata: { additional_days },
+      });
+
+      return respond({ trial_ends_at: newTrialEnd });
+    }
+
+    // ── admin_apply_discount ────────────────────────────────────────────────────
+    if (action === 'admin_apply_discount') {
+      const company_id = payload?.company_id as string | undefined;
+      const discount_pct = payload?.discount_pct as number | undefined;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id || typeof discount_pct !== 'number') {
+        return respond({ error: 'payload.company_id and payload.discount_pct (number) are required' }, 400);
+      }
+      if (discount_pct < 0 || discount_pct > 100) {
+        return respond({ error: 'payload.discount_pct must be between 0 and 100' }, 400);
+      }
+
+      const { data: before } = await adminClient.from('subscriptions').select('discount_pct').eq('company_id', company_id).maybeSingle();
+      const { data: updated, error } = await adminClient
+        .from('subscriptions').update({ discount_pct }).eq('company_id', company_id).select('*').maybeSingle();
+      if (error) return respond({ error: error.message }, 400);
+      if (!updated) return respond({ error: 'No subscription row exists for this company yet' }, 404);
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'DISCOUNT_APPLIED',
+        old_value: { discount_pct: before?.discount_pct ?? null },
+        new_value: { discount_pct },
+      });
+
+      return respond({ subscription: updated });
+    }
+
+    // ── admin_add_credits ───────────────────────────────────────────────────────
+    if (action === 'admin_add_credits') {
+      const company_id = payload?.company_id as string | undefined;
+      const amount_inr = payload?.amount_inr as number | undefined;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id || typeof amount_inr !== 'number' || amount_inr <= 0) {
+        return respond({ error: 'payload.company_id and a positive payload.amount_inr are required' }, 400);
+      }
+
+      const { data: before } = await adminClient.from('subscriptions').select('credit_balance_inr').eq('company_id', company_id).maybeSingle();
+      if (!before) return respond({ error: 'No subscription row exists for this company yet' }, 404);
+
+      const newBalance = (before.credit_balance_inr ?? 0) + amount_inr;
+      const { data: updated, error } = await adminClient
+        .from('subscriptions').update({ credit_balance_inr: newBalance }).eq('company_id', company_id).select('*').maybeSingle();
+      if (error) return respond({ error: error.message }, 400);
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'CREDITS_ADDED',
+        old_value: { credit_balance_inr: before.credit_balance_inr ?? 0 },
+        new_value: { credit_balance_inr: newBalance },
+        metadata: { amount_inr },
+      });
+
+      return respond({ subscription: updated });
+    }
+
+    // ── admin_suspend_account ───────────────────────────────────────────────────
+    if (action === 'admin_suspend_account') {
+      const company_id = payload?.company_id as string | undefined;
+      const reason = payload?.reason as string | undefined;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+
+      const { error } = await adminClient.from('companies').update({ is_active: false }).eq('id', company_id);
+      if (error) return respond({ error: error.message }, 400);
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'SUBSCRIPTION_SUSPENDED',
+        old_value: { is_active: true }, new_value: { is_active: false },
+        metadata: reason ? { reason } : {},
+      });
+
+      return respond({ success: true });
+    }
+
+    // ── admin_reactivate_account ────────────────────────────────────────────────
+    if (action === 'admin_reactivate_account') {
+      const company_id = payload?.company_id as string | undefined;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+
+      const { error } = await adminClient.from('companies').update({ is_active: true }).eq('id', company_id);
+      if (error) return respond({ error: error.message }, 400);
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'SUBSCRIPTION_REACTIVATED',
+        old_value: { is_active: false }, new_value: { is_active: true },
+      });
+
+      return respond({ success: true });
+    }
+
+    // ── admin_create_enterprise_contract ────────────────────────────────────────
+    // Depends on Plan 6's enterprise_contracts table. Degrades gracefully with a
+    // clear error if that table doesn't exist yet, rather than a raw Postgres
+    // "relation does not exist" error.
+    if (action === 'admin_create_enterprise_contract') {
+      const company_id = payload?.company_id as string | undefined;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+
+      const fields = (payload?.fields ?? {}) as Record<string, unknown>;
+      const { data, error } = await adminClient
+        .from('enterprise_contracts')
+        .insert({ company_id, ...fields })
+        .select('*')
+        .single();
+
+      if (error) {
+        if (error.code === '42P01' /* undefined_table */) {
+          return respond({ error: 'Enterprise contracts not yet available — requires the enterprise-contracts plan to land first' }, 501);
+        }
+        return respond({ error: error.message }, 400);
+      }
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'ENTERPRISE_CONTRACT_CREATED',
+        old_value: null, new_value: data,
+      });
+
+      return respond({ contract: data });
+    }
+
+    // ── get_subscription_detail ─────────────────────────────────────────────────
+    if (action === 'get_subscription_detail') {
+      const company_id = payload?.company_id as string | undefined;
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+
+      const [subRes, auditRes] = await Promise.all([
+        adminClient
+          .from('subscriptions')
+          .select(`*, companies:company_id(name, slug), plans:plan_id(slug, name, monthly_price_inr, annual_price_inr, max_users, max_active_projects)`)
+          .eq('company_id', company_id)
+          .maybeSingle(),
+        adminClient
+          .from('billing_audit_logs')
+          .select('*')
+          .eq('company_id', company_id)
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ]);
+      if (subRes.error) throw subRes.error;
+      if (auditRes.error) throw auditRes.error;
+
+      return respond({ subscription: subRes.data, audit_log: auditRes.data ?? [] });
+    }
+
     return respond({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
