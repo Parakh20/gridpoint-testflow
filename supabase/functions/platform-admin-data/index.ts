@@ -836,6 +836,30 @@ serve(async (req) => {
       return respond({ contract: data });
     }
 
+    // ── get_subscription_detail ─────────────────────────────────────────────────
+    if (action === 'get_subscription_detail') {
+      const company_id = payload?.company_id as string | undefined;
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+
+      const [subRes, auditRes] = await Promise.all([
+        adminClient
+          .from('subscriptions')
+          .select(`*, companies:company_id(name, slug), plans:plan_id(slug, name, monthly_price_inr, annual_price_inr, max_users, max_active_projects)`)
+          .eq('company_id', company_id)
+          .maybeSingle(),
+        adminClient
+          .from('billing_audit_logs')
+          .select('*')
+          .eq('company_id', company_id)
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ]);
+      if (subRes.error) throw subRes.error;
+      if (auditRes.error) throw auditRes.error;
+
+      return respond({ subscription: subRes.data, audit_log: auditRes.data ?? [] });
+    }
+
     return respond({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
