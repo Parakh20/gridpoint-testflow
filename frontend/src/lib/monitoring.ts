@@ -16,11 +16,26 @@ export function initMonitoring(): void {
   });
 }
 
-export function captureException(err: unknown, context?: Record<string, unknown>): void {
+// Launch-readiness failure categories. Tag captureException calls with one
+// of these so Sentry alert rules (configured by a human, out of scope here)
+// can filter by category — e.g. "page any payment_failure event".
+export type FailureCategory =
+  | 'api_error'
+  | 'auth_failure'
+  | 'db_error'
+  | 'sync_failure'
+  | 'report_failure'
+  | 'payment_failure';
+
+export function captureException(
+  err: unknown,
+  context?: Record<string, unknown>,
+  category?: FailureCategory,
+): void {
   if (DSN) {
-    Sentry.captureException(err, { extra: context });
+    Sentry.captureException(err, { extra: context, tags: category ? { category } : undefined });
   } else {
-    console.error('[monitoring]', err, context ?? {});
+    console.error('[monitoring]', category ? `[${category}]` : '', err, context ?? {});
   }
 }
 

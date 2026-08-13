@@ -25,6 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { dashboardPath } from '@/lib/routes';
 import { formatDate } from '@/lib/format';
 import { useFeature } from '@/lib/features';
+import { captureException } from '@/lib/monitoring';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Project = Tables<'projects'>;
@@ -187,6 +188,7 @@ export default function ProjectDetail() {
       setReportMarkdown(data?.report ?? data ?? 'No report content returned.');
     } catch (error: any) {
       console.error('Error generating report:', error);
+      captureException(error, { where: 'generateReport', projectId: id }, 'report_failure');
       toast({
         title: 'Report generation failed',
         description: error.message ?? 'Unable to generate AI report',

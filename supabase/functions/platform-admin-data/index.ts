@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { logEdgeError } from '../_shared/monitoring.ts';
 
 serve(async (req) => {
   const corsHeaders = buildCorsHeaders(req.headers.get('Origin'));
@@ -877,6 +878,7 @@ serve(async (req) => {
     return respond({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
+    logEdgeError('platform-admin-data', 'api_error', err, { action });
     return respond({ error: message }, 500);
   }
 });

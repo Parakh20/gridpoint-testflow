@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { enforceRateLimit } from '../_shared/rate_limit.ts';
+import { logEdgeError } from '../_shared/monitoring.ts';
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req.headers.get('Origin'));
@@ -215,7 +216,7 @@ Use formal engineering language. Be concise but thorough. Do not fabricate speci
       await supabase.rpc('release_ai_report_lock', { _project_id: project_id, _success: success });
     }
   } catch (error) {
-    console.error('generate-report error:', error);
+    logEdgeError('generate-report', 'report_failure', error);
     return json({ error: (error as Error).message }, 500);
   }
 });

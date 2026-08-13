@@ -10,6 +10,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { RazorpayBillingProvider } from '../_shared/billing_provider.ts';
+import { logEdgeError } from '../_shared/monitoring.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -94,7 +95,7 @@ Deno.serve(async (req) => {
       _raw: event,
     });
     if (dedupeError) {
-      console.error('record_billing_event error:', dedupeError.message);
+      logEdgeError('razorpay-webhook', 'webhook_failure', dedupeError, { step: 'record_billing_event', eventType, companyId });
       return json({ error: dedupeError.message }, 500);
     }
     if (!isNew) {
@@ -115,7 +116,7 @@ Deno.serve(async (req) => {
         _raw: event,
       });
       if (error) {
-        console.error('upsert_subscription error:', error.message);
+        logEdgeError('razorpay-webhook', 'payment_failure', error, { step: 'upsert_subscription', eventType, companyId, subId: sub.id });
         // Compensating delete: undo the dedupe-gate insert so a legitimate
         // Razorpay retry isn't silently swallowed as "already processed" —
         // this event never actually completed.
@@ -144,7 +145,7 @@ Deno.serve(async (req) => {
           _provider_payment_id: payment.id,
         });
         if (error) {
-          console.error('upsert_order error:', error.message);
+          logEdgeError('razorpay-webhook', 'payment_failure', error, { step: 'upsert_order', eventType, companyId, paymentId: payment.id });
           // Compensating delete: undo the dedupe-gate insert so a legitimate
           // Razorpay retry isn't silently swallowed as "already processed" —
           // this event never actually completed.
@@ -163,7 +164,7 @@ Deno.serve(async (req) => {
     // mirror table, so no write is needed here for invoice events.
     return json({ ok: true, ignored: eventType });
   } catch (err) {
-    console.error('razorpay-webhook error:', err);
+    logEdgeError('razorpay-webhook', 'webhook_failure', err);
     return json({ error: (err as Error).message }, 500);
   }
 });

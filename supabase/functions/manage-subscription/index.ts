@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { enforceRateLimit } from '../_shared/rate_limit.ts';
+import { logEdgeError } from '../_shared/monitoring.ts';
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req.headers.get('Origin'));
@@ -105,6 +106,7 @@ Deno.serve(async (req) => {
     return json({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
+    logEdgeError('manage-subscription', 'payment_failure', err);
     return json({ error: message }, 500);
   }
 });
