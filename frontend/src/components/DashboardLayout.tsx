@@ -17,6 +17,7 @@ import {
   Users,
   UserCircle,
   BarChart2,
+  CreditCard,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -38,6 +39,7 @@ function getNavItems(role: string | null): NavItem[] {
         { label: 'User Management', href: '/superadmin', icon: <Users size={18} /> },
         { label: 'Projects', href: '/gm', icon: <FolderOpen size={18} /> },
         { label: 'Reports', href: '/reports', icon: <BarChart2 size={18} /> },
+        { label: 'Billing', href: '/settings/billing', icon: <CreditCard size={18} /> },
         { label: 'Profile', href: '/profile', icon: <UserCircle size={18} /> },
       ];
     case 'GM':
