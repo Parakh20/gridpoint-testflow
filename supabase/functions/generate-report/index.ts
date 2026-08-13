@@ -199,6 +199,16 @@ Use formal engineering language. Be concise but thorough. Do not fabricate speci
     const reportText = anthropicData.content[0]?.text ?? '';
 
       success = true;
+
+      const { error: usageError } = await supabase.from('usage_records').insert({
+        company_id: project.company_id,
+        metric: 'ai_report_generated',
+        metadata: { project_id },
+      });
+      if (usageError) {
+        console.error('usage_records insert failed (non-blocking):', usageError.message);
+      }
+
       return json({ report: reportText });
     } finally {
       // Always release the lock, even on failure — caller can retry.
