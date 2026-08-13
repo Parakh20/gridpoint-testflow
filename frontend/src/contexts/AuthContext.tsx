@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useCompany } from '@/contexts/CompanyContext';
+import { captureException } from '@/lib/monitoring';
 
 interface AuthContextType {
   user: User | null;
@@ -122,7 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setUserRole(roleResult.data && !roleResult.error ? roleResult.data.role : null);
-    } catch {
+    } catch (err) {
+      console.error('[AuthContext] fetchUserRole failed', err);
+      captureException(err, { where: 'fetchUserRole' }, 'auth_failure');
       setUserRole(null);
     } finally {
       setLoading(false);
@@ -175,7 +178,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // status === 'provisioned' — fetch role normally
       await fetchUserRole(userId);
-    } catch {
+    } catch (err) {
+      console.error('[AuthContext] provisionOAuthUser failed', err);
+      captureException(err, { where: 'provisionOAuthUser' }, 'auth_failure');
       setLoading(false);
     }
   };

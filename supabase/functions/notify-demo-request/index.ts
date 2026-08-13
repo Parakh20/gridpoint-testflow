@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { enforceRateLimit } from '../_shared/rate_limit.ts';
+import { logEdgeError } from '../_shared/monitoring.ts';
 
 const NOTIFY_EMAIL = Deno.env.get('DEMO_NOTIFY_EMAIL') ?? 'sharmaparakh05@gmail.com';
 
@@ -81,6 +82,7 @@ Deno.serve(async (req) => {
     return json({ ok: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
+    logEdgeError('notify-demo-request', 'api_error', err);
     return json({ error: message }, 500);
   }
 });

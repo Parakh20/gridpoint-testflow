@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { parseDowngradeFeasibility, type DowngradeFeasibility, type DowngradeFeasibilityRpcResponse } from '@testflow/shared';
 import { parseFunctionsErrorBody } from '@/lib/functionsError';
+import { captureException } from '@/lib/monitoring';
 
 type PlanOption = { slug: string; name: string };
 
@@ -57,6 +58,7 @@ export function SubscriptionActions({ currentPlanName, planOptions, onChanged }:
       onChanged();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to cancel subscription';
+      captureException(err, { where: 'SubscriptionActions.handleCancel' }, 'payment_failure');
       toast({ title: 'Cancellation failed', description: message, variant: 'destructive' });
     } finally {
       setCancelling(false);
@@ -84,6 +86,7 @@ export function SubscriptionActions({ currentPlanName, planOptions, onChanged }:
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to schedule downgrade';
+      captureException(err, { where: 'SubscriptionActions.handleDowngrade', targetSlug }, 'payment_failure');
       toast({ title: 'Downgrade failed', description: message, variant: 'destructive' });
     } finally {
       setDowngrading(false);

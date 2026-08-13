@@ -14,6 +14,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { captureException } from '@/lib/monitoring';
 
 export const REALTIME_ENABLED = import.meta.env.VITE_REALTIME_ENABLED !== 'false';
 
@@ -84,7 +85,17 @@ export function useRealtimeChannel(
     channel.subscribe((subStatus) => {
       // SUBSCRIBED | TIMED_OUT | CLOSED | CHANNEL_ERROR
       if (subStatus === 'SUBSCRIBED') setStatus('connected');
-      else if (subStatus === 'CHANNEL_ERROR' || subStatus === 'TIMED_OUT') setStatus('error');
+      else if (subStatus === 'CHANNEL_ERROR' || subStatus === 'TIMED_OUT') {
+        setStatus('error');
+        // Falls back to polling silently from the user's perspective — but a
+        // sustained pattern of these means realtime is broken for a cohort
+        // of users and nobody would otherwise know. Tag for alerting.
+        captureException(
+          new Error(`Realtime channel ${subStatus.toLowerCase()}: ${channelName}`),
+          { channelName, subStatus },
+          'sync_failure',
+        );
+      }
     });
 
     return () => { supabase.removeChannel(channel); };
