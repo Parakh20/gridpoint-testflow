@@ -93,11 +93,11 @@ BEGIN
     ELSIF fkey ILIKE '%location%' OR fkey ILIKE '%bay%' THEN
       RETURN to_jsonb('Bay ' || floor(random() * 8 + 1)::text);
     ELSIF fkey ILIKE '%customer%' THEN
-      RETURN to_jsonb('Needli Power Transmission');
+      RETURN to_jsonb('Needli Power Transmission'::text);
     ELSIF fkey ILIKE '%project_name%' THEN
-      RETURN to_jsonb('400/220kV Substation - Pune');
+      RETURN to_jsonb('400/220kV Substation - Pune'::text);
     ELSE
-      RETURN to_jsonb('N/A');
+      RETURN to_jsonb('N/A'::text);
     END IF;
   END IF;
 END;
