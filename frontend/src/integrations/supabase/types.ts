@@ -839,6 +839,10 @@ export type Database = {
         Args: { _company_id?: string | null }
         Returns: Json
       }
+      get_company_usage: {
+        Args: { _company_id?: string | null }
+        Returns: Json
+      }
       has_feature: { Args: { _flag: string }; Returns: boolean }
       has_role: {
         Args: {
