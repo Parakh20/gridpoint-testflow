@@ -62,6 +62,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { platformFetch } from './platformFetch';
+import { clearPlatformToken, getPlatformToken } from './platformToken';
 import { SalesTab } from './SalesTab';
 import { BillingTab } from './BillingTab';
 
@@ -276,7 +277,7 @@ export default function PlatformDashboard() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [stats, setStats] = useState<Stats>({ companies: 0, users: 0, activeProjects: 0 });
   const [loadingData, setLoadingData] = useState(true);
-  const tokenMissing = !import.meta.env.VITE_PLATFORM_ADMIN_TOKEN;
+  const tokenMissing = !getPlatformToken();
 
   // Expandable row state
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -322,8 +323,8 @@ export default function PlatformDashboard() {
       navigate('/', { replace: true });
       return;
     }
-    if (!import.meta.env.VITE_PLATFORM_ADMIN_TOKEN) {
-      console.error('[PlatformDashboard] VITE_PLATFORM_ADMIN_TOKEN is not set — data fetching skipped');
+    if (!getPlatformToken()) {
+      console.error('[PlatformDashboard] no platform token in session — data fetching skipped');
       setLoadingData(false);
       return;
     }
@@ -419,7 +420,7 @@ export default function PlatformDashboard() {
     setAddLoading(true);
     setCreatedTenant(null);
     try {
-      const platformToken = import.meta.env.VITE_PLATFORM_ADMIN_TOKEN;
+      const platformToken = getPlatformToken();
       const { data, error } = await supabase.functions.invoke('create-tenant', {
         body: {
           name: companyName.trim(),
@@ -571,6 +572,7 @@ export default function PlatformDashboard() {
   };
 
   const handleLogout = () => {
+    clearPlatformToken();
     sessionStorage.removeItem('platform_authed');
     navigate('/', { replace: true });
   };
@@ -608,9 +610,9 @@ export default function PlatformDashboard() {
           <div className="flex items-start gap-3 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
             <div>
-              <p className="font-semibold">VITE_PLATFORM_ADMIN_TOKEN is not configured</p>
+              <p className="font-semibold">No platform token in this session</p>
               <p className="mt-0.5 text-xs text-yellow-400/80">
-                Add it to <code className="font-mono">frontend/.env</code> (local) and Vercel → Environment Variables → Production, then redeploy. Stats and company data will show zeros until this is set.
+                Sign out and sign in again, entering the <code className="font-mono">PLATFORM_ADMIN_TOKEN</code> value. The token is deliberately never built into the app bundle. Stats and company data stay empty until it is supplied.
               </p>
             </div>
           </div>

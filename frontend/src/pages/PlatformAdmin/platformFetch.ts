@@ -1,11 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getPlatformToken } from './platformToken';
 
 // ─── Secure platform data fetcher ────────────────────────────────────────────
 // Calls the platform-admin-data Edge Function (service role, RLS-bypass) with
 // the platform token. Shared by PlatformDashboard and the Sales section.
+// The token comes from the session (entered at platform login), never from a
+// build-time env var — see platformToken.ts.
 export const platformFetch = async (action: string, payload?: object) => {
-  const token = import.meta.env.VITE_PLATFORM_ADMIN_TOKEN;
-  if (!token) throw new Error('VITE_PLATFORM_ADMIN_TOKEN is not configured');
+  const token = getPlatformToken();
+  if (!token) throw new Error('Platform session expired — sign in again');
   const { data, error } = await supabase.functions.invoke('platform-admin-data', {
     body: { action, payload },
     headers: { 'X-Platform-Token': token },

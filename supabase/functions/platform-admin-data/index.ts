@@ -1,6 +1,19 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { enforceRateLimit } from '../_shared/rate_limit.ts';
+
+// Length-independent-ish equality so a wrong token can't be recovered by
+// timing the response. The token is a shared secret guarding a full
+// RLS-bypass surface — treat it like a password comparison.
+function tokensMatch(provided: string, expected: string): boolean {
+  if (provided.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < provided.length; i++) {
+    diff |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  return diff === 0;
+}
 
 serve(async (req) => {
   const corsHeaders = buildCorsHeaders(req.headers.get('Origin'));
@@ -15,18 +28,27 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  // Auth check
-  const token = req.headers.get('X-Platform-Token');
-  const expected = Deno.env.get('PLATFORM_ADMIN_TOKEN');
-  if (!token || token !== expected) {
-    return respond({ error: 'Unauthorized' }, 401);
-  }
-
   // Service role client — bypasses RLS
   const adminClient = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
+
+  // Throttle before the token check so a leaked/guessed token can't be brute
+  // forced or used to bulk-exfiltrate every tenant at machine speed.
+  const rl = await enforceRateLimit(adminClient, req, {
+    key: 'platform-admin-data',
+    limit: 300,
+    windowMinutes: 60,
+  }, corsHeaders);
+  if (!rl.ok) return rl.response;
+
+  // Auth check
+  const token = req.headers.get('X-Platform-Token');
+  const expected = Deno.env.get('PLATFORM_ADMIN_TOKEN');
+  if (!token || !expected || !tokensMatch(token, expected)) {
+    return respond({ error: 'Unauthorized' }, 401);
+  }
 
   let action: string;
   let payload: Record<string, unknown> | undefined;

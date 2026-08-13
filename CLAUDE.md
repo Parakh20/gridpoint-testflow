@@ -127,7 +127,7 @@ plan_provider_mapping  razorpay_plan_id_monthly/_annual → plans.id; RLS no-pol
 | `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` | Browser | anon key intentionally exposed — RLS enforces security |
 | `VITE_REALTIME_ENABLED` | Browser | default true; set false on Free tier |
 | `VITE_PLATFORM_ADMIN_PASSWORD` | Browser (admin panel) | Production scope only in Vercel |
-| `VITE_PLATFORM_ADMIN_TOKEN` | Browser (admin panel) | **must exactly match** `PLATFORM_ADMIN_TOKEN` secret |
+| ~~`VITE_PLATFORM_ADMIN_TOKEN`~~ | **removed** | Never build the platform token into the bundle — the operator types it at admin login (`platformToken.ts`, sessionStorage). Delete this var from Vercel. |
 | `VITE_SENTRY_DSN` | Browser | optional — see `lib/monitoring.ts` |
 | `ANTHROPIC_API_KEY` | Edge Function | `supabase secrets set`, never in `.env` |
 | `PLATFORM_ADMIN_TOKEN` | Edge Function | guards `create-tenant`, `platform-admin-data` |
@@ -186,7 +186,7 @@ Share the resulting install link (QR code in Expo dashboard) with field engineer
 4. `test_templates.fields = []` is common — render gracefully.
 5. New users have `company_id = NULL` briefly between trigger and Edge Function — safe (RLS returns nothing).
 6. `signUp()` and `signInWithGoogle()` are gone — don't re-add.
-7. `companies` SELECT is `USING (TRUE)` (anon needs it); INSERT/DELETE for anon allowed for platform admin only (migration `20260430000002`).
+7. `companies` SELECT is `USING (TRUE)` (anon needs it pre-login) but **column-scoped by GRANT** (`20260813000021`) — anon sees only id/name/slug/is_active/oauth_provisioning/allowed_domains. Anon INSERT/DELETE was revoked in the same migration; tenant creation goes through `create-tenant` (service role).
 8. `profiles_update_own` RLS WITH CHECK prevents self-changing `company_id` — anti-escalation gate, don't weaken.
 9. `PLATFORM_ADMIN_TOKEN` mismatch between Vercel and Supabase secret = 401 on all platform calls.
 10. `vercel.json` has strict CSP — add new third-parties to `connect-src`/`frame-src`/`script-src`.
@@ -196,7 +196,10 @@ Share the resulting install link (QR code in Expo dashboard) with field engineer
 14. Password policy: 10+ chars, upper+lower+digit. Enforced client (zod) + server (Edge Functions).
 15. Trial mode: `companies.trial_ends_at` (14d default via trigger). Feature flags: `companies.features` JSONB + `has_feature()` SQL fn + `useFeature()` hook. Flags default TRUE.
 16. Demo tenants `companya`/`companyb`/`companyc` seeded by migration `20260429000001` — rotate passwords before exposing.
-17. The anon key in the browser bundle is intentional and safe — RLS is the security boundary.
+17. The anon key in the browser bundle is intentional and safe — RLS is the security boundary. The **platform admin token is not** — it bypasses RLS, so it never goes in a `VITE_*` var — it is typed at admin login and held in sessionStorage.
+18. `my_company_id()` returns NULL when `profiles.is_active` or `companies.is_active` is FALSE (`20260813000021`) — deactivation/suspension is enforced in the DB, not just in `AuthContext`/`CompanyContext`. Every tenant policy inherits this.
+19. Approval is RLS-gated: only SUPERVISOR/GM/SUPERADMIN may set `test_tasks.status` to `APPROVED`/`REWORK`; ENGINEERs write `test_records`/`nameplate_records` only for tasks assigned to them (`20260813000021`).
+20. New SECURITY DEFINER functions get `EXECUTE` for PUBLIC by default. Always `REVOKE ALL ... FROM PUBLIC` + `GRANT ... TO service_role` unless the function is genuinely caller-safe and guarded on `my_company_id()`.
 
 ## Docs
 
