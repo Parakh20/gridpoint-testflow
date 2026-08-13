@@ -769,6 +769,73 @@ serve(async (req) => {
       return respond({ subscription: updated });
     }
 
+    // ── admin_suspend_account ───────────────────────────────────────────────────
+    if (action === 'admin_suspend_account') {
+      const company_id = payload?.company_id as string | undefined;
+      const reason = payload?.reason as string | undefined;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+
+      const { error } = await adminClient.from('companies').update({ is_active: false }).eq('id', company_id);
+      if (error) return respond({ error: error.message }, 400);
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'SUBSCRIPTION_SUSPENDED',
+        old_value: { is_active: true }, new_value: { is_active: false },
+        metadata: reason ? { reason } : {},
+      });
+
+      return respond({ success: true });
+    }
+
+    // ── admin_reactivate_account ────────────────────────────────────────────────
+    if (action === 'admin_reactivate_account') {
+      const company_id = payload?.company_id as string | undefined;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+
+      const { error } = await adminClient.from('companies').update({ is_active: true }).eq('id', company_id);
+      if (error) return respond({ error: error.message }, 400);
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'SUBSCRIPTION_REACTIVATED',
+        old_value: { is_active: false }, new_value: { is_active: true },
+      });
+
+      return respond({ success: true });
+    }
+
+    // ── admin_create_enterprise_contract ────────────────────────────────────────
+    // Depends on Plan 6's enterprise_contracts table. Degrades gracefully with a
+    // clear error if that table doesn't exist yet, rather than a raw Postgres
+    // "relation does not exist" error.
+    if (action === 'admin_create_enterprise_contract') {
+      const company_id = payload?.company_id as string | undefined;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+
+      const fields = (payload?.fields ?? {}) as Record<string, unknown>;
+      const { data, error } = await adminClient
+        .from('enterprise_contracts')
+        .insert({ company_id, ...fields })
+        .select('*')
+        .single();
+
+      if (error) {
+        if (error.code === '42P01' /* undefined_table */) {
+          return respond({ error: 'Enterprise contracts not yet available — requires the enterprise-contracts plan to land first' }, 501);
+        }
+        return respond({ error: error.message }, 400);
+      }
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'ENTERPRISE_CONTRACT_CREATED',
+        old_value: null, new_value: data,
+      });
+
+      return respond({ contract: data });
+    }
+
     return respond({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
