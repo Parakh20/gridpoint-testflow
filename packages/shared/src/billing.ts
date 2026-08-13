@@ -59,3 +59,12 @@ export function parseEntitlements(raw: EntitlementsRpcResponse): Entitlements {
     features: raw.features as Partial<Record<FeatureKey, boolean>>,
   };
 }
+
+/** Structured shape returned by get_resource_limit_status / the create-user 403 body. */
+export interface UpgradeReason {
+  code: 'PLAN_LIMIT_REACHED';
+  resource: 'users' | 'projects';
+  current: number | null;
+  limit: number | null;
+  required_plan: PlanSlug | null;
+}
