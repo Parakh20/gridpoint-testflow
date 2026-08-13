@@ -582,7 +582,7 @@ serve(async (req) => {
     if (action === 'get_billing_overview') {
       const { data: subs, error } = await adminClient
         .from('subscriptions')
-        .select('status, billing_interval, plan_id, plans:plan_id(monthly_price_inr, annual_price_inr)');
+        .select('status, billing_interval, discount_pct, plan_id, plans:plan_id(monthly_price_inr, annual_price_inr)');
       if (error) throw error;
 
       let mrr = 0;
@@ -597,7 +597,8 @@ serve(async (req) => {
           const monthly = s.billing_interval === 'annual'
             ? (s.plans.annual_price_inr ?? 0) / 12
             : (s.plans.monthly_price_inr ?? 0);
-          mrr += monthly;
+          const discountMultiplier = 1 - (s.discount_pct ?? 0) / 100;
+          mrr += monthly * discountMultiplier;
         }
       }
 
