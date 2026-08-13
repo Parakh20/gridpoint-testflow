@@ -320,6 +320,38 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_features: {
+        Row: {
+          config: Json
+          enabled: boolean
+          feature_key: string
+          id: string
+          plan_id: string
+        }
+        Insert: {
+          config?: Json
+          enabled?: boolean
+          feature_key: string
+          id?: string
+          plan_id: string
+        }
+        Update: {
+          config?: Json
+          enabled?: boolean
+          feature_key?: string
+          id?: string
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_features_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_id: string | null

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { PricingSection } from "@/components/marketing/PricingSection";
 import {
   ArrowRight,
   PlayCircle,
@@ -309,6 +310,7 @@ const Nav = () => (
       <nav className="hidden md:flex items-center gap-7 text-[13.5px] text-white/65">
         <a href="#product" className="hover:text-white">Product</a>
         <a href="#workflow" className="hover:text-white">Workflow</a>
+        <a href="#pricing" className="hover:text-white">Pricing</a>
         <a href="#security" className="hover:text-white">Security</a>
         <a href="#cta" className="hover:text-white">Contact</a>
       </nav>
@@ -1117,6 +1119,7 @@ const Marketing = () => (
     <ProductSection />
     <WorkflowSection />
     <Equipment />
+    <PricingSection />
     <Field />
     <Security />
     <FAQ />
