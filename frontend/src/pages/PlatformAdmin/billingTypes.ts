@@ -32,7 +32,7 @@ export interface Subscription {
   seat_count: number;
   discount_pct: number | null;
   credit_balance_inr: number;
-  companies: { name: string; slug: string } | null;
+  companies: { name: string; slug: string; is_active: boolean } | null;
   plans: {
     slug: string;
     name: string;

@@ -109,7 +109,12 @@ export function SubscriptionDetailDrawer({ companyId, open, onOpenChange, onChan
             </div>
 
             <div className="flex gap-2">
-              {sub.status === 'cancelled' || sub.status === 'expired' ? (
+              {/* admin_suspend_account/admin_reactivate_account toggle
+                  companies.is_active, not subscriptions.status — derive the
+                  button from that, not the subscription status, or a
+                  suspended-but-still-"active"-status tenant shows Suspend
+                  again with no way to reactivate. */}
+              {sub.companies?.is_active === false ? (
                 <Button variant="outline" disabled={acting} onClick={() => runAction('admin_reactivate_account', {}, 'Account reactivated')}>
                   Reactivate
                 </Button>

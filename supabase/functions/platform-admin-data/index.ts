@@ -636,9 +636,18 @@ serve(async (req) => {
       const { data: before } = await adminClient
         .from('subscriptions').select('plan_id, plans:plan_id(slug)').eq('company_id', company_id).maybeSingle();
 
+      // Clear any tenant-scheduled downgrade — an admin-driven plan change
+      // takes effect immediately and must win over a stale pending_plan_id,
+      // otherwise the next webhook-driven period rollover (upsert_subscription)
+      // silently reverts this change back to whatever the tenant had queued.
       const { data: updated, error } = await adminClient
         .from('subscriptions')
-        .update({ plan_id: plan.id, updated_at: new Date().toISOString() })
+        .update({
+          plan_id: plan.id,
+          pending_plan_id: null,
+          pending_plan_requested_at: null,
+          updated_at: new Date().toISOString(),
+        })
         .eq('company_id', company_id)
         .select('*')
         .maybeSingle();
@@ -776,12 +785,14 @@ serve(async (req) => {
       const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
       if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
 
+      const { data: before } = await adminClient.from('companies').select('is_active').eq('id', company_id).single();
+
       const { error } = await adminClient.from('companies').update({ is_active: false }).eq('id', company_id);
       if (error) return respond({ error: error.message }, 400);
 
       await adminClient.from('billing_audit_logs').insert({
         actor, company_id, action: 'SUBSCRIPTION_SUSPENDED',
-        old_value: { is_active: true }, new_value: { is_active: false },
+        old_value: { is_active: before?.is_active ?? null }, new_value: { is_active: false },
         metadata: reason ? { reason } : {},
       });
 
@@ -794,12 +805,14 @@ serve(async (req) => {
       const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
       if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
 
+      const { data: before } = await adminClient.from('companies').select('is_active').eq('id', company_id).single();
+
       const { error } = await adminClient.from('companies').update({ is_active: true }).eq('id', company_id);
       if (error) return respond({ error: error.message }, 400);
 
       await adminClient.from('billing_audit_logs').insert({
         actor, company_id, action: 'SUBSCRIPTION_REACTIVATED',
-        old_value: { is_active: false }, new_value: { is_active: true },
+        old_value: { is_active: before?.is_active ?? null }, new_value: { is_active: true },
       });
 
       return respond({ success: true });
@@ -844,7 +857,7 @@ serve(async (req) => {
       const [subRes, auditRes] = await Promise.all([
         adminClient
           .from('subscriptions')
-          .select(`*, companies:company_id(name, slug), plans:plan_id(slug, name, monthly_price_inr, annual_price_inr, max_users, max_active_projects)`)
+          .select(`*, companies:company_id(name, slug, is_active), plans:plan_id(slug, name, monthly_price_inr, annual_price_inr, max_users, max_active_projects)`)
           .eq('company_id', company_id)
           .maybeSingle(),
         adminClient
