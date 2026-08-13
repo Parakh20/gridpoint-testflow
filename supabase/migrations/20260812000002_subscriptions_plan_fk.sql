@@ -19,6 +19,13 @@ ALTER TABLE subscriptions
 
 -- upsert_subscription() (called by the webhook) writes provider_plan_id,
 -- not plan_id — update its signature to match the rename so it keeps compiling.
+-- Postgres refuses to rename a parameter via CREATE OR REPLACE (SQLSTATE
+-- 42P13, "cannot change name of input parameter") even when only the name
+-- changes and the type list is identical — the pre-existing scaffold
+-- (20260519000003_ratelimit_trial_billing.sql) named this 4th parameter
+-- _plan_id. Drop it first so the rename below actually takes.
+DROP FUNCTION IF EXISTS upsert_subscription(UUID, TEXT, TEXT, TEXT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, INT, JSONB);
+
 CREATE OR REPLACE FUNCTION upsert_subscription(
   _company_id UUID,
   _provider_sub_id TEXT,
