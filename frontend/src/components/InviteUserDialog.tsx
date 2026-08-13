@@ -30,6 +30,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import type { UpgradeReason } from '@testflow/shared';
 
 const inviteUserSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
@@ -54,6 +56,7 @@ interface InviteUserDialogProps {
 export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<UpgradeReason | null>(null);
 
   const form = useForm<InviteUserForm>({
     resolver: zodResolver(inviteUserSchema),
@@ -93,6 +96,17 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
       });
 
       if (error) throw error;
+      if (result?.code === 'PLAN_LIMIT_REACHED') {
+        setUpgradeReason({
+          code: 'PLAN_LIMIT_REACHED',
+          resource: result.resource,
+          current: result.current ?? null,
+          limit: result.limit ?? null,
+          required_plan: result.required_plan ?? null,
+        });
+        setIsLoading(false);
+        return;
+      }
       if (result?.error) throw new Error(result.error);
 
       toast.success('User created successfully', {
@@ -112,6 +126,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -211,5 +226,7 @@ export function InviteUserDialog({ open, onOpenChange, onSuccess }: InviteUserDi
         </Form>
       </DialogContent>
     </Dialog>
+    <UpgradeModal reason={upgradeReason} onOpenChange={(open) => !open && setUpgradeReason(null)} />
+    </>
   );
 }
