@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PricingSection } from "@/components/marketing/PricingSection";
+import { RoiCalculatorSection } from "@/components/marketing/RoiCalculatorSection";
 import {
   ArrowRight,
   PlayCircle,
@@ -1120,6 +1121,7 @@ const Marketing = () => (
     <WorkflowSection />
     <Equipment />
     <PricingSection />
+    <RoiCalculatorSection />
     <Field />
     <Security />
     <FAQ />
