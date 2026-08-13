@@ -20,6 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import type { UpgradeReason } from '@testflow/shared';
 
 // Supabase auth rate limits cap admin-API user creation when SMTP sends are
 // involved. We process sequentially with a small delay so a 50-user batch
@@ -85,6 +87,7 @@ export function BulkInviteDialog({ open, onOpenChange, onSuccess }: BulkInviteDi
   const [role, setRole] = useState<Role>('ENGINEER');
   const [running, setRunning] = useState(false);
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
+  const [upgradeReason, setUpgradeReason] = useState<UpgradeReason | null>(null);
 
   const rows = parseInput(input);
 
@@ -110,6 +113,26 @@ export function BulkInviteDialog({ open, onOpenChange, onSuccess }: BulkInviteDi
           body: { name: row.name, email: row.email, password, role },
         });
         if (error) throw error;
+        if (result?.code === 'PLAN_LIMIT_REACHED') {
+          setUpgradeReason({
+            code: 'PLAN_LIMIT_REACHED',
+            resource: result.resource,
+            current: result.current ?? null,
+            limit: result.limit ?? null,
+            required_plan: result.required_plan ?? null,
+          });
+          failures += 1;
+          setRowStates(prev => {
+            const updated = { ...prev, [row.email]: { status: 'failed' as const, reason: 'Plan limit reached' } };
+            for (const r of rows) {
+              if (updated[r.email]?.status === 'pending') {
+                updated[r.email] = { status: 'failed', reason: 'Skipped — plan limit reached earlier in batch' };
+              }
+            }
+            return updated;
+          });
+          break;
+        }
         if (result?.error) throw new Error(result.error);
 
         credentials.push({ email: row.email, password });
@@ -177,6 +200,7 @@ export function BulkInviteDialog({ open, onOpenChange, onSuccess }: BulkInviteDi
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={o => { if (!running) onOpenChange(o); }}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
@@ -252,5 +276,7 @@ export function BulkInviteDialog({ open, onOpenChange, onSuccess }: BulkInviteDi
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <UpgradeModal reason={upgradeReason} onOpenChange={(o) => !o && setUpgradeReason(null)} />
+    </>
   );
 }

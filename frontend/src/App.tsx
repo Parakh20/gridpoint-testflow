@@ -24,6 +24,7 @@ import NewProject from "@/pages/projects/NewProject";
 import ProjectDetail from "@/pages/projects/ProjectDetail";
 import EditProject from "@/pages/projects/EditProject";
 import Profile from "@/pages/Profile";
+import BillingSettingsPage from "@/pages/settings/BillingSettingsPage";
 import ReportsList from "@/pages/reports/ReportsList";
 import ReportProjectDetail from "@/pages/reports/ReportProjectDetail";
 import NotFound from "./pages/NotFound";
@@ -84,6 +85,7 @@ const App = () => (
                 <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
                 <Route path="/projects/:id/edit" element={<ProtectedRoute requiredRole={['GM', 'SUPERADMIN']}><EditProject /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                <Route path="/settings/billing" element={<ProtectedRoute requiredRole="SUPERADMIN"><BillingSettingsPage /></ProtectedRoute>} />
                 <Route path="/supervisor" element={<ProtectedRoute requiredRole="SUPERVISOR"><SupervisorDashboard /></ProtectedRoute>} />
                 <Route path="/engineer" element={<ProtectedRoute requiredRole="ENGINEER"><EngineerDashboard /></ProtectedRoute>} />
                 <Route path="/engineer/projects/:id" element={<ProtectedRoute requiredRole="ENGINEER"><EngineerProjectDetail /></ProtectedRoute>} />

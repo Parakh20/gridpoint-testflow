@@ -13,6 +13,9 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useEntitlements } from '@/lib/entitlements';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import type { UpgradeReason } from '@testflow/shared';
 
 type EquipmentType = 'POWER_TRANSFORMER' | 'SF6_BREAKER' | 'VCB' | 'CT' | 'CVT' | 'LA' | 'ISOLATOR' | 'EARTH_PIT' | 'VT';
 
@@ -35,8 +38,10 @@ export default function NewProject() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { company } = useCompany();
+  const { entitlements } = useEntitlements();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<UpgradeReason | null>(null);
   
   const [formData, setFormData] = useState<ProjectFormData>({
     project_number: '',
@@ -110,6 +115,25 @@ export default function NewProject() {
     
     setIsSubmitting(true);
     try {
+      const { data: statusRaw, error: statusError } = await supabase.rpc('check_can_create_project');
+      const status = statusRaw as {
+        allowed: boolean;
+        current: number | null;
+        limit: number | null;
+        required_plan: UpgradeReason['required_plan'];
+      } | null;
+      if (!statusError && status && !status.allowed) {
+        setUpgradeReason({
+          code: 'PLAN_LIMIT_REACHED',
+          resource: 'projects',
+          current: status.current,
+          limit: status.limit,
+          required_plan: status.required_plan,
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       // Create project
       const { data: project, error: projectError } = await supabase
         .from('projects')
@@ -124,7 +148,20 @@ export default function NewProject() {
         .select()
         .single();
 
-      if (projectError) throw projectError;
+      if (projectError) {
+        if (projectError.message.includes('row-level security')) {
+          setUpgradeReason({
+            code: 'PLAN_LIMIT_REACHED',
+            resource: 'projects',
+            current: entitlements?.maxActiveProjects ?? null,
+            limit: entitlements?.maxActiveProjects ?? null,
+            required_plan: null,
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        throw projectError;
+      }
 
       // Create scope items
       const scopeInserts = scopeItems.map(item => ({
@@ -429,6 +466,8 @@ export default function NewProject() {
           )}
         </div>
       </div>
+
+      <UpgradeModal reason={upgradeReason} onOpenChange={(open) => !open && setUpgradeReason(null)} />
     </DashboardLayout>
   );
 }
