@@ -56,6 +56,11 @@ docs/business/
 docs/superpowers/
 # AI-tool memory/state
 .serena/
+# Sibling SDD task worktrees created under this worktree by mistake (../ resolved
+# relative to an inconsistent cwd) — safety net so they can never be `git add`ed
+testflow-redesign-task2/
+testflow-redesign-task3/
+testflow-redesign-task4/
 
 # ── Tool runtime state (Claude Code plugins, etc.) ─
 .remember/
