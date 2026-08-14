@@ -114,6 +114,7 @@ Deno.serve(async (req) => {
         _period_end:   sub.current_end   ? new Date(sub.current_end   * 1000).toISOString() : null,
         _seat_count: sub.quantity ?? 0,
         _raw: event,
+        _event_created_at: event.created_at ? new Date(event.created_at * 1000).toISOString() : null,
       });
       if (error) {
         logEdgeError('razorpay-webhook', 'payment_failure', error, { step: 'upsert_subscription', eventType, companyId, subId: sub.id });
