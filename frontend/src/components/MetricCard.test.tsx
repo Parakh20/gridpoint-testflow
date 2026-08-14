@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { axe } from 'jest-axe';
+import { axe } from 'vitest-axe';
+import * as toHaveNoViolations from 'vitest-axe/matchers';
 import { MetricCard } from './MetricCard';
+
+expect.extend(toHaveNoViolations);
 
 describe('MetricCard', () => {
   it('renders label and value', () => {
