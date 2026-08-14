@@ -264,7 +264,7 @@ export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayou
       {/* ── Main content ── */}
       <div className={`flex flex-col flex-1 ${collapsed ? 'ml-sidebar-collapsed' : 'ml-sidebar'} min-w-0 relative z-10`}>
         {/* Frosted top bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card/80 backdrop-blur-sm px-6">
+        <header className="sticky top-0 z-30 flex min-h-14 items-center justify-between border-b border-border bg-card/80 backdrop-blur-sm px-6 py-2">
           <div>
             {breadcrumbs && breadcrumbs.length > 0 && (
               <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-metadata text-muted-foreground mb-0.5">

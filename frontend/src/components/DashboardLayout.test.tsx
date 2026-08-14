@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { DashboardLayout } from './DashboardLayout';
@@ -49,6 +49,13 @@ vi.mock('@/integrations/supabase/client', () => {
 vi.mock('@/components/TrialBanner', () => ({ TrialBanner: () => null }));
 vi.mock('@/components/RealtimeStatusBanner', () => ({ RealtimeStatusBanner: () => null }));
 
+// The collapse test writes tf.sidebar.collapsed to localStorage, which
+// jsdom persists across tests within this file. Clear it before every test
+// so no test's assertions depend on run order.
+beforeEach(() => {
+  localStorage.clear();
+});
+
 function setup() {
   return render(
     <ThemeProvider>
@@ -85,6 +92,23 @@ describe('DashboardLayout sidebar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
     expect(screen.queryByText('WORKSPACE')).not.toBeInTheDocument();
     expect(localStorage.getItem('tf.sidebar.collapsed')).toBe('true');
+  });
+
+  it('expands and persists the expanded state to localStorage', () => {
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    expect(screen.queryByText('WORKSPACE')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }));
+    expect(screen.getByText('WORKSPACE')).toBeInTheDocument();
+    expect(localStorage.getItem('tf.sidebar.collapsed')).toBe('false');
+  });
+
+  it('renders already collapsed when localStorage has a persisted collapsed flag before mount', () => {
+    localStorage.setItem('tf.sidebar.collapsed', 'true');
+    setup();
+    expect(screen.queryByText('WORKSPACE')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument();
   });
 });
 

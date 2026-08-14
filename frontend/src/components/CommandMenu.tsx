@@ -8,6 +8,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { DialogTitle } from '@/components/ui/dialog';
 
 export interface CommandMenuItem {
   id: string;
@@ -40,6 +41,7 @@ export function CommandMenu({ items }: CommandMenuProps) {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
+      <DialogTitle className="sr-only">Search</DialogTitle>
       <CommandInput placeholder="Search…" />
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
