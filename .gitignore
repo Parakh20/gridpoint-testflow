@@ -77,3 +77,5 @@ testflow-redesign-task4/
 texput.log
 
 *storybook.log
+.gstack/
+.superpowers/
