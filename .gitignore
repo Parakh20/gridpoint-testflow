@@ -16,6 +16,7 @@ dist
 dist-ssr
 frontend/dist
 frontend/dist-ssr
+frontend/storybook-static
 *.local
 
 # ── Environment files (NEVER commit these) ───────
@@ -69,3 +70,5 @@ docs/superpowers/
 *.out
 *.synctex.gz
 texput.log
+
+*storybook.log

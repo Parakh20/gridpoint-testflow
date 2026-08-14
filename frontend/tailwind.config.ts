@@ -57,6 +57,7 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        "surface-elevated": "hsl(var(--surface-elevated))",
         status: {
           unassigned: "hsl(var(--status-unassigned))",
           assigned: "hsl(var(--status-assigned))",
@@ -65,6 +66,15 @@ export default {
           approved: "hsl(var(--status-approved))",
           rework: "hsl(var(--status-rework))",
         },
+      },
+      fontSize: {
+        display:        ["2.5rem", { lineHeight: "1.1", fontWeight: "700", letterSpacing: "-0.02em" }],
+        "page-title":   ["1.5rem", { lineHeight: "1.25", fontWeight: "700", letterSpacing: "-0.01em" }],
+        "section-title":["1.125rem", { lineHeight: "1.4", fontWeight: "600" }],
+        "card-title":   ["0.9375rem", { lineHeight: "1.4", fontWeight: "600" }],
+        body:           ["0.875rem", { lineHeight: "1.5", fontWeight: "400" }],
+        metadata:       ["0.75rem", { lineHeight: "1.4", fontWeight: "500" }],
+        "micro-label":  ["0.6875rem", { lineHeight: "1.3", fontWeight: "600", letterSpacing: "0.06em" }],
       },
       borderRadius: {
         lg: "var(--radius)",
