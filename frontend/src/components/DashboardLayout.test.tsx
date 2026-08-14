@@ -87,3 +87,48 @@ describe('DashboardLayout sidebar', () => {
     expect(localStorage.getItem('tf.sidebar.collapsed')).toBe('true');
   });
 });
+
+describe('DashboardLayout topbar', () => {
+  it('renders only the title when no breadcrumbs are passed (backward compatible)', () => {
+    render(
+      <ThemeProvider>
+        <MemoryRouter initialEntries={['/gm']}>
+          <DashboardLayout title="Projects">
+            <div>content</div>
+          </DashboardLayout>
+        </MemoryRouter>
+      </ThemeProvider>
+    );
+    expect(screen.getByRole('heading', { name: 'Projects' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Breadcrumb')).not.toBeInTheDocument();
+  });
+
+  it('renders breadcrumb links when provided', () => {
+    render(
+      <ThemeProvider>
+        <MemoryRouter initialEntries={['/gm']}>
+          <DashboardLayout title="TF-1024" breadcrumbs={[{ label: 'Projects', href: '/gm' }, { label: 'TF-1024' }]}>
+            <div>content</div>
+          </DashboardLayout>
+        </MemoryRouter>
+      </ThemeProvider>
+    );
+    const crumbNav = screen.getByLabelText('Breadcrumb');
+    expect(crumbNav).toHaveTextContent('Projects');
+    expect(crumbNav).toHaveTextContent('TF-1024');
+  });
+
+  it('opens the command menu on Ctrl+K from within the layout', () => {
+    render(
+      <ThemeProvider>
+        <MemoryRouter initialEntries={['/gm']}>
+          <DashboardLayout title="Projects">
+            <div>content</div>
+          </DashboardLayout>
+        </MemoryRouter>
+      </ThemeProvider>
+    );
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    expect(screen.getByPlaceholderText('Search…')).toBeInTheDocument();
+  });
+});

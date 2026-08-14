@@ -7,6 +7,7 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { RealtimeStatusBanner } from '@/components/RealtimeStatusBanner';
 import { TrialBanner } from '@/components/TrialBanner';
 import { dashboardPath } from '@/lib/routes';
+import { CommandMenu, type CommandMenuItem } from '@/components/CommandMenu';
 import {
   Zap,
   LogOut,
@@ -20,11 +21,18 @@ import {
   CreditCard,
   ChevronsLeft,
   ChevronsRight,
+  ChevronRight,
 } from 'lucide-react';
+
+interface Breadcrumb {
+  label: string;
+  href?: string;
+}
 
 interface DashboardLayoutProps {
   children: ReactNode;
   title: string;
+  breadcrumbs?: Breadcrumb[];
 }
 
 interface NavItem {
@@ -128,7 +136,7 @@ function RolePill({ role }: { role: string | null }) {
   );
 }
 
-export function DashboardLayout({ children, title }: DashboardLayoutProps) {
+export function DashboardLayout({ children, title, breadcrumbs }: DashboardLayoutProps) {
   const { signOut, user, userRole, userName } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -142,6 +150,15 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
       return next;
     });
   }
+
+  const commandMenuItems: CommandMenuItem[] = navGroups.flatMap(group =>
+    group.items.map(item => ({
+      id: item.href + item.label,
+      label: item.label,
+      group: group.heading,
+      href: item.href,
+    }))
+  );
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -247,9 +264,28 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
       {/* ── Main content ── */}
       <div className={`flex flex-col flex-1 ${collapsed ? 'ml-sidebar-collapsed' : 'ml-sidebar'} min-w-0 relative z-10`}>
         {/* Frosted top bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center border-b border-border bg-card/80 backdrop-blur-sm px-6">
-          <h1 className="text-base font-semibold text-foreground">{title}</h1>
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card/80 backdrop-blur-sm px-6">
+          <div>
+            {breadcrumbs && breadcrumbs.length > 0 && (
+              <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-metadata text-muted-foreground mb-0.5">
+                {breadcrumbs.map((crumb, index) => (
+                  <span key={crumb.label} className="flex items-center gap-1">
+                    {index > 0 && <ChevronRight size={12} />}
+                    {crumb.href ? (
+                      <button onClick={() => navigate(crumb.href!)} className="hover:text-foreground transition-colors">
+                        {crumb.label}
+                      </button>
+                    ) : (
+                      <span className="text-foreground">{crumb.label}</span>
+                    )}
+                  </span>
+                ))}
+              </nav>
+            )}
+            <h1 className="text-page-title text-foreground">{title}</h1>
+          </div>
         </header>
+        <CommandMenu items={commandMenuItems} />
 
         <TrialBanner />
         <RealtimeStatusBanner />
