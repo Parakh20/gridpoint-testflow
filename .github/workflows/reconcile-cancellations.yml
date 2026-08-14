@@ -6,7 +6,7 @@ name: Reconcile Expired Cancellations
 # supabase/functions/reconcile-cancellations.
 #
 # Required GitHub Actions secrets:
-#   VITE_SUPABASE_URL          same project URL used by frontend.yml
+#   SUPABASE_URL               already set for backup.yml's sibling workflows
 #   RECONCILE_CRON_SECRET      must match the Edge Function secret of the
 #                              same name (`supabase secrets set RECONCILE_CRON_SECRET=...`)
 
@@ -23,11 +23,11 @@ jobs:
       - name: Check secrets
         id: check
         env:
-          URL: ${{ secrets.VITE_SUPABASE_URL }}
+          URL: ${{ secrets.SUPABASE_URL }}
           SECRET: ${{ secrets.RECONCILE_CRON_SECRET }}
         run: |
           if [ -z "${URL}" ] || [ -z "${SECRET}" ]; then
-            echo "Missing VITE_SUPABASE_URL or RECONCILE_CRON_SECRET — skipping."
+            echo "Missing SUPABASE_URL or RECONCILE_CRON_SECRET — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -36,7 +36,7 @@ jobs:
       - name: Call reconcile-cancellations
         if: steps.check.outputs.skip == 'false'
         env:
-          URL: ${{ secrets.VITE_SUPABASE_URL }}
+          URL: ${{ secrets.SUPABASE_URL }}
           SECRET: ${{ secrets.RECONCILE_CRON_SECRET }}
         run: |
           set -euo pipefail
