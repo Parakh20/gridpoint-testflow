@@ -67,6 +67,10 @@ export default {
           rework: "hsl(var(--status-rework))",
         },
       },
+      spacing: {
+        sidebar: "15rem",
+        "sidebar-collapsed": "4.25rem",
+      },
       fontSize: {
         display:        ["2.5rem", { lineHeight: "1.1", fontWeight: "700", letterSpacing: "-0.02em" }],
         "page-title":   ["1.5rem", { lineHeight: "1.25", fontWeight: "700", letterSpacing: "-0.01em" }],
