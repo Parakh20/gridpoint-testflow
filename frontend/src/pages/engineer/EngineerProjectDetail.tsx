@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DraftStatusIndicator } from '@/components/DraftStatusIndicator';
+import { ReworkBanner } from '@/components/ReworkBanner';
 import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save, ClipboardCheck, SendHorizonal } from 'lucide-react';
 import { InstrumentSelector } from '@/components/InstrumentSelector';
 import { TestFormV2 } from '@/components/TestFormV2';
@@ -585,10 +586,7 @@ export default function EngineerProjectDetail() {
                                 </div>
 
                                 {task.status === 'REWORK' && task.rework_reason && (
-                                  <div className="rounded border border-orange-200 bg-orange-50 p-3">
-                                    <p className="text-xs font-semibold text-orange-700 uppercase mb-1">Rework Required</p>
-                                    <p className="text-sm text-orange-900">{task.rework_reason}</p>
-                                  </div>
+                                  <ReworkBanner reason={task.rework_reason} />
                                 )}
 
                                 {/* Test form */}
