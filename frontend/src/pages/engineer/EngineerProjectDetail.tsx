@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save, HardDrive, ClipboardCheck, SendHorizonal } from 'lucide-react';
 import { InstrumentSelector } from '@/components/InstrumentSelector';
 import { TestFormV2 } from '@/components/TestFormV2';
+import { EquipmentUnitCard } from '@/components/EquipmentUnitCard';
 import { TEMPLATE_FALLBACKS } from '@/lib/templateFallbacks';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -187,6 +188,20 @@ export default function EngineerProjectDetail() {
   const instanceTasks = useMemo(
     () => tasks.filter(t => t.equipment_instance?.id === selectedInstanceId),
     [tasks, selectedInstanceId]
+  );
+
+  const instanceSummaries = useMemo(
+    () =>
+      instances.map(inst => {
+        const instTasks = tasks.filter(t => t.equipment_instance?.id === inst.id);
+        return {
+          instance: inst,
+          status: deriveEquipmentStatus(instTasks.map(t => t.status), true),
+          completedCount: instTasks.filter(t => t.status === 'APPROVED').length,
+          totalCount: instTasks.length,
+        };
+      }),
+    [instances, tasks]
   );
 
   const nameplateFields: NameplateFieldDef[] = selectedInstance
@@ -387,31 +402,22 @@ export default function EngineerProjectDetail() {
             {/* ── Equipment Selector ─────────────────────────────────────── */}
             <Card>
               <CardContent className="py-4">
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex items-center gap-3 flex-1 min-w-[260px]">
-                    <Label className="whitespace-nowrap font-medium">Select Equipment Unit</Label>
-                    <Select value={selectedInstanceId} onValueChange={id => { setSelectedInstanceId(id); }}>
-                      <SelectTrigger className="w-64">
-                        <SelectValue placeholder="Select equipment..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {instances.map(inst => (
-                          <SelectItem key={inst.id} value={inst.id}>
-                            {inst.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {selectedInstance && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                        {selectedInstance.equipment_type.replace(/_/g, ' ')}
-                      </span>
-                      <span>·</span>
-                      <span>Total: {instances.length} unit{instances.length !== 1 ? 's' : ''}</span>
-                    </div>
-                  )}
+                <p className="text-micro-label uppercase text-muted-foreground mb-2">
+                  Equipment Unit ({instances.length} total)
+                </p>
+                <div className="flex gap-3 overflow-x-auto pb-1">
+                  {instanceSummaries.map(({ instance, status, completedCount, totalCount }) => (
+                    <EquipmentUnitCard
+                      key={instance.id}
+                      label={instance.label}
+                      equipmentType={instance.equipment_type}
+                      status={status}
+                      completedCount={completedCount}
+                      totalCount={totalCount}
+                      selected={instance.id === selectedInstanceId}
+                      onSelect={() => setSelectedInstanceId(instance.id)}
+                    />
+                  ))}
                 </div>
               </CardContent>
             </Card>
