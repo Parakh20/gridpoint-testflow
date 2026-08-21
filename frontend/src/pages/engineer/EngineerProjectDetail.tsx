@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/StatusBadge';
-import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save, HardDrive, ClipboardCheck, SendHorizonal } from 'lucide-react';
+import { DraftStatusIndicator } from '@/components/DraftStatusIndicator';
+import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save, ClipboardCheck, SendHorizonal } from 'lucide-react';
 import { InstrumentSelector } from '@/components/InstrumentSelector';
 import { TestFormV2 } from '@/components/TestFormV2';
 import { EquipmentUnitCard } from '@/components/EquipmentUnitCard';
@@ -578,11 +579,7 @@ export default function EngineerProjectDetail() {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    {getDraftStatus(task, formData[task.id]) === 'draft' && (
-                                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <HardDrive className="h-3 w-3" /> Draft
-                                      </span>
-                                    )}
+                                    <DraftStatusIndicator status={getDraftStatus(task, formData[task.id])} />
                                     <StatusBadge status={task.status} />
                                   </div>
                                 </div>
