@@ -3,10 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, PackageSearch } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { EmptyState } from '@/components/EmptyState';
+import { ProgressBar } from '@/components/ProgressBar';
 import type { Tables } from '@/integrations/supabase/types';
 
 type EquipmentInstance = Tables<'equipment_instances'>;
@@ -203,8 +205,12 @@ export function ProjectEquipmentTab({ projectId, projectStatus: _projectStatus }
     return (
       <Card>
         <CardHeader><CardTitle>Equipment Instances</CardTitle></CardHeader>
-        <CardContent className="text-center py-12">
-          <p className="text-muted-foreground">No equipment instances found for this project</p>
+        <CardContent className="py-4">
+          <EmptyState
+            icon={<PackageSearch size={28} />}
+            title="No equipment instances yet"
+            description="Generate equipment and tasks from the Testing Scope tab once scope is finalized."
+          />
         </CardContent>
       </Card>
     );
@@ -240,6 +246,18 @@ export function ProjectEquipmentTab({ projectId, projectStatus: _projectStatus }
                 </AccordionTrigger>
 
                 <AccordionContent className="pb-4">
+                  {itemTasks.length > 0 && (
+                    <ProgressBar
+                      className="mb-3"
+                      label="Completion"
+                      tone="success"
+                      value={
+                        itemTasks.length > 0
+                          ? Math.round((itemTasks.filter(t => t.status === 'APPROVED').length / itemTasks.length) * 100)
+                          : 0
+                      }
+                    />
+                  )}
                   {itemTasks.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-2">No tests configured for this equipment</p>
                   ) : (
