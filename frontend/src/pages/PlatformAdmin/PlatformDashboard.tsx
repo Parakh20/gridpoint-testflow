@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from '@/components/StatusBadge';
+import { MetricCard } from '@/components/MetricCard';
 import {
   Loader2,
   Zap,
@@ -625,21 +626,12 @@ export default function PlatformDashboard() {
             { icon: Users,     label: 'Total Users',     value: stats.users },
             { icon: Activity,  label: 'Active Projects', value: stats.activeProjects },
           ].map(({ icon: Icon, label, value }) => (
-            <Card key={label} className="bg-card/60 backdrop-blur border-border">
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Icon className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-mono text-2xl font-semibold text-foreground leading-none">
-                    {loadingData
-                      ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                      : value}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard
+              key={label}
+              label={label}
+              value={loadingData ? '—' : value}
+              icon={<Icon className="h-5 w-5 text-primary" />}
+            />
           ))}
         </div>
 
