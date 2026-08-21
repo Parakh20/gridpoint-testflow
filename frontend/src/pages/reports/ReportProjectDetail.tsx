@@ -4,7 +4,7 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { ProgressBar } from '@/components/ProgressBar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -356,7 +356,10 @@ export default function ReportProjectDetail() {
     : 0;
 
   return (
-    <DashboardLayout title="Reports">
+    <DashboardLayout
+      title="Reports"
+      breadcrumbs={[{ label: 'Reports', href: '/reports' }, { label: project.project_number }]}
+    >
       <div className="space-y-6">
         {/* Page header (outside report ref — not in PDF) */}
         <div className="flex items-start justify-between gap-4">
@@ -446,7 +449,7 @@ export default function ReportProjectDetail() {
                     {progressStats.approved} / {progressStats.total} ({approvedPct}%)
                   </span>
                 </div>
-                <Progress value={approvedPct} />
+                <ProgressBar value={approvedPct} showPercentage={false} />
                 <div className="flex flex-wrap gap-5 text-xs">
                   <span className="flex items-center gap-1.5">
                     <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
