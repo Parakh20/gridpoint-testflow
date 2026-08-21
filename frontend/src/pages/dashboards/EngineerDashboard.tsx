@@ -5,7 +5,9 @@ import { Wrench, Clock, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatusBadge } from '@/components/StatusBadge';
-import { AnimatedCounter } from '@/components/AnimatedCounter';
+import { MetricCard } from '@/components/MetricCard';
+import { EmptyState } from '@/components/EmptyState';
+import { ProgressBar } from '@/components/ProgressBar';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/format';
 import { motion } from 'framer-motion';
@@ -74,23 +76,17 @@ export default function EngineerDashboard() {
     {
       title: 'Assigned Tests',
       value: stats.total,
-      label: 'Total test tasks assigned',
       icon: <Wrench className="h-4 w-4 text-primary" />,
-      color: '',
     },
     {
       title: 'In Progress',
       value: stats.inProgress,
-      label: 'Active tests',
       icon: <Clock className="h-4 w-4 text-accent" />,
-      color: 'text-accent',
     },
     {
       title: 'Completed',
       value: stats.completed,
-      label: 'Approved tests',
       icon: <CheckCircle className="h-4 w-4 text-success" />,
-      color: 'text-success',
     },
   ];
 
@@ -104,18 +100,7 @@ export default function EngineerDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: i * 0.07 }}
           >
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-                {card.icon}
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${card.color}`}>
-                  <AnimatedCounter value={card.value} />
-                </div>
-                <p className="text-xs text-muted-foreground">{card.label}</p>
-              </CardContent>
-            </Card>
+            <MetricCard label={card.title} value={card.value} icon={card.icon} />
           </motion.div>
         ))}
       </div>
@@ -131,13 +116,11 @@ export default function EngineerDashboard() {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : projects.length === 0 ? (
-            <div className="text-center py-12">
-              <Wrench className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No assignments yet</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Your manager will assign test scopes to you
-              </p>
-            </div>
+            <EmptyState
+              icon={<Wrench size={28} />}
+              title="No assignments yet"
+              description="Your manager will assign test scopes to you."
+            />
           ) : (
             <div className="space-y-3">
               {projects.map((project, i) => {
@@ -167,18 +150,7 @@ export default function EngineerDashboard() {
                       <p className="text-xs text-muted-foreground mt-1">
                         {project.equipmentCount} equipment · {project.completedCount}/{project.taskCount} approved
                       </p>
-                      {/* Progress bar */}
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                          <motion.div
-                            className="h-full rounded-full bg-success"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${pct}%` }}
-                            transition={{ duration: 0.6, ease: 'easeOut', delay: i * 0.05 + 0.2 }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-muted-foreground w-8 text-right">{pct}%</span>
-                      </div>
+                      <ProgressBar value={pct} showPercentage tone="success" className="mt-2" />
                     </div>
                   </motion.div>
                 );

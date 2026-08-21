@@ -375,7 +375,10 @@ export default function EngineerProjectDetail() {
     instanceTasks.every(t => t.status === 'SUBMITTED' || t.status === 'APPROVED');
 
   return (
-    <DashboardLayout title="Project Tasks">
+    <DashboardLayout
+      title={project?.project_number ?? 'Project Tasks'}
+      breadcrumbs={[{ label: 'My Tasks', href: '/engineer' }, { label: project?.project_number ?? 'Project' }]}
+    >
       <div className="space-y-6">
         {/* Back + project header */}
         <div className="flex items-center gap-3">
