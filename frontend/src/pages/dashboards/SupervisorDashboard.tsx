@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/format';
+import { sortPendingTests, rollUpInstanceStatusAfterApproval } from '@/lib/reviewQueue';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Project = Tables<'projects'>;
@@ -29,6 +30,7 @@ interface PendingTest {
   test_template: { test_name: string; test_code: string } | null;
   project_id: string;
   project_number: string;
+  created_at: string;
 }
 
 export default function SupervisorDashboard() {
@@ -77,20 +79,21 @@ export default function SupervisorDashboard() {
 
       const { data: tasks, error } = await supabase
         .from('test_tasks')
-        .select(`id, status, equipment_instance:equipment_instances(id, label, equipment_type), test_template:test_templates(test_name, test_code), equipment_instance_id`)
+        .select(`id, status, created_at, equipment_instance:equipment_instances(id, label, equipment_type), test_template:test_templates(test_name, test_code), equipment_instance_id`)
         .in('equipment_instance_id', instanceIds)
         .eq('status', 'SUBMITTED')
         .order('created_at');
       if (error) return [];
 
-      return (tasks || []).map(t => ({
+      return sortPendingTests((tasks || []).map(t => ({
         id: t.id,
         status: t.status,
+        created_at: t.created_at,
         equipment_instance: t.equipment_instance,
         test_template: t.test_template,
         project_id: instanceProjectMap[t.equipment_instance_id] || '',
         project_number: projectMap[instanceProjectMap[t.equipment_instance_id]] || '',
-      })) as PendingTest[];
+      })) as PendingTest[]);
     },
     enabled: !!user,
   });
@@ -162,7 +165,7 @@ export default function SupervisorDashboard() {
       const equipId = task.equipment_instance?.id;
       if (equipId) {
         const remaining = pendingTests.filter(t => t.id !== task.id && t.equipment_instance?.id === equipId);
-        const newEquipStatus = remaining.length > 0 ? 'SUBMITTED' : (nextStatus === 'APPROVED' ? 'APPROVED' : 'REWORK');
+        const newEquipStatus = rollUpInstanceStatusAfterApproval(remaining.map(t => t.status), nextStatus);
         await supabase.from('equipment_instances').update({ status: newEquipStatus }).eq('id', equipId);
       }
 
@@ -213,7 +216,7 @@ export default function SupervisorDashboard() {
       const instanceIds = [...new Set(pendingTests.filter(t => ids.includes(t.id)).map(t => t.equipment_instance?.id).filter(Boolean))] as string[];
       for (const equipId of instanceIds) {
         const remaining = pendingTests.filter(t => !ids.includes(t.id) && t.equipment_instance?.id === equipId);
-        const newStatus = remaining.length > 0 ? 'SUBMITTED' : 'APPROVED';
+        const newStatus = rollUpInstanceStatusAfterApproval(remaining.map(t => t.status), 'APPROVED');
         await supabase.from('equipment_instances').update({ status: newStatus }).eq('id', equipId);
       }
 
