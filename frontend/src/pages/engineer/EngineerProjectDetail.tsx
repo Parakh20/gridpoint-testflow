@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 import { NAMEPLATE_FIELDS, NameplateFieldDef } from '@/lib/nameplateFields';
+import { deriveEquipmentStatus, getDraftStatus } from '@/lib/engineerWorkspace';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -234,15 +235,6 @@ export default function EngineerProjectDetail() {
     try { localStorage.removeItem(draftKey(taskId)); } catch { /* storage unavailable */ }
   };
 
-  const deriveEquipmentStatus = (nextTasks: TestTask[]) => {
-    const statuses = nextTasks.map(t => t.status);
-    if (statuses.length > 0 && statuses.every(s => s === 'APPROVED')) return 'APPROVED';
-    if (statuses.includes('REWORK')) return 'REWORK';
-    if (statuses.includes('SUBMITTED')) return 'SUBMITTED';
-    if (statuses.some(s => s === 'IN_PROGRESS' || s === 'APPROVED')) return 'IN_PROGRESS';
-    return nextTasks[0]?.equipment_instance?.assigned_to ? 'ASSIGNED' : 'UNASSIGNED';
-  };
-
   const handleSaveTask = async (task: TestTask, submit = false) => {
     if (!user || !task.equipment_instance?.id) return;
     setSaving(task.id);
@@ -270,7 +262,10 @@ export default function EngineerProjectDetail() {
         t.id === task.id ? { ...t, status: nextTaskStatus } : t
       );
       const nextEquipmentStatus = deriveEquipmentStatus(
-        nextTasks.filter(t => t.equipment_instance?.id === task.equipment_instance?.id)
+        nextTasks
+          .filter(t => t.equipment_instance?.id === task.equipment_instance?.id)
+          .map(t => t.status),
+        true // an assigned engineer is saving a task, so the instance has an assignee by construction
       );
       await supabase.from('equipment_instances')
         .update({ status: nextEquipmentStatus })
@@ -577,7 +572,7 @@ export default function EngineerProjectDetail() {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    {!task.existing_record && formData[task.id] && Object.keys(formData[task.id]).length > 0 && (
+                                    {getDraftStatus(task, formData[task.id]) === 'draft' && (
                                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                         <HardDrive className="h-3 w-3" /> Draft
                                       </span>
