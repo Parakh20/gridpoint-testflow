@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { AnimatedCounter } from '@/components/AnimatedCounter';
+import { MetricCard } from '@/components/MetricCard';
+import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -135,26 +137,19 @@ export default function GMDashboard() {
       <div className="flex justify-between items-center mb-6">
         <div className="grid gap-4 md:grid-cols-5 flex-1 mr-6">
           {[
-            { label: 'Total Projects', value: stats.total,     icon: <FolderOpen className="h-4 w-4 text-muted-foreground" />, color: 'text-foreground' },
-            { label: 'Active',         value: stats.active,    icon: <Clock className="h-4 w-4 text-amber-400" />,            color: 'text-amber-400' },
-            { label: 'Completed',      value: stats.closed,    icon: <CheckCircle className="h-4 w-4 text-emerald-400" />,    color: 'text-emerald-400' },
-            { label: 'Assigned',       value: stats.assigned,  icon: <UserCheck className="h-4 w-4 text-blue-400" />,         color: 'text-blue-400' },
-            { label: 'Unassigned',     value: stats.unassigned,icon: <UserX className="h-4 w-4 text-orange-400" />,           color: 'text-orange-400' },
-          ].map((s, i) => (
-            <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} whileHover={{ y: -2 }}>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{s.label}</CardTitle>
-                  {s.icon}
-                </CardHeader>
-                <CardContent>
-                  {isLoading
-                    ? <Skeleton className="h-8 w-16" />
-                    : <div className={`text-2xl font-bold font-mono ${s.color}`}><AnimatedCounter value={s.value} /></div>
-                  }
-                </CardContent>
-              </Card>
-            </motion.div>
+            { label: 'Total Projects', value: stats.total,     tone: 'default' as const, icon: <FolderOpen size={16} /> },
+            { label: 'Active',         value: stats.active,    tone: 'warning' as const, icon: <Clock size={16} /> },
+            { label: 'Completed',      value: stats.closed,    tone: 'success' as const, icon: <CheckCircle size={16} /> },
+            { label: 'Assigned',       value: stats.assigned,  tone: 'default' as const, icon: <UserCheck size={16} /> },
+            { label: 'Unassigned',     value: stats.unassigned,tone: stats.unassigned > 0 ? 'danger' as const : 'default' as const, icon: <UserX size={16} /> },
+          ].map(s => (
+            <MetricCard
+              key={s.label}
+              label={s.label}
+              tone={s.tone}
+              icon={s.icon}
+              value={isLoading ? <Skeleton className="h-7 w-10" /> : <AnimatedCounter value={s.value} />}
+            />
           ))}
         </div>
 
@@ -246,18 +241,18 @@ export default function GMDashboard() {
               {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
             </div>
           ) : projects.length === 0 ? (
-            <div className="text-center py-12">
-              <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">No projects yet</p>
-              <Button onClick={() => navigate('/projects/new')}>
-                <Plus className="h-4 w-4 mr-2" />Create Your First Test Plan
-              </Button>
-            </div>
+            <EmptyState
+              icon={<FolderOpen size={28} />}
+              title="No projects yet"
+              description="Create your first test plan to start commissioning."
+              action={{ label: 'Create Your First Test Plan', onClick: () => navigate('/projects/new') }}
+            />
           ) : filteredProjects.length === 0 ? (
-            <div className="text-center py-12">
-              <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No projects match your search</p>
-            </div>
+            <EmptyState
+              icon={<Search size={28} />}
+              title="No projects match your search"
+              description="Try a different search term or clear the assignment filter."
+            />
           ) : (
             <>
               <div className="space-y-3">
