@@ -5,7 +5,7 @@ type Tone = 'default' | 'success' | 'warning' | 'danger';
 
 interface MetricCardProps {
   label: string;
-  value: string | number;
+  value: ReactNode;
   tone?: Tone;
   icon?: ReactNode;
   delta?: { value: string; direction: 'up' | 'down' | 'flat' };

@@ -24,4 +24,9 @@ describe('MetricCard', () => {
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
+
+  it('accepts a ReactNode value, not just string | number', () => {
+    render(<MetricCard label="Active Projects" value={<span data-testid="counter">12</span>} />);
+    expect(screen.getByTestId('counter')).toBeInTheDocument();
+  });
 });
