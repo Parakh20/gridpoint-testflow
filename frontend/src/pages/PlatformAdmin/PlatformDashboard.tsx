@@ -36,6 +36,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { MetricCard } from '@/components/MetricCard';
+import { EmptyState } from '@/components/EmptyState';
 import {
   Loader2,
   Zap,
@@ -664,9 +665,7 @@ export default function PlatformDashboard() {
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               ) : companies.length === 0 ? (
-                <div className="py-16 text-center text-sm text-muted-foreground">
-                  No companies yet. Create one below.
-                </div>
+                <EmptyState title="No companies yet. Create one below." />
               ) : (
                 <Table>
                   <TableHeader>
@@ -1147,9 +1146,7 @@ export default function PlatformDashboard() {
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               ) : allUsers.length === 0 ? (
-                <div className="py-16 text-center text-sm text-muted-foreground">
-                  No users found.
-                </div>
+                <EmptyState title="No users found." />
               ) : (
                 <Table>
                   <TableHeader>

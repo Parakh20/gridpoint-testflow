@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import PlatformDashboard from './PlatformDashboard';
+
+// Radix's Tabs.Trigger switches tabs on mousedown/focus (not click), so
+// dispatch mouseDown directly rather than pulling in @testing-library/user-event.
+function selectTab(name: RegExp) {
+  fireEvent.mouseDown(screen.getByRole('tab', { name }));
+}
 
 // PlatformDashboard imports the Supabase client module (unused on this
 // screen's happy path but still evaluated at import time) — createClient()
@@ -21,6 +27,9 @@ vi.mock('./platformFetch', () => ({
     }
     if (action === 'get_all_companies') {
       return Promise.resolve([]);
+    }
+    if (action === 'get_all_users') {
+      return Promise.resolve({ users: [] });
     }
     return Promise.resolve(null);
   },
@@ -58,5 +67,24 @@ describe('PlatformDashboard', () => {
     expect(await screen.findByText('4')).toHaveClass('text-page-title');
     expect(screen.getByText('12')).toHaveClass('text-page-title');
     expect(screen.getByText('7')).toHaveClass('text-page-title');
+  });
+
+  it('renders an EmptyState for the Companies tab when there are no companies', async () => {
+    setup();
+    const title = await screen.findByText('No companies yet. Create one below.');
+    expect(title).toBeInTheDocument();
+    // EmptyState renders its title in a <p> inside a dashed-border container —
+    // distinguishes it from the old hand-rolled `py-16 text-center` div.
+    expect(title.closest('div')).toHaveClass('border-dashed');
+  });
+
+  it('renders an EmptyState for the Users tab when there are no users', async () => {
+    setup();
+    // Wait for initial load to settle so the tab list is interactive.
+    await screen.findByText('Total Companies');
+    selectTab(/All Users/i);
+    const title = await screen.findByText('No users found.');
+    expect(title).toBeInTheDocument();
+    expect(title.closest('div')).toHaveClass('border-dashed');
   });
 });
