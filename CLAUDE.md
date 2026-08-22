@@ -21,7 +21,7 @@
 - **Routing:** react-router-dom v6
 - **AI:** Anthropic Claude (`claude-haiku-4-5-20251001`) — Edge Function only
 - **Excel:** SheetJS (`xlsx`), dynamically imported
-- **CI:** GH Actions → `supabase db push` + functions deploy on push to main; billing/webhook Deno integration tests (`test-billing-functions` job in `supabase.yml`) gate the functions deploy
+- **CI:** GH Actions → `supabase db push` + functions deploy on push to main; billing/webhook Deno integration tests (`test-billing-functions` job in `supabase.yml`) gate the functions deploy — if this job fails, ALL function deploys are blocked (not just the two functions it tests) while migrations still proceed, producing a migrated-schema/stale-functions skew until fixed
 
 ## Project Layout
 

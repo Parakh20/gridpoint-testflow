@@ -48,11 +48,17 @@ jobs:
           RAZORPAY_WEBHOOK_SECRET: test-secret
           RECONCILE_CRON_SECRET: test-cron-secret
         run: |
-          SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o json | jq -r '.SERVICE_ROLE_KEY') \
-            deno test --allow-net --allow-env \
-              _shared/entitlements.test.ts \
-              razorpay-webhook/index.test.ts \
-              reconcile-cancellations/index.test.ts
+          set -euo pipefail
+          SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o json | jq -r '.SERVICE_ROLE_KEY')
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ "$SUPABASE_SERVICE_ROLE_KEY" = "null" ]; then
+            echo "::error::Failed to extract SUPABASE_SERVICE_ROLE_KEY from 'supabase status -o json' (empty or literal \"null\" — check the .SERVICE_ROLE_KEY JSON path is still correct)"
+            exit 1
+          fi
+          export SUPABASE_SERVICE_ROLE_KEY
+          deno test --allow-net --allow-env \
+            _shared/entitlements.test.ts \
+            razorpay-webhook/index.test.ts \
+            reconcile-cancellations/index.test.ts
 
       - name: Stop local Supabase stack
         if: always()
