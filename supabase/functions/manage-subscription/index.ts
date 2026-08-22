@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { enforceRateLimit } from '../_shared/rate_limit.ts';
 import { logEdgeError } from '../_shared/monitoring.ts';
+import { RazorpayBillingProvider } from '../_shared/billing_provider.ts';
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req.headers.get('Origin'));
@@ -101,6 +102,104 @@ Deno.serve(async (req) => {
 
       if (data?.scheduled === false) return json(data, 409);
       return json(data);
+    }
+
+    if (action === 'upgrade') {
+      const targetSlug = body?.target_plan_slug;
+      if (typeof targetSlug !== 'string' || !targetSlug) {
+        return json({ error: 'target_plan_slug is required' }, 400);
+      }
+
+      const { data: targetPlan, error: planError } = await adminClient
+        .from('plans')
+        .select('id, monthly_price_inr, razorpay_plan_id_monthly, razorpay_plan_id_annual')
+        .eq('slug', targetSlug)
+        .eq('is_active', true)
+        .eq('is_public', true)
+        .single();
+
+      if (planError || !targetPlan) return json({ error: `Unknown plan: ${targetSlug}` }, 400);
+
+      // Pre-flight: never call Razorpay for a doomed upgrade (enterprise
+      // contract active, target isn't strictly higher-priced, etc).
+      const { data: eligibility, error: eligibilityError } = await callerClient.rpc(
+        'check_plan_upgrade_eligibility',
+        { _company_id: callerProfile.company_id, _target_plan_id: targetPlan.id },
+      );
+      if (eligibilityError) return json({ error: eligibilityError.message }, 400);
+      if (!eligibility?.eligible) {
+        return json({ upgraded: false, reason: eligibility?.reason ?? 'Not eligible to upgrade' }, 409);
+      }
+
+      const { data: subscription, error: subError } = await adminClient
+        .from('subscriptions')
+        .select('provider_subscription_id, billing_interval')
+        .eq('company_id', callerProfile.company_id)
+        .single();
+
+      if (subError || !subscription?.provider_subscription_id) {
+        return json({ error: 'No active provider subscription found for this company' }, 400);
+      }
+
+      const providerPlanId = subscription.billing_interval === 'annual'
+        ? targetPlan.razorpay_plan_id_annual
+        : targetPlan.razorpay_plan_id_monthly;
+
+      if (!providerPlanId) {
+        // Operator hasn't configured this plan's Razorpay mapping yet
+        // (plan_provider_mapping / razorpay_plan_id_* columns) — fail
+        // closed rather than silently no-op the charge.
+        return json({ error: 'This plan is not yet available for self-service upgrade' }, 400);
+      }
+
+      const keyId = Deno.env.get('RAZORPAY_KEY_ID');
+      const keySecret = Deno.env.get('RAZORPAY_KEY_SECRET');
+      if (!keyId || !keySecret) {
+        logEdgeError('manage-subscription', 'payment_failure', new Error('Razorpay credentials not configured'));
+        return json({ error: 'Billing provider not configured' }, 500);
+      }
+
+      const billingProvider = new RazorpayBillingProvider(keyId, keySecret);
+
+      try {
+        // 'now' — an upgrade takes effect immediately with Razorpay
+        // prorating the remainder of the current cycle into a fresh
+        // invoice. This call must succeed BEFORE any local write happens:
+        // if it throws, nothing in TestFlow's DB has changed and the
+        // tenant can safely retry.
+        await billingProvider.changeSubscription(
+          subscription.provider_subscription_id,
+          providerPlanId,
+          'now',
+        );
+      } catch (err: unknown) {
+        logEdgeError('manage-subscription', 'payment_failure', err);
+        const message = err instanceof Error ? err.message : 'Failed to change plan with billing provider';
+        return json({ error: message }, 502);
+      }
+
+      // Razorpay confirmed — apply the local write now. If this specific
+      // call fails (network drop, function crash), the plan is still
+      // correct at Razorpay and the next webhook delivery reconciles
+      // subscriptions.plan_id via upsert_subscription's existing
+      // plan_provider_mapping resolution — no separate recovery needed.
+      const { error: applyError } = await callerClient.rpc('apply_plan_upgrade', {
+        _company_id: callerProfile.company_id,
+        _target_plan_id: targetPlan.id,
+      });
+      if (applyError) {
+        logEdgeError('manage-subscription', 'payment_failure', applyError);
+        return json({ error: 'Plan changed with billing provider but failed to record locally — it will sync on the next billing update' }, 500);
+      }
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor: caller.email ?? caller.id,
+        company_id: callerProfile.company_id,
+        action: 'PLAN_CHANGED',
+        new_value: { plan_slug: targetSlug, trigger: 'self_service_upgrade' },
+      });
+
+      return json({ upgraded: true, plan_slug: targetSlug });
     }
 
     return json({ error: `Unknown action: ${action}` }, 400);
