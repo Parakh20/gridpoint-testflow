@@ -406,6 +406,18 @@ cancel in the first place.
    (once gap 1 is fixed) and its webhook is delivered, this resolves itself
    via the normal webhook path — but there's no backstop.
 
+**Update (2026-08-22, Plan 4 QA-matrix correction):** gap #2 ("no
+scheduled job/reconciliation flips `status`") is fixed. Migration
+`20260814000002_webhook_ordering_and_cancel_backstop.sql` added
+`flip_expired_cancellations()` (`SECURITY DEFINER`, service-role only),
+invoked daily by `supabase/functions/reconcile-cancellations/index.ts` via
+`.github/workflows/reconcile-cancellations.yml` (`X-Cron-Secret`-gated —
+see `RECONCILE_CRON_SECRET` in root `CLAUDE.md`'s Environment Variables
+table). Gap #1 (Razorpay is never told to stop billing —
+`manage-subscription`'s `TODO(Plan 2)`) is still open and unfixed as of
+this update; re-verify `supabase/functions/manage-subscription/index.ts`
+before assuming otherwise.
+
 ---
 
 ## 7. Duplicate webhook delivery — same `X-Razorpay-Event-Id` twice
@@ -556,6 +568,15 @@ speculative fix under this QA pass. Recommend tracking in
 `docs/dev/IMPROVEMENTS.md` before this is relied on at higher webhook
 volume/latency variance than has been seen so far.
 
+**Update (2026-08-22, Plan 4 QA-matrix correction):** this gap is fixed.
+Migration `20260814000002_webhook_ordering_and_cancel_backstop.sql` added
+`subscriptions.last_event_at` and rewrote `upsert_subscription` to compare
+the incoming event's `_event_created_at` parameter against
+`prior_last_event_at` before applying `status`/period/seat-count updates —
+a stale/out-of-order event now no-ops instead of overwriting newer state
+(see CLAUDE.md's billing-webhooks paragraph). **Result: PASS (fixed, no
+longer a gap).**
+
 ---
 
 ## 9. Scheduled downgrade must not apply mid-period on an unrelated webhook event
@@ -640,9 +661,9 @@ correctly-ordered input.
 | 3 | Professional→Business proration | **GAP** | documented, not fixed (no upgrade codepath exists at all) |
 | 4 | Business→Professional downgrade blocker math | PASS | verified by trace + real Vitest test |
 | 5 | Past-due grace enforcement | **BUG → FIXED** | migration `20260814000001` + CLAUDE.md update |
-| 6 | Cancel-at-period-end semantics / auto-flip | PARTIAL PASS + **GAP** | `cancel_at` math correct; provider-side cancel call + any status-flip backstop are both unbuilt — documented |
+| 6 | Cancel-at-period-end semantics / auto-flip | PARTIAL PASS + **PARTIAL GAP** | `cancel_at` math correct; DB-side auto-flip backstop now built (`flip_expired_cancellations`, migration `20260814000002`) — remaining gap: provider-side cancel call (`manage-subscription` TODO) still unbuilt |
 | 7 | Duplicate webhook dedup | PASS | none |
-| 8 | Out-of-order webhook | **GAP** | documented, not fixed (needs a real ordering-token design decision) |
+| 8 | Out-of-order webhook | **FIXED** | `last_event_at` ordering guard added in migration `20260814000002` — see updated trace above |
 | 9 | Scheduled downgrade doesn't apply mid-period | PASS | none |
 
 ## Runnable Vitest coverage added this session
