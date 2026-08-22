@@ -18,6 +18,7 @@ import { AssignProjectDialog } from '@/components/AssignProjectDialog';
 import { NeedsAttentionPanel, type AttentionProject } from '@/components/NeedsAttentionPanel';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/format';
+import { isOverdue } from '@/lib/projectStatus';
 import { useEffect } from 'react';
 import { useRealtimeChannel, usePollingFallback } from '@/lib/realtime';
 import type { Tables } from '@/integrations/supabase/types';
@@ -31,9 +32,6 @@ type Project = Tables<'projects'> & {
 };
 
 const PAGE_SIZE = 20;
-
-const isOverdue = (endDate: string | null, status: string) =>
-  !!endDate && new Date(endDate) < new Date() && status !== 'CLOSED';
 
 async function fetchAllProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -131,6 +129,15 @@ export default function GMDashboard() {
         const aOverdue = isOverdue(a.end_date, a.status);
         const bOverdue = isOverdue(b.end_date, b.status);
         if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+        if (aOverdue && bOverdue) {
+          // Both overdue: most-overdue (earliest end_date) first, per the
+          // original design intent — see this plan's Task 4 for why a prior
+          // created_at-descending tiebreak was wrong here.
+          const aEnd = a.end_date ? new Date(a.end_date).getTime() : 0;
+          const bEnd = b.end_date ? new Date(b.end_date).getTime() : 0;
+          return aEnd - bEnd;
+        }
+        // Both unassigned-only (not overdue): newest project first, unchanged.
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       })
       .slice(0, 8);

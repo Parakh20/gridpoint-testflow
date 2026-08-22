@@ -28,12 +28,10 @@ import { dashboardPath } from '@/lib/routes';
 import { formatDate } from '@/lib/format';
 import { useFeature } from '@/lib/features';
 import { captureException } from '@/lib/monitoring';
+import { isOverdue } from '@/lib/projectStatus';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Project = Tables<'projects'>;
-
-const isOverdue = (endDate: string | null | undefined, status: string) =>
-  !!endDate && new Date(endDate) < new Date() && status !== 'CLOSED';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -314,34 +312,37 @@ export default function ProjectDetail() {
 
           <TabsContent value="overview" className="space-y-4">
             {progressStats && (
-              <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-                <MetricCard
-                  label="Approved"
-                  tone="success"
-                  value={<AnimatedCounter value={progressStats.approved} />}
-                  delta={{ value: `of ${progressStats.total}`, direction: 'flat' }}
-                />
-                <MetricCard
-                  label="Pending Review"
-                  tone="warning"
-                  value={<AnimatedCounter value={progressStats.submitted} />}
-                />
-                <MetricCard
-                  label="In Progress"
-                  tone="default"
-                  value={<AnimatedCounter value={progressStats.inProgress} />}
-                />
-                <MetricCard
-                  label="Not Started"
-                  tone="default"
-                  value={<AnimatedCounter value={progressStats.draft} />}
-                />
-                <div className="col-span-2 lg:col-span-4">
-                  <ProgressBar
-                    label="Overall completion"
+              <div className="space-y-3">
+                <h2 className="text-section-title text-foreground">Project Progress</h2>
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                  <MetricCard
+                    label="Approved"
                     tone="success"
-                    value={progressStats.total > 0 ? Math.round((progressStats.approved / progressStats.total) * 100) : 0}
+                    value={<AnimatedCounter value={progressStats.approved} />}
+                    delta={{ value: `of ${progressStats.total}`, direction: 'flat' }}
                   />
+                  <MetricCard
+                    label="Pending Review"
+                    tone="warning"
+                    value={<AnimatedCounter value={progressStats.submitted} />}
+                  />
+                  <MetricCard
+                    label="In Progress"
+                    tone="default"
+                    value={<AnimatedCounter value={progressStats.inProgress} />}
+                  />
+                  <MetricCard
+                    label="Not Started"
+                    tone="default"
+                    value={<AnimatedCounter value={progressStats.draft} />}
+                  />
+                  <div className="col-span-2 lg:col-span-4">
+                    <ProgressBar
+                      label="Overall completion"
+                      tone="success"
+                      value={progressStats.total > 0 ? Math.round((progressStats.approved / progressStats.total) * 100) : 0}
+                    />
+                  </div>
                 </div>
               </div>
             )}

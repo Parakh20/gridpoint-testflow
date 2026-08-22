@@ -7,7 +7,7 @@ interface StatusBadgeProps {
 
 const STATUS_CONFIG: Record<string, { pill: string; dot: string }> = {
   unassigned:  { pill: 'bg-slate-500/15 text-slate-400 border-slate-500/25',   dot: '#94a3b8' },
-  assigned:    { pill: 'bg-blue-500/15 text-blue-400 border-blue-500/25',       dot: '#60a5fa' },
+  assigned:    { pill: 'bg-blue-500/20 text-blue-300 border-blue-500/30',       dot: '#93c5fd' },
   in_progress: { pill: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/25',       dot: '#22d3ee' },
   inprogress:  { pill: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/25',       dot: '#22d3ee' },
   submitted:   { pill: 'bg-violet-500/15 text-violet-400 border-violet-500/25', dot: '#a78bfa' },

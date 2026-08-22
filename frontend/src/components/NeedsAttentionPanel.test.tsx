@@ -63,4 +63,9 @@ describe('NeedsAttentionPanel', () => {
     const results = await axe(container);
     expect(results.violations).toHaveLength(0);
   });
+
+  it('sets type="button" on each row button (not the implicit form-submit default)', () => {
+    render(<NeedsAttentionPanel projects={[overdue]} onSelect={vi.fn()} />);
+    expect(screen.getByText('TF-1001').closest('button')).toHaveAttribute('type', 'button');
+  });
 });

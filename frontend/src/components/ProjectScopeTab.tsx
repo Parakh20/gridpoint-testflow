@@ -54,15 +54,11 @@ export function ProjectScopeTab({ projectId }: ProjectScopeTabProps) {
 
   if (scopeItems.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-4">
-          <EmptyState
-            icon={<PackageSearch size={28} />}
-            title="No equipment scope defined"
-            description="Define equipment types and quantities in the New Project wizard or Edit Project screen."
-          />
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon={<PackageSearch size={28} />}
+        title="No equipment scope defined"
+        description="Define equipment types and quantities in the New Project wizard or Edit Project screen."
+      />
     );
   }
 

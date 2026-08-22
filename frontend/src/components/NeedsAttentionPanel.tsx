@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { cn } from '@/lib/utils';
+import { isOverdue } from '@/lib/projectStatus';
 
 export interface AttentionProject {
   id: string;
@@ -20,7 +21,7 @@ interface NeedsAttentionPanelProps {
 }
 
 function reasonFor(project: AttentionProject): { label: string; tone: 'danger' | 'warning' } | null {
-  const overdue = !!project.end_date && new Date(project.end_date) < new Date() && project.status !== 'CLOSED';
+  const overdue = isOverdue(project.end_date, project.status);
   const unassigned = !project.assigned_to;
   if (overdue && unassigned) return { label: 'Overdue · Unassigned', tone: 'danger' };
   if (overdue) return { label: 'Overdue', tone: 'danger' };
@@ -51,6 +52,7 @@ export function NeedsAttentionPanel({ projects, onSelect, className }: NeedsAtte
               return (
                 <li key={project.id}>
                   <button
+                    type="button"
                     onClick={() => onSelect(project.id)}
                     className={cn(
                       'flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-left',

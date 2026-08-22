@@ -35,4 +35,14 @@ describe('ProjectScopeTab', () => {
     expect(screen.getByText('CT')).toBeInTheDocument();
     expect(screen.getByText('8')).toBeInTheDocument(); // total row
   });
+
+  it('does not wrap the EmptyState in a second bordered Card (avoids a double border)', async () => {
+    mockScopeItems([]);
+    const { container } = render(<ProjectScopeTab projectId="p1" />);
+    await waitFor(() => expect(screen.getByText('No equipment scope defined')).toBeInTheDocument());
+    // EmptyState's own container carries `border-dashed`. A solid-bordered Card
+    // wrapper around it (`rounded-lg border bg-card`) would add a second,
+    // non-dashed `.border` element — assert none exists anywhere in the tree.
+    expect(container.querySelectorAll('.border:not(.border-dashed)')).toHaveLength(0);
+  });
 });

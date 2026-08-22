@@ -1,14 +1,11 @@
 import { useState } from "react";
+import { formatInr } from "@/lib/format";
 
 const DEFAULT_ENGINEERS = 20;
 const DEFAULT_PROJECTS_PER_YEAR = 8;
 const DEFAULT_HOURS_PER_PROJECT = 120;
 const DEFAULT_HOURLY_COST_INR = 1000;
 const DEFAULT_REDUCTION_PERCENT = 60;
-
-function formatInr(amount: number): string {
-  return `₹${Math.round(amount).toLocaleString("en-IN")}`;
-}
 
 interface NumberFieldProps {
   label: string;

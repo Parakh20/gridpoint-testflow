@@ -71,4 +71,14 @@ describe('ProjectEquipmentTab', () => {
     await user.click(screen.getByText('PTR-001'));
     await waitFor(() => expect(screen.getByText('50%')).toBeInTheDocument()); // 1 of 2 tasks approved
   });
+
+  it('does not wrap the EmptyState in a second bordered Card (avoids a double border)', async () => {
+    mockEmpty();
+    const { container } = render(<ProjectEquipmentTab projectId="p1" projectStatus="ACTIVE" />);
+    await waitFor(() => expect(screen.getByText('No equipment instances yet')).toBeInTheDocument());
+    // EmptyState's own container carries `border-dashed`. A solid-bordered Card
+    // wrapper around it (`rounded-lg border bg-card`) would add a second,
+    // non-dashed `.border` element — assert none exists anywhere in the tree.
+    expect(container.querySelectorAll('.border:not(.border-dashed)')).toHaveLength(0);
+  });
 });

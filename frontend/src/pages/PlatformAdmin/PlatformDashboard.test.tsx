@@ -20,8 +20,14 @@ vi.mock('@/integrations/supabase/client', () => ({
 // PlatformDashboard fetches through platformFetch (the platform-admin-data
 // Edge Function proxy) rather than the Supabase client directly — mock that
 // module so the stats bar resolves without a network call.
-vi.mock('./platformFetch', () => ({
-  platformFetch: (action: string) => {
+//
+// The mock function is declared via vi.hoisted() so it can be shared between
+// the vi.mock() factory (which Vitest hoists above these imports/statements)
+// and the test bodies below, which swap its implementation with
+// mockImplementationOnce/mockImplementation instead of reassigning the
+// (read-only, per TypeScript) module namespace export directly.
+const { platformFetchMock, defaultPlatformFetchImpl } = vi.hoisted(() => {
+  const defaultPlatformFetchImpl = (action: string) => {
     if (action === 'get_stats') {
       return Promise.resolve({ total_companies: 4, total_users: 12, active_projects: 7 });
     }
@@ -32,7 +38,15 @@ vi.mock('./platformFetch', () => ({
       return Promise.resolve({ users: [] });
     }
     return Promise.resolve(null);
-  },
+  };
+  return {
+    defaultPlatformFetchImpl,
+    platformFetchMock: vi.fn(defaultPlatformFetchImpl),
+  };
+});
+
+vi.mock('./platformFetch', () => ({
+  platformFetch: platformFetchMock,
 }));
 
 function setup() {
@@ -86,5 +100,29 @@ describe('PlatformDashboard', () => {
     const title = await screen.findByText('No users found.');
     expect(title).toBeInTheDocument();
     expect(title.closest('div')).toHaveClass('border-dashed');
+  });
+
+  it('renders Skeleton placeholders in MetricCard stat values while loading, not a plain em-dash', async () => {
+    // Override the shared mock to return a promise that never resolves,
+    // keeping loadingData = true so we can test the loading state rendering.
+    platformFetchMock.mockImplementation(() => new Promise(() => { /* never resolves */ }));
+
+    try {
+      setup();
+
+      // Give the component a moment to initialize and start the fetch
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // While loading, MetricCard values should render Skeleton elements
+      // (with animate-pulse class from @/components/ui/skeleton), not a literal '—' em-dash.
+      const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
+      expect(skeletons.length).toBeGreaterThan(0);
+
+      // Verify the em-dash placeholder is NOT rendered in the stat cards
+      expect(screen.queryByText('—')).not.toBeInTheDocument();
+    } finally {
+      // Restore the default implementation for subsequent tests.
+      platformFetchMock.mockImplementation(defaultPlatformFetchImpl);
+    }
   });
 });

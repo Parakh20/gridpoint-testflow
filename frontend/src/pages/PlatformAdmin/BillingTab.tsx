@@ -5,7 +5,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatInr } from '@/lib/format';
 import { platformFetch } from './platformFetch';
 import { SubscriptionDetailDrawer } from './SubscriptionDetailDrawer';
 import { Subscription, BillingOverview, SubscriptionStatus } from './billingTypes';
@@ -18,10 +18,6 @@ const STATUS_BADGE: Record<SubscriptionStatus, string> = {
   cancelled: 'bg-slate-500/15 text-slate-600 dark:text-slate-400',
   expired: 'bg-slate-500/15 text-slate-600 dark:text-slate-400',
 };
-
-export function formatInr(amount: number): string {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
-}
 
 export function BillingTab({ active }: { active: boolean }) {
   const { toast } = useToast();

@@ -27,4 +27,11 @@ describe('StatusBadge', () => {
     // Underscores replaced with spaces; original casing preserved
     expect(screen.getByText('UNKNOWN STATUS')).toBeInTheDocument();
   });
+
+  it('renders the assigned status with the updated (AA-compliant) blue tone', () => {
+    const { container } = render(<StatusBadge status="ASSIGNED" />);
+    const pill = container.querySelector('span');
+    expect(pill?.className).toContain('text-blue-300');
+    expect(pill?.className).not.toContain('text-blue-400');
+  });
 });
