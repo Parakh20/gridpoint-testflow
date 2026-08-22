@@ -19,10 +19,13 @@ interface NeedsAttentionPanelProps {
   className?: string;
 }
 
-function reasonFor(project: AttentionProject): { label: string; tone: 'danger' | 'warning' } {
+function reasonFor(project: AttentionProject): { label: string; tone: 'danger' | 'warning' } | null {
   const overdue = !!project.end_date && new Date(project.end_date) < new Date() && project.status !== 'CLOSED';
+  const unassigned = !project.assigned_to;
+  if (overdue && unassigned) return { label: 'Overdue · Unassigned', tone: 'danger' };
   if (overdue) return { label: 'Overdue', tone: 'danger' };
-  return { label: 'Unassigned', tone: 'warning' };
+  if (unassigned) return { label: 'Unassigned', tone: 'warning' };
+  return null;
 }
 
 export function NeedsAttentionPanel({ projects, onSelect, className }: NeedsAttentionPanelProps) {
@@ -59,9 +62,11 @@ export function NeedsAttentionPanel({ projects, onSelect, className }: NeedsAtte
                       <span className="text-metadata text-muted-foreground block truncate">{project.site_name}</span>
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
-                      <span className={cn('text-metadata font-semibold', reason.tone === 'danger' ? 'text-destructive' : 'text-warning')}>
-                        {reason.label}
-                      </span>
+                      {reason && (
+                        <span className={cn('text-metadata font-semibold', reason.tone === 'danger' ? 'text-destructive' : 'text-warning')}>
+                          {reason.label}
+                        </span>
+                      )}
                       <StatusBadge status={project.status} />
                     </span>
                   </button>

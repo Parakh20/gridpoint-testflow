@@ -244,7 +244,6 @@ export default function ProjectDetail() {
               </Button>
             </div>
             <div className="flex items-center gap-3 mt-2">
-              <h2 className="text-2xl font-bold">{project.project_number}</h2>
               <StatusBadge status={project.status} />
               {isOverdue(project.end_date, project.status) && (
                 <Badge variant="destructive" className="text-sm">Overdue</Badge>

@@ -14,6 +14,14 @@ const unassigned: AttentionProject = {
   id: 'p2', project_number: 'TF-1002', site_name: 'Substation B',
   status: 'APPROVED', end_date: null, assigned_to: null,
 };
+const overdueAndUnassigned: AttentionProject = {
+  id: 'p3', project_number: 'TF-1003', site_name: 'Substation C',
+  status: 'ACTIVE', end_date: '2020-01-01', assigned_to: null,
+};
+const neither: AttentionProject = {
+  id: 'p4', project_number: 'TF-1004', site_name: 'Substation D',
+  status: 'ACTIVE', end_date: '2099-01-01', assigned_to: 'sup-1',
+};
 
 describe('NeedsAttentionPanel', () => {
   it('renders each flagged project with its reason', () => {
@@ -34,6 +42,20 @@ describe('NeedsAttentionPanel', () => {
   it('renders the shared EmptyState when nothing needs attention', () => {
     render(<NeedsAttentionPanel projects={[]} onSelect={vi.fn()} />);
     expect(screen.getByText("You're all caught up")).toBeInTheDocument();
+  });
+
+  it('shows a combined reason for a project that is both overdue and unassigned', () => {
+    render(<NeedsAttentionPanel projects={[overdueAndUnassigned]} onSelect={vi.fn()} />);
+    expect(screen.getByText('TF-1003')).toBeInTheDocument();
+    expect(screen.getByText(/overdue/i)).toBeInTheDocument();
+    expect(screen.getByText(/unassigned/i)).toBeInTheDocument();
+  });
+
+  it('renders a row with no reason chip when neither overdue nor unassigned', () => {
+    render(<NeedsAttentionPanel projects={[neither]} onSelect={vi.fn()} />);
+    expect(screen.getByText('TF-1004')).toBeInTheDocument();
+    expect(screen.queryByText(/overdue/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/unassigned/i)).not.toBeInTheDocument();
   });
 
   it('has no accessibility violations', async () => {

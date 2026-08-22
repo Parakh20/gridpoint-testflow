@@ -91,6 +91,7 @@ describe('GMDashboard', () => {
     // `profiles` chain (.select().in()) that fetchAllProjects issues for
     // assigned_to lookups, or the second call throws (`.in` is not a function).
     const { supabase } = await import('@/integrations/supabase/client');
+    const originalFrom = supabase.from;
     (supabase.from as any) = vi.fn(() => ({
       select: () => ({
         order: () => Promise.resolve({ data: [overdueProject], error: null }),
@@ -98,11 +99,15 @@ describe('GMDashboard', () => {
       }),
     }));
 
-    setup();
-    await waitFor(() => expect(screen.getByText('Needs Attention')).toBeInTheDocument());
-    // The overdue project renders both in the Needs Attention panel and in the
-    // main project list below it, so assert presence rather than a single match.
-    expect(screen.getAllByText('TF-9001').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/overdue/i).length).toBeGreaterThan(0);
+    try {
+      setup();
+      await waitFor(() => expect(screen.getByText('Needs Attention')).toBeInTheDocument());
+      // The overdue project renders both in the Needs Attention panel and in the
+      // main project list below it, so assert presence rather than a single match.
+      expect(screen.getAllByText('TF-9001').length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/overdue/i).length).toBeGreaterThan(0);
+    } finally {
+      (supabase.from as any) = originalFrom;
+    }
   });
 });
