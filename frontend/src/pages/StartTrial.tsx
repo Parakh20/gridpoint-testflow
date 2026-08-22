@@ -28,14 +28,19 @@ export default function StartTrial() {
 
   // Mirrors start-trial's server-side check so the user sees the problem
   // before a failed round-trip. The server remains the real gate.
-  const passwordError =
-    password.length > 0 && !(password.length >= 10 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password))
-      ? 'Must be 10+ characters with an uppercase letter, a lowercase letter, and a number.'
-      : null;
+  // Tracked per-rule rather than as one boolean so the user can see exactly
+  // which requirement is unmet instead of re-reading the whole sentence.
+  const passwordRules = [
+    { label: 'At least 10 characters', met: password.length >= 10 },
+    { label: 'An uppercase letter (A-Z)', met: /[A-Z]/.test(password) },
+    { label: 'A lowercase letter (a-z)', met: /[a-z]/.test(password) },
+    { label: 'A number (0-9)', met: /\d/.test(password) },
+  ];
+  const passwordValid = passwordRules.every(r => r.met);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordError) return;
+    if (!passwordValid) return;
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('start-trial', {
@@ -106,11 +111,21 @@ export default function StartTrial() {
           <div className="space-y-1.5">
             <Label htmlFor="password" className="text-white/80">Password</Label>
             <Input id="password" type="password" required minLength={10} value={password} onChange={e => setPassword(e.target.value)} disabled={loading} />
-            <p className={`text-[11px] ${passwordError ? 'text-red-400' : 'text-white/40'}`}>
-              {passwordError ?? '10+ characters, with uppercase, lowercase, and a number.'}
-            </p>
+            <ul className="space-y-0.5 pt-0.5">
+              {passwordRules.map(rule => (
+                <li
+                  key={rule.label}
+                  className={`text-[11px] flex items-center gap-1.5 ${
+                    password.length === 0 ? 'text-white/40' : rule.met ? 'text-emerald-400' : 'text-red-400'
+                  }`}
+                >
+                  <span aria-hidden="true">{password.length > 0 && rule.met ? '✓' : '•'}</span>
+                  {rule.label}
+                </li>
+              ))}
+            </ul>
           </div>
-          <Button type="submit" className="w-full" disabled={loading || !!passwordError}>
+          <Button type="submit" className="w-full" disabled={loading || !passwordValid}>
             {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Start free trial
           </Button>
