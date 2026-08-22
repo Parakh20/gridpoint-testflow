@@ -30,6 +30,7 @@ import { Loader2, Search, Plus, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/format';
+import { EmptyState } from '@/components/EmptyState';
 import { platformFetch } from './platformFetch';
 import { LeadDetailDrawer } from './LeadDetailDrawer';
 import { Lead, LeadStage, LEAD_STAGES, STAGE_LABEL } from './leadTypes';
@@ -198,9 +199,7 @@ export function SalesTab({ active }: { active: boolean }) {
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">
-            {leads.length === 0 ? 'No leads yet.' : 'No leads match your filters.'}
-          </div>
+          <EmptyState title={leads.length === 0 ? 'No leads yet.' : 'No leads match your filters.'} />
         ) : (
           <Table>
             <TableHeader>
