@@ -406,6 +406,18 @@ cancel in the first place.
    (once gap 1 is fixed) and its webhook is delivered, this resolves itself
    via the normal webhook path — but there's no backstop.
 
+**Update (2026-08-22, Plan 4 QA-matrix correction):** gap #2 ("no
+scheduled job/reconciliation flips `status`") is fixed. Migration
+`20260814000002_webhook_ordering_and_cancel_backstop.sql` added
+`flip_expired_cancellations()` (`SECURITY DEFINER`, service-role only),
+invoked daily by `supabase/functions/reconcile-cancellations/index.ts` via
+`.github/workflows/reconcile-cancellations.yml` (`X-Cron-Secret`-gated —
+see `RECONCILE_CRON_SECRET` in root `CLAUDE.md`'s Environment Variables
+table). Gap #1 (Razorpay is never told to stop billing —
+`manage-subscription`'s `TODO(Plan 2)`) is still open and unfixed as of
+this update; re-verify `supabase/functions/manage-subscription/index.ts`
+before assuming otherwise.
+
 ---
 
 ## 7. Duplicate webhook delivery — same `X-Razorpay-Event-Id` twice
@@ -556,6 +568,15 @@ speculative fix under this QA pass. Recommend tracking in
 `docs/dev/IMPROVEMENTS.md` before this is relied on at higher webhook
 volume/latency variance than has been seen so far.
 
+**Update (2026-08-22, Plan 4 QA-matrix correction):** this gap is fixed.
+Migration `20260814000002_webhook_ordering_and_cancel_backstop.sql` added
+`subscriptions.last_event_at` and rewrote `upsert_subscription` to compare
+the incoming event's `_event_created_at` parameter against
+`prior_last_event_at` before applying `status`/period/seat-count updates —
+a stale/out-of-order event now no-ops instead of overwriting newer state
+(see CLAUDE.md's billing-webhooks paragraph). **Result: PASS (fixed, no
+longer a gap).**
+
 ---
 
 ## 9. Scheduled downgrade must not apply mid-period on an unrelated webhook event
@@ -640,9 +661,9 @@ correctly-ordered input.
 | 3 | Professional→Business proration | **GAP** | documented, not fixed (no upgrade codepath exists at all) |
 | 4 | Business→Professional downgrade blocker math | PASS | verified by trace + real Vitest test |
 | 5 | Past-due grace enforcement | **BUG → FIXED** | migration `20260814000001` + CLAUDE.md update |
-| 6 | Cancel-at-period-end semantics / auto-flip | PARTIAL PASS + **GAP** | `cancel_at` math correct; provider-side cancel call + any status-flip backstop are both unbuilt — documented |
+| 6 | Cancel-at-period-end semantics / auto-flip | PARTIAL PASS + **PARTIAL GAP** | `cancel_at` math correct; DB-side auto-flip backstop now built (`flip_expired_cancellations`, migration `20260814000002`) — remaining gap: provider-side cancel call (`manage-subscription` TODO) still unbuilt |
 | 7 | Duplicate webhook dedup | PASS | none |
-| 8 | Out-of-order webhook | **GAP** | documented, not fixed (needs a real ordering-token design decision) |
+| 8 | Out-of-order webhook | **FIXED** | `last_event_at` ordering guard added in migration `20260814000002` — see updated trace above |
 | 9 | Scheduled downgrade doesn't apply mid-period | PASS | none |
 
 ## Runnable Vitest coverage added this session
@@ -668,3 +689,57 @@ Result at time of writing: **7 passed (7)** across both files (3 pre-existing
 Vitest — `e2e/golden-path.spec.ts` calls `test.skip()` at module scope, which
 Playwright's test runner allows but Vitest's collector doesn't; this is
 pre-existing and unrelated to billing).
+
+## Runnable Deno integration-test coverage (Plan 4, Task 9)
+
+Scenarios 6, 7, and 8 above, plus the `get_company_entitlements` Cases A/B/C
+referenced throughout this doc, now also have a real, runnable counterpart:
+a Deno integration-test suite against Edge Functions and Postgres RPCs. This
+is the **first** Deno-test convention in this repo for `supabase/functions/`
+(confirmed absent before this — no `deno.json`, no `*.test.ts` anywhere
+under `supabase/functions/`), so it establishes rather than follows an
+existing pattern. There is no import map, so every local-module import
+within these test files (and from them into `test_helpers.ts`) is a plain
+relative path — same as the non-test code under `supabase/functions/`.
+
+```
+supabase/functions/_shared/test_helpers.ts        (shared client/signing/seed/cleanup helpers)
+supabase/functions/_shared/entitlements.test.ts   (get_company_entitlements Cases A/B/C)
+supabase/functions/razorpay-webhook/index.test.ts (HMAC rejection, dedup, out-of-order no-op)
+supabase/functions/reconcile-cancellations/index.test.ts (cron-secret gate, cancel_at flip/no-flip)
+```
+
+### How to run this suite
+
+1. Start a local Supabase instance: `supabase start` (from the repo root).
+2. Export the local, non-production secrets the handlers under test read at
+   runtime — these must match whatever your local Edge Function runtime has
+   configured (`supabase/.env` for local dev, or `supabase secrets list`
+   equivalent), **never** production values:
+   ```
+   export SUPABASE_URL=http://127.0.0.1:54321
+   export SUPABASE_SERVICE_ROLE_KEY=<local service_role key from `supabase status -o json`>
+   export RAZORPAY_WEBHOOK_SECRET=<local RAZORPAY_WEBHOOK_SECRET>
+   export RECONCILE_CRON_SECRET=<local RECONCILE_CRON_SECRET>
+   ```
+3. Run the suite:
+   ```
+   cd supabase/functions
+   deno test --allow-net --allow-env _shared razorpay-webhook reconcile-cancellations
+   ```
+
+Every test seeds its own company/subscription (`seedTestCompanyWithSubscription`)
+and tears it down in a `finally` block (`cleanupTestCompany`), so the suite
+is self-contained and safe to re-run repeatedly against the same local
+database.
+
+**Status at time of writing:** written and statically verified line-by-line
+against the actual handler/migration code (`razorpay-webhook/index.ts`,
+`reconcile-cancellations/index.ts`, `20260813000002_billing_events.sql`,
+`20260814000002_webhook_ordering_and_cancel_backstop.sql`,
+`20260813000019_final_review_fixes.sql`'s `get_company_entitlements`) — this
+environment had neither Docker nor a `deno` binary available
+(`supabase status` fails with "Cannot connect to the Docker daemon"; `deno`
+is not on `PATH`), so the suite has **not** been executed live. See
+`.superpowers/sdd/2026-08-14-testflow-redesign-04-reports-billing-superadmin/task-9-report.md`
+for the full disclosure of what was and wasn't verified.

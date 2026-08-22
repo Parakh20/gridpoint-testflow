@@ -19,7 +19,7 @@ const STATUS_BADGE: Record<SubscriptionStatus, string> = {
   expired: 'bg-slate-500/15 text-slate-600 dark:text-slate-400',
 };
 
-function formatInr(amount: number): string {
+export function formatInr(amount: number): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
 }
 

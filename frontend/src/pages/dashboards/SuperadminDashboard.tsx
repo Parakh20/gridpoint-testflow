@@ -5,7 +5,8 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserManagementTable } from '@/components/UserManagementTable';
 import { AuditLogViewer } from '@/components/AuditLogViewer';
-import { AnimatedCounter } from '@/components/AnimatedCounter';
+import { MetricCard } from '@/components/MetricCard';
+import { EmptyState } from '@/components/EmptyState';
 import { Users, Shield, Activity, UserCheck, CheckCircle2, XCircle, Loader2, RefreshCw, AlertCircle, UserPlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
@@ -111,7 +112,7 @@ function OAuthPendingQueue() {
 
   if (isLoading) return <Skeleton className="h-20 w-full" />;
   if (pending.length === 0) return (
-    <p className="text-sm text-muted-foreground">No pending approvals.</p>
+    <EmptyState title="No pending approvals." />
   );
 
   return (
@@ -231,9 +232,9 @@ export default function SuperadminDashboard() {
   });
 
   const statCards = [
-    { title: 'Total Users', value: totalUsers, label: 'All registered users', icon: <Users className="h-4 w-4 text-muted-foreground" />, color: '' },
-    { title: 'Active Users', value: stats?.activeUsers || 0, label: 'Currently active accounts', icon: <UserCheck className="h-4 w-4 text-primary" />, color: 'text-primary' },
-    { title: 'Active Projects', value: stats?.activeProjects || 0, label: 'Currently running', icon: <Activity className="h-4 w-4 text-accent" />, color: 'text-accent' },
+    { title: 'Total Users', value: totalUsers, icon: <Users className="h-4 w-4 text-muted-foreground" /> },
+    { title: 'Active Users', value: stats?.activeUsers || 0, icon: <UserCheck className="h-4 w-4 text-primary" /> },
+    { title: 'Active Projects', value: stats?.activeProjects || 0, icon: <Activity className="h-4 w-4 text-accent" /> },
   ];
 
   return (
@@ -246,24 +247,11 @@ export default function SuperadminDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: i * 0.07 }}
           >
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-                {card.icon}
-              </CardHeader>
-              <CardContent>
-                {statsLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  <>
-                    <div className={`text-2xl font-bold ${card.color}`}>
-                      <AnimatedCounter value={card.value} />
-                    </div>
-                    <p className="text-xs text-muted-foreground">{card.label}</p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+            {statsLoading ? (
+              <Skeleton className="h-20 w-full rounded-lg" />
+            ) : (
+              <MetricCard label={card.title} value={card.value} icon={card.icon} />
+            )}
           </motion.div>
         ))}
 

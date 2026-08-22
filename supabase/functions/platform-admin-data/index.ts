@@ -3,6 +3,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { logEdgeError } from '../_shared/monitoring.ts';
 import { enforceRateLimit } from '../_shared/rate_limit.ts';
+// No `@testflow/shared` package import precedent exists in supabase/functions
+// (grep confirmed zero matches) and there is no Deno import map/deno.json to
+// resolve a bare specifier — Deno has no bundler doing package.json "paths"
+// resolution. billing.ts has no imports of its own, so a plain relative
+// import resolves cleanly under Deno's native ESM loader.
+import { ADDON_KEYS } from '../_shared/addon_keys.ts';
 
 // Length-independent-ish equality so a wrong token can't be recovered by
 // timing the response. The token is a shared secret guarding a full
@@ -895,6 +901,122 @@ serve(async (req) => {
       if (auditRes.error) throw auditRes.error;
 
       return respond({ subscription: subRes.data, audit_log: auditRes.data ?? [] });
+    }
+
+    // ── get_billing_extras ────────────────────────────────────────────────────
+    // Reads the company's active enterprise contract (if any) and all its
+    // subscription add-ons (active + cancelled, so the admin UI can show
+    // history) in one round trip. Mirrors get_subscription_detail's shape —
+    // degrades gracefully (empty results, not an error) if enterprise_contracts
+    // has no row for this company, which is the normal case for non-Enterprise
+    // tenants.
+    if (action === 'get_billing_extras') {
+      const company_id = payload?.company_id as string | undefined;
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+
+      const nowIso = new Date().toISOString();
+      const [contractRes, subRes] = await Promise.all([
+        adminClient
+          .from('enterprise_contracts')
+          .select('*')
+          .eq('company_id', company_id)
+          .lte('contract_start', nowIso)
+          .or(`contract_end.is.null,contract_end.gte.${nowIso}`)
+          .order('contract_start', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        adminClient
+          .from('subscriptions')
+          .select('id')
+          .eq('company_id', company_id)
+          .maybeSingle(),
+      ]);
+
+      if (contractRes.error && contractRes.error.code !== '42P01') throw contractRes.error;
+      if (subRes.error) throw subRes.error;
+
+      let addons: unknown[] = [];
+      if (subRes.data?.id) {
+        const addonRes = await adminClient
+          .from('subscription_addons')
+          .select('*')
+          .eq('subscription_id', subRes.data.id)
+          .order('created_at', { ascending: false });
+        if (addonRes.error && addonRes.error.code !== '42P01') throw addonRes.error;
+        addons = addonRes.data ?? [];
+      }
+
+      return respond({ contract: contractRes.data ?? null, addons });
+    }
+
+    // ── admin_create_addon ────────────────────────────────────────────────────
+    if (action === 'admin_create_addon') {
+      const company_id = payload?.company_id as string | undefined;
+      const addon_key = payload?.addon_key as string | undefined;
+      const quantity = Number(payload?.quantity ?? 0);
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
+      if (!addon_key || !ADDON_KEYS.includes(addon_key as (typeof ADDON_KEYS)[number])) {
+        return respond({ error: `payload.addon_key must be one of: ${ADDON_KEYS.join(', ')}` }, 400);
+      }
+      if (!Number.isFinite(quantity) || quantity < 0) {
+        return respond({ error: 'payload.quantity must be a non-negative number' }, 400);
+      }
+
+      const { data: sub, error: subError } = await adminClient
+        .from('subscriptions')
+        .select('id')
+        .eq('company_id', company_id)
+        .maybeSingle();
+      if (subError) throw subError;
+      if (!sub) return respond({ error: 'Company has no subscription row — cannot attach an add-on' }, 400);
+
+      const { data, error } = await adminClient
+        .from('subscription_addons')
+        .insert({ subscription_id: sub.id, addon_key, quantity, unit_price_inr: payload?.unit_price_inr ?? null })
+        .select('*')
+        .single();
+
+      if (error) {
+        if (error.code === '42P01') return respond({ error: 'Subscription add-ons not yet available' }, 501);
+        return respond({ error: error.message }, 400);
+      }
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id, action: 'ADDON_CREATED', old_value: null, new_value: data,
+      });
+
+      return respond({ addon: data });
+    }
+
+    // ── admin_cancel_addon ─────────────────────────────────────────────────────
+    if (action === 'admin_cancel_addon') {
+      const addon_id = payload?.addon_id as string | undefined;
+      const company_id = payload?.company_id as string | undefined;
+      const actor = (payload?.actor as string | undefined) ?? 'platform-admin';
+      if (!addon_id) return respond({ error: 'payload.addon_id is required' }, 400);
+
+      const { data: before, error: beforeError } = await adminClient
+        .from('subscription_addons')
+        .select('*')
+        .eq('id', addon_id)
+        .maybeSingle();
+      if (beforeError) return respond({ error: beforeError.message }, 400);
+
+      const { data, error } = await adminClient
+        .from('subscription_addons')
+        .update({ status: 'cancelled' })
+        .eq('id', addon_id)
+        .select('*')
+        .single();
+
+      if (error) return respond({ error: error.message }, 400);
+
+      await adminClient.from('billing_audit_logs').insert({
+        actor, company_id: company_id ?? null, action: 'ADDON_CANCELLED', old_value: before ?? null, new_value: data,
+      });
+
+      return respond({ addon: data });
     }
 
     return respond({ error: `Unknown action: ${action}` }, 400);
