@@ -1,11 +1,11 @@
 // Shared helpers for the Deno integration-test suite added in Plan 4
 // (redesign/04-reports-billing-superadmin, Task 9). Run against a local
 // `supabase start` instance ONLY — never against production. This is the
-// first Edge Function test convention in this repo (no deno.json / import
-// map exists under supabase/functions/, so every local-module import here
-// and in the *.test.ts files that consume this is a relative path, mirroring
-// the plain-relative-import pattern already established for non-test code
-// under supabase/functions/_shared/).
+// first Edge Function test convention in this repo (supabase/functions/deno.json
+// exists for nodeModulesDir resolution but carries no import map, so every
+// local-module import here and in the *.test.ts files that consume this is a
+// relative path, mirroring the plain-relative-import pattern already established
+// for non-test code under supabase/functions/_shared/).
 //
 // Required env before running:
 //   SUPABASE_URL                 defaults to the local Supabase URL

@@ -8,9 +8,9 @@
 // lives under supabase/functions/_shared/ anyway (rather than a new
 // top-level supabase/tests/ directory) because (a) it reuses
 // getServiceClient()/seedTestCompanyWithSubscription()/cleanupTestCompany()
-// from ./test_helpers.ts via a plain relative import — no deno.json/import
-// map exists under supabase/functions/ (confirmed absent, same as Task 6's
-// finding) so every local-module import in this suite must stay relative;
+// from ./test_helpers.ts via a plain relative import — supabase/functions/deno.json
+// exists for nodeModulesDir resolution but carries no import map, so every
+// local-module import in this suite must stay relative;
 // and (b) `deno test --allow-net --allow-env _shared razorpay-webhook
 // reconcile-cancellations` (brief Step 7 / docs run command) already treats
 // `_shared` as one of the directories to sweep for *.test.ts, so this file
