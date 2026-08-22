@@ -1,0 +1,9 @@
+{
+  "nodeModulesDir": "auto",
+  "fmt": {
+    "include": ["_shared/", "razorpay-webhook/", "reconcile-cancellations/"]
+  },
+  "lint": {
+    "include": ["_shared/", "razorpay-webhook/", "reconcile-cancellations/"]
+  }
+}
