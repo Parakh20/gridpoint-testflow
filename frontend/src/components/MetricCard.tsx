@@ -35,7 +35,7 @@ export function MetricCard({ label, value, tone = 'default', icon, delta, classN
     >
       <div className="min-w-0">
         <p className="text-micro-label uppercase text-muted-foreground">{label}</p>
-        <p className={cn('text-page-title mt-1', TONE_ACCENT[tone])}>{value}</p>
+        <div className={cn('text-page-title mt-1', TONE_ACCENT[tone])}>{value}</div>
         {delta && (
           <p className={cn('text-metadata mt-1', DIRECTION_CLASS[delta.direction])}>{delta.value}</p>
         )}
