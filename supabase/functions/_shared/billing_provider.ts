@@ -82,6 +82,14 @@ export class RazorpayBillingProvider implements BillingProvider {
         name: params.name,
         email: params.email,
         notes: { company_id: params.companyId },
+        // Without this, Razorpay 400s ("Customer already exists for the
+        // merchant") instead of returning the existing customer — confirmed
+        // via a live call retried after an earlier createSubscription
+        // failure (subscribe's manage-subscription action doesn't persist
+        // provider_customer_id locally until the webhook confirms checkout,
+        // so any retry before that point re-hits createCustomer with the
+        // same email). fail_existing: '0' makes this call idempotent.
+        fail_existing: '0',
       }),
     });
     return { providerCustomerId: data.id };
@@ -102,6 +110,16 @@ export class RazorpayBillingProvider implements BillingProvider {
         customer_notify: 1,
         quantity: params.seatCount,
         notes: { company_id: params.companyId },
+        // Razorpay rejects subscription creation without total_count unless
+        // "perpetual subscriptions" is enabled on the account (a Standard-plan
+        // feature, off by default — confirmed via a live 400 against this
+        // account: "Perpetual subscriptions are not enabled ... total_count is
+        // required"). 100 cycles is the standard "effectively until cancelled"
+        // workaround (100 months ≈ 8 years for a monthly plan) — real
+        // cancellation still goes through cancelSubscription(), this is just
+        // satisfying Razorpay's required field, not an actual expiry we expect
+        // to hit.
+        total_count: 100,
       }),
     });
     return {
