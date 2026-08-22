@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Loader2, BarChart2, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/lib/format';
+import { isOverdue } from '@/lib/projectStatus';
 import { motion } from 'framer-motion';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -65,7 +66,7 @@ export default function ReportsList() {
               <MetricCard label="Active" value={projects.filter(p => p.status === 'ACTIVE').length} />
               <MetricCard
                 label="Overdue"
-                value={projects.filter(p => p.end_date && new Date(p.end_date) < new Date() && p.status !== 'CLOSED').length}
+                value={projects.filter(p => isOverdue(p.end_date, p.status)).length}
                 tone="danger"
               />
             </div>
