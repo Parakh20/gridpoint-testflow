@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { enforceRateLimit } from '../_shared/rate_limit.ts';
 import { logEdgeError } from '../_shared/monitoring.ts';
+import { RazorpayBillingProvider } from '../_shared/billing_provider.ts';
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req.headers.get('Origin'));
@@ -56,14 +57,63 @@ Deno.serve(async (req) => {
       });
       if (error) return json({ error: error.message }, 400);
 
-      // TODO(Plan 2): once BillingProvider exists, call
-      // billingProvider.cancelSubscription(subscription.provider_subscription_id)
-      // here so Razorpay actually stops renewing at period end. The DB-side
-      // cancel_at is already set above and is what the frontend/RLS reads —
-      // this call is what makes the provider agree not to charge again.
-      // Until Plan 2 lands, cancellation is DB-only: TestFlow will stop
-      // treating the company as billable at period end, but Razorpay will
-      // still attempt to charge unless cancelled manually in its dashboard.
+      // Tell Razorpay to actually stop renewing, matching the cancel_at the RPC
+      // above just set (always current_period_end, per
+      // request_subscription_cancellation's COALESCE(cancel_at, period_end)).
+      // atPeriodEnd=true maps to Razorpay's cancel_at_cycle_end:1 — Razorpay
+      // itself now defers the real cutoff to the end of the paid cycle, so no
+      // second call is needed later (see this plan's Global Constraints for why
+      // reconcile-cancellations deliberately does NOT also call Razorpay).
+      //
+      // Deliberately NOT rolled back on Razorpay failure below — cancel_at is
+      // already committed and is what RLS/entitlements read; surfacing an error
+      // here tells the operator Razorpay wasn't reached, without silently
+      // un-cancelling a subscription the user just confirmed.
+      const { data: sub, error: subLookupError } = await callerClient
+        .from('subscriptions')
+        .select('provider_subscription_id')
+        .eq('company_id', callerProfile.company_id)
+        .single();
+
+      if (subLookupError || !sub?.provider_subscription_id) {
+        logEdgeError('manage-subscription', 'payment_failure', subLookupError ?? new Error('missing provider_subscription_id'), {
+          step: 'cancel_provider_lookup', companyId: callerProfile.company_id,
+        });
+        return json({ ...data, provider_cancel_warning: 'Local cancellation recorded, but no Razorpay subscription is on file to cancel provider-side.' }, 200);
+      }
+
+      const provider = new RazorpayBillingProvider(
+        Deno.env.get('RAZORPAY_KEY_ID') ?? '',
+        Deno.env.get('RAZORPAY_KEY_SECRET') ?? '',
+      );
+
+      try {
+        await provider.cancelSubscription(sub.provider_subscription_id, true);
+      } catch (providerErr) {
+        // ASSUMPTION (flagged per this plan's Global Constraints — unverified
+        // against a live Razorpay sandbox): Razorpay's "already cancelled"
+        // error surfaces as a 4xx whose body contains "already been cancelled"
+        // per Razorpay's public API docs. RazorpayBillingProvider.request()
+        // throws `Razorpay API error ${status}: ${body}` — matching on that
+        // substring is fragile (breaks if Razorpay changes their error copy)
+        // but this repo doesn't currently expose a structured error code from
+        // that method. Treated as idempotent success rather than failure so a
+        // double-cancel (e.g. a retried request after a timeout) doesn't error.
+        const message = providerErr instanceof Error ? providerErr.message : String(providerErr);
+        const alreadyCancelled = /already been cancelled|already cancelled/i.test(message);
+
+        if (!alreadyCancelled) {
+          logEdgeError('manage-subscription', 'payment_failure', providerErr, {
+            step: 'cancel_provider_call', companyId: callerProfile.company_id,
+            providerSubscriptionId: sub.provider_subscription_id,
+          });
+          return json({
+            ...data,
+            provider_cancel_warning: 'Local cancellation recorded, but Razorpay was not reached — billing may continue until this is resolved manually.',
+          }, 200);
+        }
+        // Already cancelled provider-side: fall through, this is a success.
+      }
 
       return json(data);
     }
