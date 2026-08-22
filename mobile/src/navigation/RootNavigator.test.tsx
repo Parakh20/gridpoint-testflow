@@ -91,5 +91,8 @@ describe('RootNavigator — role-based routing', () => {
     withRole('SOME_FUTURE_ROLE', true);
     render(<RootNavigator />);
     await waitFor(() => expect(screen.getByText('RoleBlockedScreen')).toBeTruthy());
+    expect(screen.queryByText('ProjectListScreen')).toBeNull();
+    expect(screen.queryByText('GMProjectsScreen')).toBeNull();
+    expect(screen.queryByText('SupervisorHomeScreen')).toBeNull();
   });
 });
