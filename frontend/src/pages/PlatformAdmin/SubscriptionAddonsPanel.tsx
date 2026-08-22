@@ -103,18 +103,27 @@ export function SubscriptionAddonsPanel({ companyId, addons, onChanged }: Props)
       <div className="rounded-lg border p-4 space-y-3">
         <Label className="text-xs">Add add-on</Label>
         <div className="grid grid-cols-3 gap-3">
-          <Select value={addonKeyInput} onValueChange={setAddonKeyInput}>
-            <SelectTrigger>
-              <SelectValue placeholder="Add-on key" />
-            </SelectTrigger>
-            <SelectContent>
-              {ADDON_KEYS.map((key) => (
-                <SelectItem key={key} value={key}>{key}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input value={quantityInput} onChange={(e) => setQuantityInput(e.target.value)} placeholder="Quantity" />
-          <Input value={unitPriceInput} onChange={(e) => setUnitPriceInput(e.target.value)} placeholder="Unit price (INR, optional)" />
+          <div className="space-y-1">
+            <Label htmlFor="addon-key" className="text-xs">Add-on key</Label>
+            <Select value={addonKeyInput} onValueChange={setAddonKeyInput}>
+              <SelectTrigger id="addon-key" aria-label="Add-on key">
+                <SelectValue placeholder="Add-on key" />
+              </SelectTrigger>
+              <SelectContent>
+                {ADDON_KEYS.map((key) => (
+                  <SelectItem key={key} value={key}>{key}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="addon-quantity" className="text-xs">Quantity</Label>
+            <Input id="addon-quantity" value={quantityInput} onChange={(e) => setQuantityInput(e.target.value)} placeholder="Quantity" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="addon-unit-price" className="text-xs">Unit price (INR, optional)</Label>
+            <Input id="addon-unit-price" value={unitPriceInput} onChange={(e) => setUnitPriceInput(e.target.value)} placeholder="Unit price (INR, optional)" />
+          </div>
         </div>
         <Button disabled={acting || !addonKeyInput} onClick={createAddon}>Add add-on</Button>
       </div>
