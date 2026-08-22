@@ -195,6 +195,18 @@ jobs:
         if: steps.secret_check.outputs.ready == 'true'
         run: supabase link --project-ref "$PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
 
+      - name: Repair phantom migration history entry (one-time, self-healing)
+        # A 2026-08-22 push collision left a phantom schema_migrations row
+        # for version 20260822000004 with no matching local file anymore
+        # (renumbered to 20260822000008/000009 after discovering the real
+        # functions were never created despite the bookkeeping row existing
+        # -- see commit 3a57bc7). `db push` refuses to proceed while a
+        # remote version has no local file. This repair is idempotent
+        # (`|| true`): once the remote entry is marked reverted, later runs
+        # find nothing to repair and this step is a harmless no-op forever.
+        if: steps.secret_check.outputs.ready == 'true'
+        run: supabase migration repair --status reverted 20260822000004 || true
+
       - name: Apply database migrations
         if: steps.secret_check.outputs.ready == 'true'
         run: supabase db push --password "$SUPABASE_DB_PASSWORD"
