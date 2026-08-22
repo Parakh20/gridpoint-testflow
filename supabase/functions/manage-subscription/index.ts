@@ -57,6 +57,26 @@ Deno.serve(async (req) => {
       });
       if (error) return json({ error: error.message }, 400);
 
+      // Guard against local/provider divergence: request_subscription_
+      // cancellation does `cancel_at = COALESCE(cancel_at, period_end)` and
+      // returns `cancel_at` in its JSON response. If the company's
+      // subscriptions.current_period_end was NULL, the RPC's returned
+      // cancel_at comes back null/missing too — meaning NO local
+      // cancellation timestamp was actually recorded (existing non-null
+      // cancel_at, if any, was left untouched by the COALESCE, but the RPC
+      // still reports back whatever `period_end` it read, which is null
+      // here). Telling Razorpay to cancel in that state would leave
+      // Razorpay stopped but the local record looking like nothing
+      // happened, and flip_expired_cancellations() (which keys off
+      // cancel_at) couldn't help. So skip the Razorpay call entirely and
+      // surface it explicitly instead of silently proceeding.
+      if (!data?.cancel_at) {
+        return json({
+          ...data,
+          provider_cancel_warning: 'Local cancellation timestamp was not recorded (no cancel_at), so Razorpay was not contacted — resolve the missing current_period_end and retry.',
+        }, 200);
+      }
+
       // Tell Razorpay to actually stop renewing, matching the cancel_at the RPC
       // above just set (always current_period_end, per
       // request_subscription_cancellation's COALESCE(cancel_at, period_end)).
@@ -75,10 +95,26 @@ Deno.serve(async (req) => {
         .eq('company_id', callerProfile.company_id)
         .single();
 
-      if (subLookupError || !sub?.provider_subscription_id) {
-        logEdgeError('manage-subscription', 'payment_failure', subLookupError ?? new Error('missing provider_subscription_id'), {
+      if (subLookupError) {
+        logEdgeError('manage-subscription', 'payment_failure', subLookupError, {
           step: 'cancel_provider_lookup', companyId: callerProfile.company_id,
         });
+        return json({ ...data, provider_cancel_warning: 'Local cancellation recorded, but no Razorpay subscription is on file to cancel provider-side.' }, 200);
+      }
+
+      if (!sub?.provider_subscription_id) {
+        // Not a failure: companies on a trial routinely have no Razorpay
+        // subscription yet, by design. Logging this under 'payment_failure'
+        // would pollute the category a future alert filters on with
+        // routine, expected non-failures — so log it separately at info
+        // level instead of via logEdgeError.
+        console.log(JSON.stringify({
+          level: 'info',
+          function: 'manage-subscription',
+          message: 'Cancel requested for a company with no provider_subscription_id on file (expected for trial-only subscriptions)',
+          context: { step: 'cancel_provider_lookup', companyId: callerProfile.company_id },
+          timestamp: new Date().toISOString(),
+        }));
         return json({ ...data, provider_cancel_warning: 'Local cancellation recorded, but no Razorpay subscription is on file to cancel provider-side.' }, 200);
       }
 
@@ -116,6 +152,21 @@ Deno.serve(async (req) => {
           }, 200);
         }
         // Already cancelled provider-side: fall through, this is a success.
+        // Still log it (info level, not an error) so the classifier's
+        // real-world hit rate is auditable against production traffic —
+        // without this, a *correct* classification left zero trail.
+        console.log(JSON.stringify({
+          level: 'info',
+          function: 'manage-subscription',
+          message: 'Razorpay cancelSubscription treated as idempotent success (already cancelled/scheduled)',
+          context: {
+            step: 'cancel_provider_call',
+            companyId: callerProfile.company_id,
+            providerSubscriptionId: sub.provider_subscription_id,
+            razorpayMessage: message,
+          },
+          timestamp: new Date().toISOString(),
+        }));
       }
 
       return json(data);

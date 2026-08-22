@@ -56,3 +56,13 @@ Deno.test('does NOT match a generic 5xx failure', () => {
   const message = 'Razorpay API error 500: {"error":{"description":"Internal server error"}}';
   assertEquals(isAlreadyCancelledError(message), false);
 });
+
+Deno.test('does NOT match a validation-rejection error that echoes cancel_at_cycle_end as a field name without "already"', () => {
+  // Razorpay can reject the cancel call outright (e.g. the field isn't
+  // accepted in this context) and echo the field name back in the error
+  // body. That is Razorpay REFUSING to cancel — the opposite of idempotent
+  // success — so a bare `cancel_at_cycle_end` mention must never qualify on
+  // its own; "already" must also be present.
+  const message = 'Razorpay API error 400: {"error":{"code":"BAD_REQUEST_ERROR","description":"cancel_at_cycle_end is/are not required and should not be sent","field":"cancel_at_cycle_end"}}';
+  assertEquals(isAlreadyCancelledError(message), false);
+});
