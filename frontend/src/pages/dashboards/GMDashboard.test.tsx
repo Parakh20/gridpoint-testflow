@@ -79,4 +79,30 @@ describe('GMDashboard', () => {
     await waitFor(() => expect(screen.getByText('No projects yet')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /Create Your First Test Plan/i })).toBeInTheDocument();
   });
+
+  it('surfaces an overdue project in the Needs Attention panel', async () => {
+    const overdueProject = {
+      id: 'p1', project_number: 'TF-9001', site_name: 'Substation Z', status: 'ACTIVE',
+      end_date: '2020-01-01', assigned_to: 'sup-1', created_at: '2026-01-01',
+      site_address: '', client: null, start_date: null,
+    };
+    // Re-mock supabase for this test only — override the module-level mock's return value.
+    // Must handle both the `projects` chain (.select().order()) and the
+    // `profiles` chain (.select().in()) that fetchAllProjects issues for
+    // assigned_to lookups, or the second call throws (`.in` is not a function).
+    const { supabase } = await import('@/integrations/supabase/client');
+    (supabase.from as any) = vi.fn(() => ({
+      select: () => ({
+        order: () => Promise.resolve({ data: [overdueProject], error: null }),
+        in: () => Promise.resolve({ data: [], error: null }),
+      }),
+    }));
+
+    setup();
+    await waitFor(() => expect(screen.getByText('Needs Attention')).toBeInTheDocument());
+    // The overdue project renders both in the Needs Attention panel and in the
+    // main project list below it, so assert presence rather than a single match.
+    expect(screen.getAllByText('TF-9001').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/overdue/i).length).toBeGreaterThan(0);
+  });
 });

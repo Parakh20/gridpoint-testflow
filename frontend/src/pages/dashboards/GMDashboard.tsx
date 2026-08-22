@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { AssignProjectDialog } from '@/components/AssignProjectDialog';
+import { NeedsAttentionPanel, type AttentionProject } from '@/components/NeedsAttentionPanel';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/format';
 import { useEffect } from 'react';
@@ -123,6 +124,18 @@ export default function GMDashboard() {
     });
   }, [projects, assignmentFilter, searchQuery]);
 
+  const attentionProjects: AttentionProject[] = useMemo(() => {
+    const flagged = projects.filter(p => isOverdue(p.end_date, p.status) || !p.assigned_to);
+    return flagged
+      .sort((a, b) => {
+        const aOverdue = isOverdue(a.end_date, a.status);
+        const bOverdue = isOverdue(b.end_date, b.status);
+        if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      })
+      .slice(0, 8);
+  }, [projects]);
+
   const visibleProjects = filteredProjects.slice(0, visibleCount);
   const hasMore = filteredProjects.length > visibleCount;
 
@@ -158,6 +171,14 @@ export default function GMDashboard() {
           New Test Plan
         </Button>
       </div>
+
+      {!isLoading && attentionProjects.length > 0 && (
+        <NeedsAttentionPanel
+          className="mb-6"
+          projects={attentionProjects}
+          onSelect={id => navigate(`/projects/${id}`)}
+        />
+      )}
 
       {/* Analytics charts */}
       {projects.length > 0 && (
