@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import PlatformDashboard from './PlatformDashboard';
@@ -86,5 +86,35 @@ describe('PlatformDashboard', () => {
     const title = await screen.findByText('No users found.');
     expect(title).toBeInTheDocument();
     expect(title.closest('div')).toHaveClass('border-dashed');
+  });
+
+  it('renders Skeleton placeholders in MetricCard stat values while loading, not a plain em-dash', async () => {
+    // Get the mocked platformFetch and override it to return a promise that never resolves,
+    // keeping loadingData = true so we can test the loading state rendering
+    const platformFetchModule = await import('./platformFetch');
+    const originalPlatformFetch = vi.mocked(platformFetchModule).platformFetch;
+
+    // Replace the mock to never resolve
+    vi.mocked(platformFetchModule).platformFetch = vi.fn(
+      () => new Promise(() => { /* never resolves */ })
+    );
+
+    try {
+      setup();
+
+      // Give the component a moment to initialize and start the fetch
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // While loading, MetricCard values should render Skeleton elements
+      // (with animate-pulse class from @/components/ui/skeleton), not a literal '—' em-dash.
+      const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
+      expect(skeletons.length).toBeGreaterThan(0);
+
+      // Verify the em-dash placeholder is NOT rendered in the stat cards
+      expect(screen.queryByText('—')).not.toBeInTheDocument();
+    } finally {
+      // Restore original mock
+      vi.mocked(platformFetchModule).platformFetch = originalPlatformFetch;
+    }
   });
 });

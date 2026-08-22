@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/StatusBadge';
 import { MetricCard } from '@/components/MetricCard';
 import { EmptyState } from '@/components/EmptyState';
@@ -630,7 +631,7 @@ export default function PlatformDashboard() {
             <MetricCard
               key={label}
               label={label}
-              value={loadingData ? '—' : value}
+              value={loadingData ? <Skeleton className="h-7 w-10" /> : value}
               icon={<Icon className="h-5 w-5 text-primary" />}
             />
           ))}
