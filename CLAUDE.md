@@ -21,7 +21,7 @@
 - **Routing:** react-router-dom v6
 - **AI:** Anthropic Claude (`claude-haiku-4-5-20251001`) — Edge Function only
 - **Excel:** SheetJS (`xlsx`), dynamically imported
-- **CI:** GH Actions → `supabase db push` + functions deploy on push to main; billing/webhook Deno integration tests (`test-billing-functions` job in `supabase.yml`) gate the functions deploy — if this job fails, ALL function deploys are blocked (not just the two functions it tests) while migrations still proceed, producing a migrated-schema/stale-functions skew until fixed
+- **CI:** GH Actions → `supabase db push` + functions deploy on push to main; billing/webhook Deno integration tests (`test-billing-functions` job in `supabase.yml`) run informationally alongside the deploy but do NOT gate it (temporarily — see comment above `deploy-functions` in `supabase.yml`), since its first live run (2026-08-22) failed on a pre-existing, unrelated `supabase start`-from-scratch bug in migration `20260411000005` (Postgres 55P04: new enum value used in the same file that adds it — only surfaces on a from-scratch replay, not on production's already-migrated DB). Re-couple it to `deploy-functions.needs` once that from-scratch-replay issue is fixed.
 
 ## Project Layout
 
