@@ -8,7 +8,7 @@ import { enforceRateLimit } from '../_shared/rate_limit.ts';
 // resolve a bare specifier — Deno has no bundler doing package.json "paths"
 // resolution. billing.ts has no imports of its own, so a plain relative
 // import resolves cleanly under Deno's native ESM loader.
-import { ADDON_KEYS } from '../../../packages/shared/src/billing.ts';
+import { ADDON_KEYS } from '../_shared/addon_keys.ts';
 
 // Length-independent-ish equality so a wrong token can't be recovered by
 // timing the response. The token is a shared secret guarding a full
@@ -914,11 +914,14 @@ serve(async (req) => {
       const company_id = payload?.company_id as string | undefined;
       if (!company_id) return respond({ error: 'payload.company_id is required' }, 400);
 
+      const nowIso = new Date().toISOString();
       const [contractRes, subRes] = await Promise.all([
         adminClient
           .from('enterprise_contracts')
           .select('*')
           .eq('company_id', company_id)
+          .lte('contract_start', nowIso)
+          .or(`contract_end.is.null,contract_end.gte.${nowIso}`)
           .order('contract_start', { ascending: false })
           .limit(1)
           .maybeSingle(),

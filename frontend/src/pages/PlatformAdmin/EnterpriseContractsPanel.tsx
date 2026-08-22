@@ -106,7 +106,15 @@ export function EnterpriseContractsPanel({ companyId, contract, onChanged }: Pro
             <Input id="ec-end" type="date" value={contractEndInput} onChange={(e) => setContractEndInput(e.target.value)} />
           </div>
         </div>
-        <Button disabled={acting} onClick={createContract}>Create contract</Button>
+        <Button
+          disabled={
+            acting ||
+            !(priceInput || maxUsersInput || maxProjectsInput || contractEndInput || slaLevelInput)
+          }
+          onClick={createContract}
+        >
+          Create contract
+        </Button>
       </div>
     </div>
   );

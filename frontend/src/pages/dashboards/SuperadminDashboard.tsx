@@ -248,7 +248,7 @@ export default function SuperadminDashboard() {
             transition={{ duration: 0.3, delay: i * 0.07 }}
           >
             {statsLoading ? (
-              <Skeleton className="h-[88px] w-full rounded-lg" />
+              <Skeleton className="h-20 w-full rounded-lg" />
             ) : (
               <MetricCard label={card.title} value={card.value} icon={card.icon} />
             )}

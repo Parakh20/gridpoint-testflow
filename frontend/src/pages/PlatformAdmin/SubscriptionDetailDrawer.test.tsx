@@ -69,6 +69,10 @@ describe('SubscriptionDetailDrawer', () => {
       ([action]) => action === 'get_subscription_detail' || action === 'get_billing_extras'
     ).length;
 
+    // The submit button is disabled on a fully-blank form (guard against
+    // silently creating an unlimited-entitlement contract) — fill one field
+    // so the click actually submits.
+    await user.type(screen.getByLabelText(/sla level/i), 'gold');
     await user.click(screen.getByRole('button', { name: /create contract/i }));
 
     // Parent's onChanged prop must fire (drives BillingTab's MRR/ARR + list refresh).

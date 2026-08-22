@@ -9,6 +9,7 @@ export const BILLING_AUDIT_ACTIONS = [
   'ENTERPRISE_CONTRACT_CREATED',
   'ADDON_CREATED',
   'ADDON_CANCELLED',
+  'SUBSCRIPTION_AUTO_CANCELLED',
 ] as const;
 export type BillingAuditAction = (typeof BILLING_AUDIT_ACTIONS)[number];
 
@@ -23,6 +24,7 @@ export const ACTION_LABEL: Record<BillingAuditAction, string> = {
   ENTERPRISE_CONTRACT_CREATED: 'Enterprise contract created',
   ADDON_CREATED: 'Add-on created',
   ADDON_CANCELLED: 'Add-on cancelled',
+  SUBSCRIPTION_AUTO_CANCELLED: 'Subscription auto-cancelled',
 };
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'paused' | 'past_due' | 'cancelled' | 'expired';

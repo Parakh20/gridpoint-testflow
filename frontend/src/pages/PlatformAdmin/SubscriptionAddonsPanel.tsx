@@ -42,12 +42,17 @@ export function SubscriptionAddonsPanel({ companyId, addons, onChanged }: Props)
 
   const createAddon = async () => {
     if (!addonKeyInput) return;
+    const quantity = Number(quantityInput);
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      toast({ variant: 'destructive', title: 'Invalid quantity', description: 'Quantity must be a whole number of 1 or more.' });
+      return;
+    }
     setActing(true);
     try {
       await platformFetch('admin_create_addon', {
         company_id: companyId,
         addon_key: addonKeyInput,
-        quantity: Number(quantityInput),
+        quantity,
         unit_price_inr: unitPriceInput ? Number(unitPriceInput) : null,
         actor: 'platform-admin',
       });
@@ -118,7 +123,7 @@ export function SubscriptionAddonsPanel({ companyId, addons, onChanged }: Props)
           </div>
           <div className="space-y-1">
             <Label htmlFor="addon-quantity" className="text-xs">Quantity</Label>
-            <Input id="addon-quantity" value={quantityInput} onChange={(e) => setQuantityInput(e.target.value)} placeholder="Quantity" />
+            <Input id="addon-quantity" type="number" min="0" value={quantityInput} onChange={(e) => setQuantityInput(e.target.value)} placeholder="Quantity" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="addon-unit-price" className="text-xs">Unit price (INR, optional)</Label>
