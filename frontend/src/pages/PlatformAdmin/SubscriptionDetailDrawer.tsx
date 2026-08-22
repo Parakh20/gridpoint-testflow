@@ -147,8 +147,8 @@ export function SubscriptionDetailDrawer({ companyId, open, onOpenChange, onChan
               </div>
             </div>
 
-            <EnterpriseContractsPanel companyId={companyId as string} contract={contract} onChanged={load} />
-            <SubscriptionAddonsPanel companyId={companyId as string} addons={addons} onChanged={load} />
+            <EnterpriseContractsPanel companyId={companyId as string} contract={contract} onChanged={() => { onChanged(); load(); }} />
+            <SubscriptionAddonsPanel companyId={companyId as string} addons={addons} onChanged={() => { onChanged(); load(); }} />
           </div>
         )}
       </SheetContent>
