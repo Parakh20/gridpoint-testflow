@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { theme, statusColor } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
+import { computeProgressPct } from '@/lib/taskProgress';
 
 type R = RouteProp<RootStackParamList, 'ProjectOverview'>;
 type Nav = NativeStackNavigationProp<RootStackParamList, 'ProjectOverview'>;
@@ -109,7 +110,7 @@ export default function ProjectOverviewScreen() {
   const sc = statusColor(data.status);
   const totalTasks = data.instances.reduce((a, i) => a + i.totalTasks, 0);
   const doneTasks = data.instances.reduce((a, i) => a + i.submittedOrApproved, 0);
-  const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  const pct = computeProgressPct(doneTasks, totalTasks);
 
   return (
     <ScrollView
@@ -200,9 +201,7 @@ export default function ProjectOverviewScreen() {
         <Text style={s.emptyText}>No equipment instances generated yet.</Text>
       ) : (
         data.instances.map((inst) => {
-          const instPct = inst.totalTasks > 0
-            ? Math.round((inst.submittedOrApproved / inst.totalTasks) * 100)
-            : 0;
+          const instPct = computeProgressPct(inst.submittedOrApproved, inst.totalTasks);
           const allDone = inst.totalTasks > 0 && inst.submittedOrApproved === inst.totalTasks;
           return (
             <View key={inst.id} style={s.instanceRow}>

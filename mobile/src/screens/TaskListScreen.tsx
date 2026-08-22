@@ -19,6 +19,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useToast } from '@/components/Toast';
 import { explainSupabaseError } from '@/lib/errors';
 import { useRealtimeChannel, usePollingFallback } from '@/lib/realtime';
+import { computeProgressPct, rollUpTaskCounts } from '@/lib/taskProgress';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Tasks'>;
 type R = RouteProp<RootStackParamList, 'Tasks'>;
@@ -75,36 +76,32 @@ export default function TaskListScreen() {
 
   // Group tasks by equipment instance
   const instanceGroups = useMemo<InstanceGroup[]>(() => {
-    const map = new Map<string, InstanceGroup>();
+    const map = new Map<string, TaskRow[]>();
     for (const task of rows) {
       const existing = map.get(task.instanceId);
       if (existing) {
-        existing.tasks.push(task);
-        existing.totalCount++;
-        if (task.status === 'SUBMITTED' || task.status === 'APPROVED') existing.doneCount++;
-        if (task.status === 'REWORK') existing.hasRework = true;
+        existing.push(task);
       } else {
-        map.set(task.instanceId, {
-          instanceId: task.instanceId,
-          instanceLabel: task.instanceLabel,
-          equipmentType: task.equipmentType,
-          tasks: [task],
-          totalCount: 1,
-          doneCount: task.status === 'SUBMITTED' || task.status === 'APPROVED' ? 1 : 0,
-          hasRework: task.status === 'REWORK',
-        });
+        map.set(task.instanceId, [task]);
       }
     }
-    return Array.from(map.values()).sort((a, b) =>
-      a.instanceLabel.localeCompare(b.instanceLabel)
-    );
+    return Array.from(map.values())
+      .map((tasks) => {
+        const { total, done, hasRework } = rollUpTaskCounts(tasks);
+        return {
+          instanceId: tasks[0].instanceId,
+          instanceLabel: tasks[0].instanceLabel,
+          equipmentType: tasks[0].equipmentType,
+          tasks,
+          totalCount: total,
+          doneCount: done,
+          hasRework,
+        };
+      })
+      .sort((a, b) => a.instanceLabel.localeCompare(b.instanceLabel));
   }, [rows]);
 
-  const overallProgress = useMemo(() => {
-    if (rows.length === 0) return 0;
-    const done = rows.filter((r) => r.status === 'SUBMITTED' || r.status === 'APPROVED').length;
-    return Math.round((done / rows.length) * 100);
-  }, [rows]);
+  const overallProgress = useMemo(() => rollUpTaskCounts(rows).pct, [rows]);
 
   if (q.isLoading) {
     return (
@@ -170,7 +167,7 @@ const InstanceCard = memo(function InstanceCard({
   group: InstanceGroup;
   onPress: () => void;
 }) {
-  const pct = group.totalCount > 0 ? Math.round((group.doneCount / group.totalCount) * 100) : 0;
+  const pct = computeProgressPct(group.doneCount, group.totalCount);
   const allDone = group.doneCount === group.totalCount && group.totalCount > 0;
 
   return (
