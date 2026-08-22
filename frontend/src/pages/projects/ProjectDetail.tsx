@@ -28,12 +28,10 @@ import { dashboardPath } from '@/lib/routes';
 import { formatDate } from '@/lib/format';
 import { useFeature } from '@/lib/features';
 import { captureException } from '@/lib/monitoring';
+import { isOverdue } from '@/lib/projectStatus';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Project = Tables<'projects'>;
-
-const isOverdue = (endDate: string | null | undefined, status: string) =>
-  !!endDate && new Date(endDate) < new Date() && status !== 'CLOSED';
 
 export default function ProjectDetail() {
   const { id } = useParams();

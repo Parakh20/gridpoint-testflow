@@ -18,6 +18,7 @@ import { AssignProjectDialog } from '@/components/AssignProjectDialog';
 import { NeedsAttentionPanel, type AttentionProject } from '@/components/NeedsAttentionPanel';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/format';
+import { isOverdue } from '@/lib/projectStatus';
 import { useEffect } from 'react';
 import { useRealtimeChannel, usePollingFallback } from '@/lib/realtime';
 import type { Tables } from '@/integrations/supabase/types';
@@ -31,9 +32,6 @@ type Project = Tables<'projects'> & {
 };
 
 const PAGE_SIZE = 20;
-
-const isOverdue = (endDate: string | null, status: string) =>
-  !!endDate && new Date(endDate) < new Date() && status !== 'CLOSED';
 
 async function fetchAllProjects(): Promise<Project[]> {
   const { data, error } = await supabase
