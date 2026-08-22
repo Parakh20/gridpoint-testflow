@@ -32,11 +32,51 @@ jobs:
           version: latest
 
       - name: Write local-only test secrets
+        # Written to both locations: `supabase/.env` is the documented
+        # convention, but empirically (verified via a real CI trial run,
+        # branch test/ci-migration-fix, 2026-08-22) the local edge-runtime
+        # started by `supabase start` only picked up custom function secrets
+        # from `supabase/functions/.env` -- without it, both
+        # razorpay-webhook and reconcile-cancellations saw their secrets as
+        # unset and failed every test (500/401 instead of the expected
+        # status). Keep both until this CLI behavior is better understood.
         run: |
           cat > supabase/.env <<'EOF'
           RAZORPAY_WEBHOOK_SECRET=test-secret
           RECONCILE_CRON_SECRET=test-cron-secret
           EOF
+          cp supabase/.env supabase/functions/.env
+
+      - name: Split migration 20260411000005 for from-scratch replay only
+        # Every local full-migration-replay mechanism this CLI offers
+        # (`start`'s auto-apply, `migration up --local`, `db push --local`)
+        # applies each *.sql file as one implicit transaction (confirmed
+        # empirically -- all three failed identically in the CI trial run
+        # above before this step existed). Migration 20260411000005 does
+        # `ALTER TYPE equipment_type ADD VALUE 'VT'` then uses 'VT' in an
+        # INSERT in that SAME file, which Postgres forbids within one
+        # transaction (SQLSTATE 55P04) -- this only surfaces on a
+        # from-scratch replay (this job's `supabase start`), never on
+        # production's already-migrated database. Migrations are
+        # forward-only (docs/dev/MIGRATIONS.md) so that historical file
+        # can't be edited in git history. This step splits it on the CI
+        # runner's ephemeral checkout ONLY (never committed, never pushed):
+        # the ALTER TYPE line stays in the original file, everything after
+        # it moves to a new file timestamped to sort immediately after (and
+        # before the next real migration, 20260412000001), so the enum
+        # value commits in its own transaction before anything uses it.
+        run: |
+          set -euo pipefail
+          SRC=supabase/migrations/20260411000005_add_vt_equipment_type_and_templates.sql
+          SPLIT_LINE=$(grep -n "^ALTER TYPE equipment_type ADD VALUE IF NOT EXISTS 'VT';$" "$SRC" | cut -d: -f1)
+          if [ -z "$SPLIT_LINE" ]; then
+            echo "::error::Expected ALTER TYPE line not found in $SRC -- migration content may have drifted, update this split step"
+            exit 1
+          fi
+          DEST=supabase/migrations/20260411000006_add_vt_equipment_type_and_templates_inserts.sql
+          tail -n +"$((SPLIT_LINE + 1))" "$SRC" > "$DEST"
+          head -n "$SPLIT_LINE" "$SRC" > "$SRC.tmp" && mv "$SRC.tmp" "$SRC"
+          echo "Split $SRC at line $SPLIT_LINE -> $DEST ($(wc -l < "$DEST") lines)"
 
       - name: Start local Supabase stack
         run: supabase start
@@ -65,23 +105,14 @@ jobs:
         run: supabase stop
 
   # ── Edge functions deploy (runs AFTER migrations so schema is up to date) ────
-  #
-  # test-billing-functions is intentionally NOT in `needs` right now: its first
-  # live run on main (2026-08-22) failed on a pre-existing, unrelated bug —
-  # migration 20260411000005_add_vt_equipment_type_and_templates.sql adds
-  # 'VT' to the equipment_type enum and uses it in the SAME file (Postgres
-  # SQLSTATE 55P04, "unsafe use of new value"), which only surfaces on a
-  # from-scratch `supabase start` (this CI job's first-ever run of one) — not
-  # on production's already-migrated database. Migrations are forward-only
-  # (docs/dev/MIGRATIONS.md) so that file cannot be edited; fixing the
-  # from-scratch-replay path needs its own investigation with a live Docker
-  # environment. Until then, test-billing-functions runs informationally
-  # (its own job still reports pass/fail in the Actions UI) without blocking
-  # deploys. Re-add it to `needs` once the from-scratch migration replay is
-  # fixed.
+  # test-billing-functions gates this deploy again as of 2026-08-22: the
+  # from-scratch-replay bug (see that job's "Split migration..." step) and
+  # the local-secrets gap (see "Write local-only test secrets") are both
+  # fixed and verified via a real CI trial run (branch
+  # test/ci-migration-fix, 9/9 tests passing).
   deploy-functions:
     name: Deploy edge functions
-    needs: [run-migrations]
+    needs: [run-migrations, test-billing-functions]
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

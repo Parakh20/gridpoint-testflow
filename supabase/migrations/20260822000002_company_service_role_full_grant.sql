@@ -1,0 +1,21 @@
+-- =============================================================================
+-- Migration: Grant SELECT/INSERT/DELETE on companies to service_role
+-- =============================================================================
+--
+-- 20260513000002_company_update_grant.sql granted UPDATE (and UPDATE(is_active))
+-- to service_role, with the comment: "service_role bypasses RLS but still needs
+-- table privs at the PostgreSQL level when going through the PostgREST layer."
+-- SELECT/INSERT/DELETE were never granted because no production Edge Function
+-- code path queried `companies` directly through the REST/PostgREST layer as
+-- service_role (production reads/writes go through SECURITY DEFINER RPCs like
+-- get_company_entitlements(), which run as the function owner regardless of
+-- the caller's own table grants).
+--
+-- supabase/functions/_shared/test_helpers.ts's seedTestCompanyWithSubscription()
+-- / cleanupTestCompany() (added for the billing/webhook Deno integration test
+-- suite) DO insert/select/delete `companies` rows directly via the standard
+-- service_role Supabase client for test fixture setup/teardown -- surfacing
+-- this gap for the first time when that suite actually ran against a real
+-- from-scratch database (previously only statically verified, never executed).
+
+GRANT SELECT, INSERT, DELETE ON public.companies TO service_role;
