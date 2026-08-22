@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { parseFunctionsErrorBody } from '@/lib/functionsError';
 
 const PLAN_NAMES: Record<string, string> = {
   starter: 'Starter',
@@ -25,17 +26,31 @@ export default function StartTrial() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ workspace_url: string } | null>(null);
 
+  // Mirrors start-trial's server-side check so the user sees the problem
+  // before a failed round-trip. The server remains the real gate.
+  const passwordError =
+    password.length > 0 && !(password.length >= 10 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password))
+      ? 'Must be 10+ characters with an uppercase letter, a lowercase letter, and a number.'
+      : null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (passwordError) return;
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('start-trial', {
         body: { company_name: companyName, email, password, full_name: fullName },
       });
-      if (error || !data?.workspace_url) {
-        throw new Error((data?.message as string) ?? error?.message ?? 'Failed to start trial');
+      // supabase-js throws on any non-2xx and leaves error.message as the
+      // useless "Edge Function returned a non-2xx status code" — the real
+      // validation message ("Password must include...") is in the response body.
+      const body = error ? await parseFunctionsErrorBody(error) : data;
+      if (!body?.workspace_url) {
+        throw new Error(
+          (body?.message as string) ?? (body?.error as string) ?? error?.message ?? 'Failed to start trial',
+        );
       }
-      setResult(data as { workspace_url: string });
+      setResult(body as unknown as { workspace_url: string });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start trial';
       toast({ title: 'Sign up failed', description: message, variant: 'destructive' });
@@ -87,9 +102,11 @@ export default function StartTrial() {
           <div className="space-y-1.5">
             <Label htmlFor="password" className="text-white/80">Password</Label>
             <Input id="password" type="password" required minLength={10} value={password} onChange={e => setPassword(e.target.value)} disabled={loading} />
-            <p className="text-[11px] text-white/40">10+ characters, with uppercase, lowercase, and a number.</p>
+            <p className={`text-[11px] ${passwordError ? 'text-red-400' : 'text-white/40'}`}>
+              {passwordError ?? '10+ characters, with uppercase, lowercase, and a number.'}
+            </p>
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !!passwordError}>
             {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Start free trial
           </Button>
