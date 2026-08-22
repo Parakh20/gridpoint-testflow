@@ -46,6 +46,8 @@ type Tab = 'nameplate' | 'testing' | 'review';
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+const EQUIPMENT_FILTER_THRESHOLD = 8; // show the filter input once there are more units than fit comfortably in one glance
+
 export default function EngineerProjectDetail() {
   const { id: projectId } = useParams();
   const navigate = useNavigate();
@@ -61,6 +63,7 @@ export default function EngineerProjectDetail() {
   const [saving, setSaving] = useState<string | null>(null);
   const [savingNameplate, setSavingNameplate] = useState(false);
   const [submittingAll, setSubmittingAll] = useState(false);
+  const [equipmentFilter, setEquipmentFilter] = useState('');
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -205,6 +208,16 @@ export default function EngineerProjectDetail() {
       }),
     [instances, tasks]
   );
+
+  const filteredInstanceSummaries = useMemo(() => {
+    const query = equipmentFilter.trim().toLowerCase();
+    if (!query) return instanceSummaries;
+    return instanceSummaries.filter(
+      ({ instance }) =>
+        instance.label.toLowerCase().includes(query) ||
+        instance.equipment_type.toLowerCase().includes(query)
+    );
+  }, [instanceSummaries, equipmentFilter]);
 
   const nameplateFields: NameplateFieldDef[] = selectedInstance
     ? NAMEPLATE_FIELDS[selectedInstance.equipment_type] ?? []
@@ -357,7 +370,7 @@ export default function EngineerProjectDetail() {
 
   if (loading) {
     return (
-      <DashboardLayout title="Project Tasks">
+      <DashboardLayout title="Project Tasks" breadcrumbs={[{ label: 'My Tasks', href: '/engineer' }, { label: 'Loading…' }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -407,11 +420,26 @@ export default function EngineerProjectDetail() {
             {/* ── Equipment Selector ─────────────────────────────────────── */}
             <Card>
               <CardContent className="py-4">
-                <p className="text-micro-label uppercase text-muted-foreground mb-2">
-                  Equipment Unit ({instances.length} total)
-                </p>
-                <div className="flex gap-3 overflow-x-auto pb-1">
-                  {instanceSummaries.map(({ instance, status, completedCount, totalCount }) => (
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <p className="text-micro-label uppercase text-muted-foreground">
+                    Equipment Unit ({instances.length} total)
+                  </p>
+                  {instances.length > EQUIPMENT_FILTER_THRESHOLD && (
+                    <input
+                      type="text"
+                      value={equipmentFilter}
+                      onChange={e => setEquipmentFilter(e.target.value)}
+                      placeholder="Filter equipment…"
+                      className="h-8 w-48 rounded-md border border-border bg-background px-2 text-body text-foreground placeholder:text-muted-foreground"
+                    />
+                  )}
+                </div>
+                <div
+                  role="group"
+                  aria-label="Equipment units"
+                  className="flex flex-wrap gap-3 overflow-x-auto pb-1"
+                >
+                  {filteredInstanceSummaries.map(({ instance, status, completedCount, totalCount }) => (
                     <EquipmentUnitCard
                       key={instance.id}
                       label={instance.label}
