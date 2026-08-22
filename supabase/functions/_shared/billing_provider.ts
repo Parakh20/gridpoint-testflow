@@ -33,7 +33,18 @@ export interface BillingProvider {
     seatCount: number;
   }): Promise<BillingSubscription>;
   cancelSubscription(providerSubscriptionId: string, atPeriodEnd: boolean): Promise<void>;
-  changeSubscription(providerSubscriptionId: string, newProviderPlanId: string): Promise<BillingSubscription>;
+  // scheduleChangeAt: 'now' applies the plan change (and Razorpay's proration
+  // for the remainder of the cycle) immediately — used for upgrades, where
+  // the customer expects expanded access and the prorated charge right away.
+  // 'cycle_end' (the default, preserving this method's original behavior)
+  // defers the change to the next billing cycle — intended for downgrades,
+  // not yet wired to any caller as of this comment (see manage-subscription's
+  // `downgrade` action TODO).
+  changeSubscription(
+    providerSubscriptionId: string,
+    newProviderPlanId: string,
+    scheduleChangeAt?: 'now' | 'cycle_end'
+  ): Promise<BillingSubscription>;
   getSubscription(providerSubscriptionId: string): Promise<BillingSubscription>;
   getInvoices(providerCustomerId: string): Promise<BillingInvoice[]>;
   verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean>;
@@ -108,12 +119,16 @@ export class RazorpayBillingProvider implements BillingProvider {
     });
   }
 
-  async changeSubscription(providerSubscriptionId: string, newProviderPlanId: string): Promise<BillingSubscription> {
+  async changeSubscription(
+    providerSubscriptionId: string,
+    newProviderPlanId: string,
+    scheduleChangeAt: 'now' | 'cycle_end' = 'cycle_end'
+  ): Promise<BillingSubscription> {
     const data = await this.request<{
       id: string; status: string; current_start: number | null; current_end: number | null;
     }>(`/subscriptions/${providerSubscriptionId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ plan_id: newProviderPlanId, schedule_change_at: 'cycle_end' }),
+      body: JSON.stringify({ plan_id: newProviderPlanId, schedule_change_at: scheduleChangeAt }),
     });
     return {
       providerSubscriptionId: data.id,

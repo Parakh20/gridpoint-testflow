@@ -99,6 +99,21 @@ export function parseDowngradeFeasibility(raw: DowngradeFeasibilityRpcResponse):
   };
 }
 
+/** Shape returned by check_plan_upgrade_eligibility(). */
+export interface UpgradeEligibilityRpcResponse {
+  eligible: boolean;
+  reason: string | null;
+}
+
+export interface UpgradeEligibility {
+  eligible: boolean;
+  reason: string | null;
+}
+
+export function parseUpgradeEligibility(raw: UpgradeEligibilityRpcResponse): UpgradeEligibility {
+  return { eligible: raw.eligible, reason: raw.reason };
+}
+
 /**
  * Add-on keys, matching subscription_addons.addon_key's CHECK constraint in
  * supabase/migrations/20260813000013_enterprise_contracts_and_addons.sql.

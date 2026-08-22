@@ -39,6 +39,32 @@ export default function BillingSettingsPage() {
     enabled: !!entitlements?.planSlug,
   });
 
+  // Higher-priced public, non-custom plans than the current one —
+  // check_plan_upgrade_eligibility (server-side) is the real enforcement;
+  // this list keeps the dropdown from offering an ineligible target.
+  const { data: upgradeOptions = [] } = useQuery({
+    queryKey: ['upgrade-plan-options', entitlements?.planSlug],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plans')
+        .select('slug, name, monthly_price_inr, is_custom')
+        .eq('is_public', true)
+        .eq('is_active', true)
+        .eq('is_custom', false)
+        .order('monthly_price_inr', { ascending: true, nullsFirst: false });
+      if (error) throw error;
+
+      const current = (data ?? []).find(p => p.slug === entitlements?.planSlug);
+      const currentPrice = current?.monthly_price_inr ?? null;
+
+      return (data ?? [])
+        .filter(p => p.slug !== entitlements?.planSlug && p.monthly_price_inr !== null)
+        .filter(p => currentPrice !== null && (p.monthly_price_inr as number) > currentPrice)
+        .map(p => ({ slug: p.slug, name: p.name }));
+    },
+    enabled: !!entitlements?.planSlug,
+  });
+
   if (entitlementsLoading || usageLoading) {
     return (
       <DashboardLayout title="Billing">
@@ -71,6 +97,7 @@ export default function BillingSettingsPage() {
             <SubscriptionActions
               currentPlanName={entitlements?.planName ?? 'your current plan'}
               planOptions={downgradeOptions}
+              upgradeOptions={upgradeOptions}
               onChanged={() => window.location.reload()}
             />
           </CardContent>

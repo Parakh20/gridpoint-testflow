@@ -20,19 +20,21 @@ vi.mock('@/contexts/AuthContext', () => ({
 // downgrade-options query) — createClient() throws at import time without
 // a real VITE_SUPABASE_URL, so mock the client module itself (same pattern
 // as UpgradeModal.test.tsx / ReportsList.test.tsx) rather than relying on env vars.
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          eq: () => ({
-            order: () => Promise.resolve({ data: [], error: null }),
-          }),
-        }),
+vi.mock('@/integrations/supabase/client', () => {
+  // Recursive so any number of chained .eq() calls (downgrade-plan-options
+  // uses 2, upgrade-plan-options uses 3) resolve the same way.
+  const query = (): { eq: () => ReturnType<typeof query>; order: () => Promise<{ data: never[]; error: null }> } => ({
+    eq: () => query(),
+    order: () => Promise.resolve({ data: [] as never[], error: null }),
+  });
+  return {
+    supabase: {
+      from: () => ({
+        select: () => query(),
       }),
-    }),
-  },
-}));
+    },
+  };
+});
 // DashboardLayout pulls in NotificationBell, ThemeToggle, TrialBanner, etc.
 // (auth/theme/router context this test doesn't set up) — mocked to a plain
 // passthrough, matching ReportsList.test.tsx / ReportProjectDetail.test.tsx
