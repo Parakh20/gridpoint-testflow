@@ -7,6 +7,8 @@ export const BILLING_AUDIT_ACTIONS = [
   'SUBSCRIPTION_SUSPENDED',
   'SUBSCRIPTION_REACTIVATED',
   'ENTERPRISE_CONTRACT_CREATED',
+  'ADDON_CREATED',
+  'ADDON_CANCELLED',
 ] as const;
 export type BillingAuditAction = (typeof BILLING_AUDIT_ACTIONS)[number];
 
@@ -19,6 +21,8 @@ export const ACTION_LABEL: Record<BillingAuditAction, string> = {
   SUBSCRIPTION_SUSPENDED: 'Suspended',
   SUBSCRIPTION_REACTIVATED: 'Reactivated',
   ENTERPRISE_CONTRACT_CREATED: 'Enterprise contract created',
+  ADDON_CREATED: 'Add-on created',
+  ADDON_CANCELLED: 'Add-on cancelled',
 };
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'paused' | 'past_due' | 'cancelled' | 'expired';
