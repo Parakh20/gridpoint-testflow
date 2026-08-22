@@ -191,7 +191,7 @@ export function SubscriptionActions({ currentPlanName, planOptions, upgradeOptio
               value={targetSlug}
               onChange={e => setTargetSlug(e.target.value)}
               disabled={downgrading}
-              className="w-full border rounded-md px-3 py-2"
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
             >
               {planOptions.map(p => (
                 <option key={p.slug} value={p.slug}>{p.name}</option>
@@ -235,7 +235,7 @@ export function SubscriptionActions({ currentPlanName, planOptions, upgradeOptio
               value={upgradeTargetSlug}
               onChange={e => setUpgradeTargetSlug(e.target.value)}
               disabled={upgrading}
-              className="w-full border rounded-md px-3 py-2"
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
             >
               {upgradeOptions.map(p => (
                 <option key={p.slug} value={p.slug}>{p.name}</option>

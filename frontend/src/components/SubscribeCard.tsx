@@ -93,9 +93,12 @@ export function SubscribeCard({ planOptions, companyName, userEmail, onSubscribe
     <Card>
       <CardHeader>
         <CardTitle>Subscribe</CardTitle>
-        <CardDescription>Choose a plan to start your paid subscription.</CardDescription>
+        <CardDescription>
+          You're on a trial with no active subscription yet — subscribe to keep access after it ends.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="subscribe-plan">Plan</Label>
           <select
@@ -103,7 +106,7 @@ export function SubscribeCard({ planOptions, companyName, userEmail, onSubscribe
             value={targetSlug}
             onChange={e => setTargetSlug(e.target.value)}
             disabled={subscribing}
-            className="w-full border rounded-md px-3 py-2"
+            className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
           >
             {planOptions.map(p => (
               <option key={p.slug} value={p.slug}>{p.name}</option>
@@ -117,11 +120,12 @@ export function SubscribeCard({ planOptions, companyName, userEmail, onSubscribe
             value={billingInterval}
             onChange={e => setBillingInterval(e.target.value as 'monthly' | 'annual')}
             disabled={subscribing}
-            className="w-full border rounded-md px-3 py-2"
+            className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
           >
             <option value="monthly">Monthly</option>
             <option value="annual">Annual</option>
           </select>
+        </div>
         </div>
         <Button onClick={handleSubscribe} disabled={subscribing || !targetSlug}>
           {subscribing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

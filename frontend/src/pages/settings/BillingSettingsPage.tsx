@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubscriptionActions } from '@/components/SubscriptionActions';
 import { SubscribeCard } from '@/components/SubscribeCard';
-import { MetricCard } from '@/components/MetricCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -108,7 +107,7 @@ export default function BillingSettingsPage() {
   if (entitlementsLoading || usageLoading || subLoading) {
     return (
       <DashboardLayout title="Billing">
-        <div className="space-y-4 p-6">
+        <div className="space-y-4">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-48 w-full" />
         </div>
@@ -118,35 +117,46 @@ export default function BillingSettingsPage() {
 
   return (
     <DashboardLayout title="Billing">
-      <div className="space-y-6 p-6 max-w-3xl">
+      <div className="space-y-6 max-w-3xl">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Billing</h1>
-          <p className="text-muted-foreground">Your plan, usage, and upcoming invoices.</p>
+          <h2 className="text-page-title">Billing</h2>
+          <p className="text-muted-foreground mt-1">Your plan, usage, and upcoming invoices.</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>{entitlements?.planName ?? 'No plan'}</CardTitle>
-            <CardDescription>
-              {entitlements?.isCustom
-                ? 'Custom pricing — contact your account manager for details.'
-                : 'Monthly and annual pricing available on the pricing page.'}
-            </CardDescription>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>{entitlements?.planName ?? 'No plan'}</CardTitle>
+                <CardDescription className="mt-1">
+                  {entitlements?.isCustom
+                    ? 'Custom pricing — contact your account manager for details.'
+                    : hasProviderSubscription
+                      ? 'Your active subscription.'
+                      : 'No paid subscription yet.'}
+                </CardDescription>
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+                  hasProviderSubscription
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-amber-500/10 text-amber-500'
+                }`}
+              >
+                {hasProviderSubscription ? 'Active' : 'Trial'}
+              </span>
+            </div>
           </CardHeader>
-          <CardContent>
-            {hasProviderSubscription ? (
+          {hasProviderSubscription && (
+            <CardContent>
               <SubscriptionActions
                 currentPlanName={entitlements?.planName ?? 'your current plan'}
                 planOptions={downgradeOptions}
                 upgradeOptions={upgradeOptions}
                 onChanged={() => window.location.reload()}
               />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                You're on a trial with no active subscription yet — subscribe below to keep access after your trial ends.
-              </p>
-            )}
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
 
         {!hasProviderSubscription && subscribePlanOptions.length > 0 && (
@@ -182,7 +192,10 @@ export default function BillingSettingsPage() {
                 tone={(usage?.activeProjects ?? 0) / entitlements.maxActiveProjects > 0.9 ? 'warning' : 'default'}
               />
             )}
-            <MetricCard label="AI reports this month" value={usage?.aiReportsThisMonth ?? 0} />
+            <div className="flex items-center justify-between border-t pt-3 text-sm">
+              <span className="text-muted-foreground">AI reports this month</span>
+              <span className="font-medium tabular-nums">{usage?.aiReportsThisMonth ?? 0}</span>
+            </div>
           </CardContent>
         </Card>
 
