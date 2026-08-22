@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
       return json({ error: `Role assignment failed: ${roleError.message}` }, 500);
     }
 
-    const workspace_url = `https://${slug}.optimustesting.com`;
+    const workspace_url = "https://app.optimustesting.com";
 
     return json({ company_id, company_slug: slug, user_id, workspace_url });
   } catch (err: unknown) {

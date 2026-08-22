@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2 } from "lucide-react";
+import { appUrl } from "@/lib/appOrigin";
 
 interface PlanRow {
   id: string;
@@ -123,7 +124,7 @@ export function PricingSection() {
                   <div>{plan.max_active_projects ?? "Unlimited"} active projects</div>
                 </div>
                 <a
-                  href={plan.is_custom ? "#cta" : `/start-trial?plan=${plan.slug}`}
+                  href={plan.is_custom ? "#cta" : appUrl(`/start-trial?plan=${plan.slug}`)}
                   className={`mt-5 text-center text-[13.5px] font-medium px-4 py-2.5 rounded-lg transition ${
                     isPopular
                       ? "btn-primary text-white"

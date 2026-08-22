@@ -1,4 +1,17 @@
 {
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?!app\\.|www\\.|admin\\.)(?<sub>[a-z0-9-]+)\\.optimustesting\\.com"
+        }
+      ],
+      "destination": "https://app.optimustesting.com/:path*",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/" }
   ],

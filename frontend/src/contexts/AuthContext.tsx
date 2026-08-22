@@ -118,22 +118,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Company-scoped login guard: if a subdomain company is resolved (not localhost/dev)
-      // and the user's profile company_id does not match, reject the session immediately.
-      // Skip the check when userCompanyId is null — that user has no company yet and is
-      // handled by the "role pending" flow rather than a mismatch rejection.
-      // Also skip during magic link callbacks — the session is still being established.
-      if (company !== null && userCompanyId !== null && userCompanyId !== company.id && !isMagicLinkCallback) {
-        console.error('[AuthContext] Company mismatch — user does not belong to this workspace. Signing out.');
-        await supabase.auth.signOut();
-        setUser(null);
-        setSession(null);
-        setUserRole(null);
-        setCompanyMismatch(true);
-        navigate('/auth?error=wrong_company');
-        return;
-      }
-
+      // NOTE: the old company-scoped login guard lived here. It rejected a
+      // session whose profile.company_id didn't match the company resolved
+      // from the subdomain. Under the single-domain architecture there is no
+      // per-company host to land on the wrong side of — CompanyContext now
+      // derives the company FROM this user's own profile, so the two can no
+      // longer disagree. Tenant isolation is unchanged and still enforced by
+      // RLS (my_company_id()), which was always the real boundary; the guard
+      // was only ever about the URL. `companyMismatch` is retained in the
+      // context type so Auth.tsx's existing branch compiles, but is never set.
       setUserRole(roleResult.data && !roleResult.error ? roleResult.data.role : null);
     } catch (err) {
       console.error('[AuthContext] fetchUserRole failed', err);

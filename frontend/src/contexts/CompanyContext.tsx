@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import CompanyNotFound from '@/pages/CompanyNotFound';
 
 interface Company {
   id: string;
@@ -19,64 +18,78 @@ interface CompanyContextType {
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
-function getSubdomainSlug(): string | null {
-  const host = window.location.hostname; // e.g. "powergrid.testflow.io" or "localhost"
-  const parts = host.split('.');
-  // On localhost or bare domain (testflow.io), no company slug
-  if (parts.length < 3) return null;
-  const subdomain = parts[0];
-  if (subdomain === 'www') return null;
-  return subdomain;
-}
-
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const [company, setCompany] = useState<Company | null>(null);
   const [companySlug, setCompanySlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
   const [suspended, setSuspended] = useState(false);
 
+  // Single-domain architecture: the whole app is served from one host
+  // (app.optimustesting.com) for every tenant, so the company is resolved
+  // from the signed-in user's profile rather than the hostname. Before
+  // sign-in there is no company — the Auth page renders unbranded, which is
+  // expected and is why `company` is nullable here.
   useEffect(() => {
-    const slug = getSubdomainSlug();
-    setCompanySlug(slug);
+    let cancelled = false;
 
-    if (!slug) {
+    async function resolveCompany(userId: string | undefined) {
+      if (!userId) {
+        if (!cancelled) { setCompany(null); setCompanySlug(null); setLoading(false); }
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (!profile?.company_id) {
+        // New OAuth user awaiting provisioning, or a user with no company
+        // yet — AuthContext's "role pending" flow owns this state.
+        setCompany(null);
+        setCompanySlug(null);
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, slug, is_active, oauth_provisioning, allowed_domains')
+        .eq('id', profile.company_id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error || !data) {
+        setCompany(null);
+        setCompanySlug(null);
+      } else if (!data.is_active) {
+        setCompanySlug(data.slug);
+        setSuspended(true);
+        supabase.auth.signOut();
+      } else {
+        setCompany(data);
+        setCompanySlug(data.slug);
+      }
       setLoading(false);
-      return;
     }
 
-    supabase
-      .from('companies')
-      .select('id, name, slug, is_active, oauth_provisioning, allowed_domains')
-      .eq('slug', slug)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          // If the error is "column does not exist" (migration pending), retry with
-          // base columns only so tenants can still log in.
-          if (error?.message?.includes('column') || error?.code === '42703') {
-            supabase
-              .from('companies')
-              .select('id, name, slug, is_active')
-              .eq('slug', slug)
-              .single()
-              .then(({ data: d2, error: e2 }) => {
-                if (e2 || !d2) { setNotFound(true); }
-                else if (!d2.is_active) { setSuspended(true); supabase.auth.signOut(); }
-                else { setCompany({ ...d2, oauth_provisioning: 'off', allowed_domains: [] }); }
-                setLoading(false);
-              });
-            return;
-          }
-          setNotFound(true);
-        } else if (!data.is_active) {
-          setSuspended(true);
-          supabase.auth.signOut();
-        } else {
-          setCompany(data);
-        }
-        setLoading(false);
-      });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      resolveCompany(session?.user?.id);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setLoading(true);
+      resolveCompany(session?.user?.id);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (loading) {
@@ -106,10 +119,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         </div>
       </div>
     );
-  }
-
-  if (notFound && companySlug) {
-    return <CompanyNotFound slug={companySlug} />;
   }
 
   return (

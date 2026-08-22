@@ -359,7 +359,7 @@ serve(async (req) => {
           type: 'magiclink',
           email,
           options: {
-            redirectTo: `https://${slug}.optimustesting.com/`,
+            redirectTo: "https://app.optimustesting.com/",
           },
         });
 
@@ -370,7 +370,7 @@ serve(async (req) => {
         // Manually override redirect_to since Supabase ignores it
         const rawLink = linkData.properties.action_link;
         const url = new URL(rawLink);
-        url.searchParams.set('redirect_to', `https://${slug}.optimustesting.com/`);
+        url.searchParams.set('redirect_to', "https://app.optimustesting.com/");
         const fixedLink = url.toString();
 
         console.log('Step 5: raw redirect_to =', linkData.properties.action_link);

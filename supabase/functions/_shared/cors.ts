@@ -3,6 +3,7 @@
 const ALLOWED_ORIGINS = [
   'https://optimustesting.com',
   'https://www.optimustesting.com',
+  'https://app.optimustesting.com',
   'http://localhost:8080',
   'http://localhost:5173',
 ];

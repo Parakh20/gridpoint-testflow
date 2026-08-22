@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
     // signups. Same generateLink + redirect_to rewrite pattern the platform
     // admin magic-link flow uses (Supabase ignores options.redirectTo in
     // generateLink, so the query param has to be set on the returned URL).
-    const workspaceUrl = `https://${slug}.optimustesting.com`;
+    const workspaceUrl = "https://app.optimustesting.com";
     let emailSent = false;
 
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({

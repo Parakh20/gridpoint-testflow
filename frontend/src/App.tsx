@@ -11,7 +11,6 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlatformLogin, PlatformDashboard } from "./pages/PlatformAdmin";
 import Marketing from "./pages/Marketing";
 import StartTrial from "./pages/StartTrial";
-import SignIn from "./pages/SignIn";
 import BlogIndex from "@/pages/blog/BlogIndex";
 import BlogPost from "@/pages/blog/BlogPost";
 import Index from "./pages/Index";
@@ -34,11 +33,18 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Three host modes:
+// Three host modes (single-domain architecture — every tenant shares one app
+// host; the company is resolved from the signed-in user's profile, not the
+// hostname. See CompanyContext):
 //   - `admin.optimustesting.com`             → platform admin (PlatformLogin + PlatformDashboard)
-//   - `optimustesting.com` / www / localhost → public marketing site
-//   - anything-else.optimustesting.com       → tenant workspace (CompanyProvider + AuthProvider)
-// `?marketing` query string forces the marketing site on any host (useful for previewing locally).
+//   - `optimustesting.com` / www             → public marketing site
+//   - `app.optimustesting.com`               → the tenant app, for ALL companies
+// Legacy per-company subdomains (`acme.optimustesting.com`) are redirected to
+// the app host by vercel.json, but are also treated as the app host here so a
+// stale bookmark that bypasses the redirect still lands somewhere usable.
+//
+// localhost defaults to the app host (that's what you're normally developing);
+// `?marketing` forces the marketing site, `?admin` the admin panel.
 const HOST = window.location.hostname;
 const FORCE_MARKETING = new URLSearchParams(window.location.search).has('marketing');
 const FORCE_ADMIN = new URLSearchParams(window.location.search).has('admin');
@@ -48,9 +54,7 @@ const IS_MARKETING_HOST =
   !IS_ADMIN_HOST &&
   (FORCE_MARKETING ||
     HOST === 'optimustesting.com' ||
-    HOST === 'www.optimustesting.com' ||
-    HOST === 'localhost' ||
-    HOST === '127.0.0.1');
+    HOST === 'www.optimustesting.com');
 
 const App = () => (
   <ErrorBoundary>
@@ -71,8 +75,6 @@ const App = () => (
               // Public-facing marketing site at optimustesting.com (apex)
               <Routes>
                 <Route path="/" element={<Marketing />} />
-                <Route path="/start-trial" element={<StartTrial />} />
-                <Route path="/sign-in" element={<SignIn />} />
                 <Route path="/blog" element={<BlogIndex />} />
                 <Route path="/blog/:slug" element={<BlogPost />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -83,6 +85,10 @@ const App = () => (
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
+                {/* Signup lives on the app host, not the marketing site: the
+                    session it creates (especially via Google OAuth) has to be
+                    on the same origin as the workspace the user lands in. */}
+                <Route path="/start-trial" element={<StartTrial />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/superadmin" element={<ProtectedRoute requiredRole="SUPERADMIN"><SuperadminDashboard /></ProtectedRoute>} />
                 <Route path="/gm" element={<ProtectedRoute requiredRole={['GM', 'SUPERADMIN']}><GMDashboard /></ProtectedRoute>} />
