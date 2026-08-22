@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -94,6 +95,17 @@ export default function ProjectOverviewScreen() {
     queryKey: ['project-overview', params.projectId],
     queryFn: () => fetchProjectDetail(params.projectId),
   });
+  const [filter, setFilter] = useState('');
+  const filteredInstances = useMemo(() => {
+    const instances = q.data?.instances ?? [];
+    const query = filter.trim().toLowerCase();
+    if (!query) return instances;
+    return instances.filter(
+      (inst) =>
+        inst.label.toLowerCase().includes(query) ||
+        inst.equipment_type.toLowerCase().replace(/_/g, ' ').includes(query)
+    );
+  }, [q.data?.instances, filter]);
 
   if (q.isLoading) {
     return (
@@ -112,117 +124,137 @@ export default function ProjectOverviewScreen() {
   const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
   return (
-    <ScrollView
+    <FlatList
       style={s.root}
       contentContainerStyle={{ padding: theme.pad, paddingBottom: 40 }}
+      data={filteredInstances}
+      keyExtractor={(inst) => inst.id}
       refreshControl={
         <RefreshControl refreshing={q.isFetching && !q.isLoading} onRefresh={() => q.refetch()} tintColor={theme.primary} />
       }
-    >
-      {/* Project info card */}
-      <View style={s.infoCard}>
-        <View style={s.infoRow}>
-          <Text style={s.projectNum}>{data.project_number}</Text>
-          <View style={[s.badge, { borderColor: sc }]}>
-            <Text style={[s.badgeText, { color: sc }]}>{data.status}</Text>
-          </View>
-        </View>
-        <Text style={s.siteName}>{data.site_name}</Text>
-        {data.client ? <Text style={s.client}>{data.client}</Text> : null}
-        <View style={s.divider} />
-        <View style={s.datesRow}>
-          <View>
-            <Text style={s.dateLabel}>Start Date</Text>
-            <Text style={s.dateVal}>{fmt(data.start_date)}</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={s.dateLabel}>End Date</Text>
-            <Text style={s.dateVal}>{fmt(data.end_date)}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Action buttons — role gated */}
-      {(role === 'GM' || role === 'SUPERADMIN' || role === 'SUPERVISOR') && (
-        <View style={s.actionsRow}>
-          {(role === 'GM' || role === 'SUPERADMIN') && (
-            <>
-              <ActionButton
-                label="Edit Project"
-                onPress={() => nav.navigate('EditProject', { projectId: params.projectId, projectNumber: params.projectNumber })}
-              />
-              <ActionButton
-                label="Manage Scope"
-                onPress={() => nav.navigate('ScopeManagement', { projectId: params.projectId, projectNumber: params.projectNumber })}
-                disabled={data.status === 'CLOSED'}
-              />
-              <ActionButton
-                label="Tests & Generate"
-                onPress={() => nav.navigate('TestingScope', { projectId: params.projectId, projectNumber: params.projectNumber })}
-                disabled={data.status === 'CLOSED'}
-              />
-              <ActionButton
-                label="Assign Supervisor"
-                onPress={() => nav.navigate('AssignSupervisor', { projectId: params.projectId, projectNumber: params.projectNumber })}
-              />
-            </>
-          )}
-          <ActionButton
-            label="Assign Engineers"
-            onPress={() => nav.navigate('EngineerAssignment', { projectId: params.projectId, projectNumber: params.projectNumber })}
-          />
-          <ActionButton
-            label="View Report"
-            onPress={() => nav.navigate('ReportDetail', { projectId: params.projectId, projectNumber: params.projectNumber })}
-          />
-        </View>
-      )}
-
-      {/* Overall progress */}
-      <View style={s.progressCard}>
-        <View style={s.progressRow}>
-          <Text style={s.progressLabel}>Overall Progress</Text>
-          <Text style={[s.progressPct, { color: pct === 100 ? theme.success : theme.primary }]}>
-            {pct}%
-          </Text>
-        </View>
-        <View style={s.progressTrack}>
-          <View style={[s.progressFill, { width: `${pct}%` as any, backgroundColor: pct === 100 ? theme.success : theme.primary }]} />
-        </View>
-        <Text style={s.progressSub}>
-          {doneTasks} / {totalTasks} tests submitted or approved
-        </Text>
-      </View>
-
-      {/* Equipment instances */}
-      <Text style={s.sectionTitle}>EQUIPMENT UNITS ({data.instances.length})</Text>
-      {data.instances.length === 0 ? (
-        <Text style={s.emptyText}>No equipment instances generated yet.</Text>
-      ) : (
-        data.instances.map((inst) => {
-          const instPct = inst.totalTasks > 0
-            ? Math.round((inst.submittedOrApproved / inst.totalTasks) * 100)
-            : 0;
-          const allDone = inst.totalTasks > 0 && inst.submittedOrApproved === inst.totalTasks;
-          return (
-            <View key={inst.id} style={s.instanceRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.instanceLabel}>{inst.label}</Text>
-                <Text style={s.instanceType}>{inst.equipment_type.replace(/_/g, ' ')}</Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[s.instPct, { color: allDone ? theme.success : theme.text }]}>
-                  {instPct}%
-                </Text>
-                <Text style={s.instCount}>
-                  {inst.submittedOrApproved}/{inst.totalTasks}
-                </Text>
+      ListHeaderComponent={
+        <>
+          {/* Project info card */}
+          <View style={s.infoCard}>
+            <View style={s.infoRow}>
+              <Text style={s.projectNum}>{data.project_number}</Text>
+              <View style={[s.badge, { borderColor: sc }]}>
+                <Text style={[s.badgeText, { color: sc }]}>{data.status}</Text>
               </View>
             </View>
-          );
-        })
-      )}
-    </ScrollView>
+            <Text style={s.siteName}>{data.site_name}</Text>
+            {data.client ? <Text style={s.client}>{data.client}</Text> : null}
+            <View style={s.divider} />
+            <View style={s.datesRow}>
+              <View>
+                <Text style={s.dateLabel}>Start Date</Text>
+                <Text style={s.dateVal}>{fmt(data.start_date)}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={s.dateLabel}>End Date</Text>
+                <Text style={s.dateVal}>{fmt(data.end_date)}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Action buttons — role gated */}
+          {(role === 'GM' || role === 'SUPERADMIN' || role === 'SUPERVISOR') && (
+            <View style={s.actionsRow}>
+              {(role === 'GM' || role === 'SUPERADMIN') && (
+                <>
+                  <ActionButton
+                    label="Edit Project"
+                    onPress={() => nav.navigate('EditProject', { projectId: params.projectId, projectNumber: params.projectNumber })}
+                  />
+                  <ActionButton
+                    label="Manage Scope"
+                    onPress={() => nav.navigate('ScopeManagement', { projectId: params.projectId, projectNumber: params.projectNumber })}
+                    disabled={data.status === 'CLOSED'}
+                  />
+                  <ActionButton
+                    label="Tests & Generate"
+                    onPress={() => nav.navigate('TestingScope', { projectId: params.projectId, projectNumber: params.projectNumber })}
+                    disabled={data.status === 'CLOSED'}
+                  />
+                  <ActionButton
+                    label="Assign Supervisor"
+                    onPress={() => nav.navigate('AssignSupervisor', { projectId: params.projectId, projectNumber: params.projectNumber })}
+                  />
+                </>
+              )}
+              <ActionButton
+                label="Assign Engineers"
+                onPress={() => nav.navigate('EngineerAssignment', { projectId: params.projectId, projectNumber: params.projectNumber })}
+              />
+              <ActionButton
+                label="View Report"
+                onPress={() => nav.navigate('ReportDetail', { projectId: params.projectId, projectNumber: params.projectNumber })}
+              />
+            </View>
+          )}
+
+          {/* Overall progress */}
+          <View style={s.progressCard}>
+            <View style={s.progressRow}>
+              <Text style={s.progressLabel}>Overall Progress</Text>
+              <Text style={[s.progressPct, { color: pct === 100 ? theme.success : theme.primary }]}>
+                {pct}%
+              </Text>
+            </View>
+            <View style={s.progressTrack}>
+              <View style={[s.progressFill, { width: `${pct}%` as any, backgroundColor: pct === 100 ? theme.success : theme.primary }]} />
+            </View>
+            <Text style={s.progressSub}>
+              {doneTasks} / {totalTasks} tests submitted or approved
+            </Text>
+          </View>
+
+          <Text style={s.sectionTitle}>EQUIPMENT UNITS ({data.instances.length})</Text>
+
+          {data.instances.length > 0 && (
+            <TextInput
+              style={s.filterInput}
+              value={filter}
+              onChangeText={setFilter}
+              placeholder="Filter by label or type…"
+              placeholderTextColor={theme.textDim}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+            />
+          )}
+
+          {data.instances.length === 0 && (
+            <Text style={s.emptyText}>No equipment instances generated yet.</Text>
+          )}
+          {data.instances.length > 0 && filteredInstances.length === 0 && (
+            <Text style={s.emptyText}>No equipment units match "{filter}".</Text>
+          )}
+        </>
+      }
+      renderItem={({ item: inst }) => {
+        const instPct = inst.totalTasks > 0
+          ? Math.round((inst.submittedOrApproved / inst.totalTasks) * 100)
+          : 0;
+        const allDone = inst.totalTasks > 0 && inst.submittedOrApproved === inst.totalTasks;
+        return (
+          <View style={s.instanceRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.instanceLabel}>{inst.label}</Text>
+              <Text style={s.instanceType}>{inst.equipment_type.replace(/_/g, ' ')}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={[s.instPct, { color: allDone ? theme.success : theme.text }]}>
+                {instPct}%
+              </Text>
+              <Text style={s.instCount}>
+                {inst.submittedOrApproved}/{inst.totalTasks}
+              </Text>
+            </View>
+          </View>
+        );
+      }}
+    />
   );
 }
 
@@ -280,6 +312,17 @@ const s = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.8,
     marginBottom: 10,
+  },
+  filterInput: {
+    backgroundColor: theme.card,
+    color: theme.text,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14,
+    marginBottom: 12,
   },
   instanceRow: {
     flexDirection: 'row',
