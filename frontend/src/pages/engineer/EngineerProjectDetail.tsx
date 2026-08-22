@@ -420,7 +420,7 @@ export default function EngineerProjectDetail() {
             {/* ── Equipment Selector ─────────────────────────────────────── */}
             <Card>
               <CardContent className="py-4">
-                <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
                   <p className="text-micro-label uppercase text-muted-foreground">
                     Equipment Unit ({instances.length} total)
                   </p>
