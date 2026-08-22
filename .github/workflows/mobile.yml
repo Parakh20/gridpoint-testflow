@@ -43,6 +43,9 @@ jobs:
       - name: TypeScript check
         run: npx tsc --noEmit
 
+      - name: Run mobile test suite
+        run: npx jest --ci --coverage
+
       - name: Verify Expo dep alignment
         run: npx expo install --check
 

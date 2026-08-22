@@ -24,6 +24,7 @@ import { useToast } from '@/components/Toast';
 import { explainSupabaseError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import { ENGINEER_EDITABLE_TEST_STATUSES } from '@testflow/shared';
+import { rollUpTaskCounts } from '@/lib/taskProgress';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'EquipmentDetail'>;
 type R = RouteProp<RootStackParamList, 'EquipmentDetail'>;
@@ -140,11 +141,7 @@ export default function EquipmentDetailScreen() {
   const nameplateFields: NameplateFieldDef[] = NAMEPLATE_FIELDS[params.equipmentType] ?? [];
 
   // ── Progress ──────────────────────────────────────────────────────────────
-  const progress = useMemo(() => {
-    if (instanceTasks.length === 0) return 0;
-    const done = instanceTasks.filter((t) => t.status === 'SUBMITTED' || t.status === 'APPROVED').length;
-    return Math.round((done / instanceTasks.length) * 100);
-  }, [instanceTasks]);
+  const progress = useMemo(() => rollUpTaskCounts(instanceTasks).pct, [instanceTasks]);
 
   return (
     <View style={s.root}>

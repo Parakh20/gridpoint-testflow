@@ -28,6 +28,7 @@ import {
   type FieldSchema,
 } from '@testflow/shared';
 import { TestFormV2Native, type V2Schema, type V2Section } from '@/components/TestFormV2Native';
+import { coerceNumericFields, computeMissingRequiredFields } from '@/lib/testFormValues';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'TestForm'>;
 type R = RouteProp<RootStackParamList, 'TestForm'>;
@@ -113,24 +114,10 @@ export default function TestFormScreen() {
     setDirty(true);
   };
 
-  const missing = useMemo(() => {
-    if (v2Sections !== null) {
-      // For V2, check required fields in 'fields'-type sections only.
-      const required: string[] = [];
-      for (const sec of v2Sections) {
-        if (sec.type === 'fields') {
-          for (const f of sec.fields ?? []) {
-            if (f.required) required.push(`${sec.id}__${f.key}`);
-          }
-        }
-      }
-      return required.filter((k) => values[k] === undefined || values[k] === '' || values[k] === null);
-    }
-    return fields
-      .filter((f) => f.required && f.name)
-      .map((f) => f.name!)
-      .filter((n) => values[n] === undefined || values[n] === '' || values[n] === null);
-  }, [fields, v2Sections, values]);
+  const missing = useMemo(
+    () => computeMissingRequiredFields({ fields, v2Sections, values }),
+    [fields, v2Sections, values]
+  );
 
   const persistRecord = useCallback(
     async (silent: boolean): Promise<{ ok: boolean; recordId: string | null }> => {
@@ -142,19 +129,7 @@ export default function TestFormScreen() {
 
       try {
         // Coerce numeric fields from in-progress strings ("12.", "-") to clean numbers or null.
-        const normalized: Record<string, any> = { ...valuesRef.current };
-        for (const f of fields) {
-          if (!f.name || f.type !== 'number') continue;
-          const v = normalized[f.name];
-          if (v === undefined || v === null || v === '') {
-            normalized[f.name] = null;
-            continue;
-          }
-          if (typeof v === 'number') continue;
-          const trimmed = String(v).replace(/\.$/, '').replace(/^-$/, '');
-          const num = Number(trimmed);
-          normalized[f.name] = Number.isFinite(num) ? num : null;
-        }
+        const normalized = coerceNumericFields(fields, valuesRef.current);
 
         const payload: any = {
           test_task_id: params.taskId,
