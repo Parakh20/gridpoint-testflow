@@ -3,7 +3,8 @@ import { useRealtimeChannel, usePollingFallback } from '@/lib/realtime';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { AnimatedCounter } from '@/components/AnimatedCounter';
+import { MetricCard } from '@/components/MetricCard';
+import { EmptyState } from '@/components/EmptyState';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -248,27 +249,16 @@ export default function SupervisorDashboard() {
   };
 
   return (
-    <DashboardLayout title="Manager Dashboard">
+    <DashboardLayout title="Manager Dashboard" breadcrumbs={[{ label: 'Dashboard' }]}>
       <div className="grid gap-6 md:grid-cols-4">
         {[
-          { label: 'Assigned Projects', value: stats.total,        icon: <FolderOpen className="h-4 w-4 text-muted-foreground" />,  color: 'text-foreground',    sub: 'Total projects assigned' },
-          { label: 'Active Projects',   value: stats.active,       icon: <ClipboardCheck className="h-4 w-4 text-cyan-400" />,      color: 'text-cyan-400',      sub: 'Currently in progress' },
-          { label: 'Pending Start',     value: stats.pendingStart, icon: <AlertCircle className="h-4 w-4 text-amber-400" />,        color: 'text-amber-400',     sub: 'Awaiting activation' },
-          { label: 'Pending Review',    value: stats.pendingReview,icon: <ClipboardCheck className="h-4 w-4 text-orange-400" />,    color: 'text-orange-400',    sub: 'Tests awaiting approval' },
+          { label: 'Assigned Projects', value: stats.total,        icon: <FolderOpen className="h-4 w-4" />, tone: 'default' as const },
+          { label: 'Active Projects',   value: stats.active,       icon: <ClipboardCheck className="h-4 w-4" />, tone: 'default' as const },
+          { label: 'Pending Start',     value: stats.pendingStart, icon: <AlertCircle className="h-4 w-4" />, tone: 'warning' as const },
+          { label: 'Pending Review',    value: stats.pendingReview,icon: <ClipboardCheck className="h-4 w-4" />, tone: stats.pendingReview > 0 ? 'danger' as const : 'default' as const },
         ].map(s => (
           <motion.div key={s.label} whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }}>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{s.label}</CardTitle>
-                {s.icon}
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold font-mono ${s.color}`}>
-                  <AnimatedCounter value={s.value} />
-                </div>
-                <p className="text-xs text-muted-foreground">{s.sub}</p>
-              </CardContent>
-            </Card>
+            <MetricCard label={s.label} value={s.value} icon={s.icon} tone={s.tone} />
           </motion.div>
         ))}
       </div>
@@ -286,10 +276,7 @@ export default function SupervisorDashboard() {
         </CardHeader>
         <CardContent>
           {pendingTests.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle2 className="h-10 w-10 mx-auto text-green-500 mb-3" />
-              <p className="text-muted-foreground">No tests pending review</p>
-            </div>
+            <EmptyState icon={<CheckCircle2 size={28} />} title="No tests pending review" />
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between px-2">
@@ -341,13 +328,11 @@ export default function SupervisorDashboard() {
         </CardHeader>
         <CardContent>
           {projects.length === 0 ? (
-            <div className="text-center py-12">
-              <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No projects assigned yet</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Projects will appear here when a General Manager assigns them to you
-              </p>
-            </div>
+            <EmptyState
+              icon={<FolderOpen size={28} />}
+              title="No projects assigned yet"
+              description="Projects will appear here when a General Manager assigns them to you."
+            />
           ) : (
             <div className="space-y-4">
               {projects.map(project => (
