@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import PlatformDashboard from './PlatformDashboard';
@@ -20,8 +20,14 @@ vi.mock('@/integrations/supabase/client', () => ({
 // PlatformDashboard fetches through platformFetch (the platform-admin-data
 // Edge Function proxy) rather than the Supabase client directly — mock that
 // module so the stats bar resolves without a network call.
-vi.mock('./platformFetch', () => ({
-  platformFetch: (action: string) => {
+//
+// The mock function is declared via vi.hoisted() so it can be shared between
+// the vi.mock() factory (which Vitest hoists above these imports/statements)
+// and the test bodies below, which swap its implementation with
+// mockImplementationOnce/mockImplementation instead of reassigning the
+// (read-only, per TypeScript) module namespace export directly.
+const { platformFetchMock, defaultPlatformFetchImpl } = vi.hoisted(() => {
+  const defaultPlatformFetchImpl = (action: string) => {
     if (action === 'get_stats') {
       return Promise.resolve({ total_companies: 4, total_users: 12, active_projects: 7 });
     }
@@ -32,7 +38,15 @@ vi.mock('./platformFetch', () => ({
       return Promise.resolve({ users: [] });
     }
     return Promise.resolve(null);
-  },
+  };
+  return {
+    defaultPlatformFetchImpl,
+    platformFetchMock: vi.fn(defaultPlatformFetchImpl),
+  };
+});
+
+vi.mock('./platformFetch', () => ({
+  platformFetch: platformFetchMock,
 }));
 
 function setup() {
@@ -89,15 +103,9 @@ describe('PlatformDashboard', () => {
   });
 
   it('renders Skeleton placeholders in MetricCard stat values while loading, not a plain em-dash', async () => {
-    // Get the mocked platformFetch and override it to return a promise that never resolves,
-    // keeping loadingData = true so we can test the loading state rendering
-    const platformFetchModule = await import('./platformFetch');
-    const originalPlatformFetch = vi.mocked(platformFetchModule).platformFetch;
-
-    // Replace the mock to never resolve
-    vi.mocked(platformFetchModule).platformFetch = vi.fn(
-      () => new Promise(() => { /* never resolves */ })
-    );
+    // Override the shared mock to return a promise that never resolves,
+    // keeping loadingData = true so we can test the loading state rendering.
+    platformFetchMock.mockImplementation(() => new Promise(() => { /* never resolves */ }));
 
     try {
       setup();
@@ -113,8 +121,8 @@ describe('PlatformDashboard', () => {
       // Verify the em-dash placeholder is NOT rendered in the stat cards
       expect(screen.queryByText('—')).not.toBeInTheDocument();
     } finally {
-      // Restore original mock
-      vi.mocked(platformFetchModule).platformFetch = originalPlatformFetch;
+      // Restore the default implementation for subsequent tests.
+      platformFetchMock.mockImplementation(defaultPlatformFetchImpl);
     }
   });
 });
