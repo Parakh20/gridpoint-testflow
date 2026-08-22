@@ -46,6 +46,10 @@ export default function StartTrial() {
       // validation message ("Password must include...") is in the response body.
       const body = error ? await parseFunctionsErrorBody(error) : data;
       if (!body?.workspace_url) {
+        if (typeof body?.retry_after_seconds === 'number') {
+          const mins = Math.ceil(body.retry_after_seconds / 60);
+          throw new Error(`Too many signups from your network. Please try again in about ${mins} minute${mins === 1 ? '' : 's'}.`);
+        }
         throw new Error(
           (body?.message as string) ?? (body?.error as string) ?? error?.message ?? 'Failed to start trial',
         );

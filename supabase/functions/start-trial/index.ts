@@ -39,11 +39,16 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // 5 signups per IP per hour — public unauthenticated endpoint, this is
-    // the primary abuse guard until a CAPTCHA is added.
+    // 20 signups per IP per hour — public unauthenticated endpoint, this is
+    // the primary abuse guard until a CAPTCHA is added. Deliberately not
+    // tighter: this key buckets by IP alone, and real prospects routinely
+    // share an egress IP (corporate NAT, CGNAT, VPN, the Cloudflare edge in
+    // front of this project), so a low limit makes one signup lock out
+    // everyone behind the same address. 20 still bounds junk-tenant creation
+    // to a rate a human can't exceed legitimately.
     const rl = await enforceRateLimit(adminClient, req, {
       key: 'start-trial',
-      limit: 5,
+      limit: 20,
       windowMinutes: 60,
     }, cors);
     if (!rl.ok) return rl.response;
