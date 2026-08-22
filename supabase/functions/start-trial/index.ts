@@ -53,7 +53,10 @@ Deno.serve(async (req) => {
     }, cors);
     if (!rl.ok) return rl.response;
 
-    const { company_name, email, password, full_name } = await req.json();
+    const {
+      company_name, email, password, full_name,
+      phone, company_size, industry, country,
+    } = await req.json();
 
     if (!company_name || !email || !password || !full_name) {
       return json({ error: 'company_name, email, password, and full_name are required' }, 400);
@@ -88,9 +91,22 @@ Deno.serve(async (req) => {
       slug = `${baseSlug}-${suffix}`;
     }
 
+    const optionalText = (value: unknown, max: number): string | null => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed.slice(0, max) : null;
+    };
+
     const { data: company, error: companyError } = await adminClient
       .from('companies')
-      .insert({ name: String(company_name).trim(), slug })
+      .insert({
+        name: String(company_name).trim(),
+        slug,
+        phone: optionalText(phone, 40),
+        company_size: optionalText(company_size, 40),
+        industry: optionalText(industry, 80),
+        country: optionalText(country, 80),
+      })
       .select('id')
       .single();
 
@@ -101,10 +117,14 @@ Deno.serve(async (req) => {
 
     const company_id = company.id;
 
+    // email_confirm: false — the address is unverified at this point, so the
+    // account stays unconfirmed until the user clicks the link mailed below.
+    // Supabase blocks sign-in for an unconfirmed user, which is the actual
+    // gate; nothing else here needs to check it.
     const { data: newUserData, error: createError } = await adminClient.auth.admin.createUser({
       email: email.trim(),
       password,
-      email_confirm: true,
+      email_confirm: false,
       user_metadata: { full_name: full_name.trim() },
     });
 
@@ -140,7 +160,63 @@ Deno.serve(async (req) => {
       return json({ error: 'Failed to finish account setup' }, 500);
     }
 
-    return json({ company_slug: slug, workspace_url: `https://${slug}.optimustesting.com` });
+    // Mail the confirmation link ourselves via Resend rather than relying on
+    // Supabase's built-in mailer, which is rate-limited to a handful of
+    // messages an hour on this project and would silently throttle real
+    // signups. Same generateLink + redirect_to rewrite pattern the platform
+    // admin magic-link flow uses (Supabase ignores options.redirectTo in
+    // generateLink, so the query param has to be set on the returned URL).
+    const workspaceUrl = `https://${slug}.optimustesting.com`;
+    let emailSent = false;
+
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: 'signup',
+      email: email.trim(),
+      password,
+      options: { redirectTo: `${workspaceUrl}/auth` },
+    });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      logEdgeError('start-trial', 'auth_failure', linkError ?? new Error('generateLink returned no action_link'));
+    } else {
+      const confirmUrl = new URL(linkData.properties.action_link);
+      confirmUrl.searchParams.set('redirect_to', `${workspaceUrl}/auth`);
+
+      const resendKey = Deno.env.get('RESEND_API_KEY');
+      if (!resendKey) {
+        logEdgeError('start-trial', 'api_error', new Error('RESEND_API_KEY not configured — confirmation email not sent'));
+      } else {
+        const escape = (value: string) =>
+          value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const resendRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: 'TestFlow <onboarding@resend.dev>',
+            to: [email.trim()],
+            subject: 'Confirm your TestFlow workspace',
+            html: `
+              <p>Hi ${escape(full_name.trim())},</p>
+              <p>Your TestFlow workspace <strong>${escape(String(company_name).trim())}</strong> is ready — confirm your email to activate it.</p>
+              <p><a href="${confirmUrl.toString()}">Confirm my email</a></p>
+              <p>Once confirmed you can sign in at <a href="${workspaceUrl}/auth">${workspaceUrl}</a>.</p>
+              <p>This link expires in 24 hours.</p>
+            `,
+          }),
+        });
+        if (resendRes.ok) {
+          emailSent = true;
+        } else {
+          logEdgeError('start-trial', 'api_error', await resendRes.text());
+        }
+      }
+    }
+
+    // The workspace exists either way — a mail failure must not roll back a
+    // successfully created tenant, but the client needs to know so it can
+    // tell the user to contact support rather than watch for an email that
+    // will never arrive.
+    return json({ company_slug: slug, workspace_url: workspaceUrl, email_sent: emailSent });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
     logEdgeError('start-trial', 'auth_failure', err);
