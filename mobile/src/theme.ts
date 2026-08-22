@@ -62,3 +62,27 @@ export const statusColor = (s: string) => {
       return theme.textDim;
   }
 };
+
+/**
+ * Accessible variant of statusColor() for TEXT specifically. statusColor()
+ * itself stays unchanged and in lock-step with web's CSS custom properties
+ * (see file header) — it's still correct for borders and status dots, which
+ * only need the 3:1 WCAG non-text threshold and clear it at every hue.
+ * Badge/label TEXT needs the stricter 4.5:1 threshold; primary/danger/
+ * success fail that against theme.bg/theme.card as rendered (hand-verified
+ * — see docs/superpowers/plans/2026-08-22-mobile-ux-pattern-parity.md
+ * Task 4), so this lightens just those three for text use only.
+ */
+export const statusTextColor = (s: string) => {
+  switch (s) {
+    case 'IN_PROGRESS':
+      return '#7aabf8';
+    case 'REWORK':
+      return '#f47b6e';
+    case 'APPROVED':
+    case 'ACTIVE':
+      return '#5fc491';
+    default:
+      return statusColor(s); // DRAFT/SUBMITTED/CLOSED/unknown already pass at 4.5:1
+  }
+};
