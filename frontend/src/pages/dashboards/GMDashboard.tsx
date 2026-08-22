@@ -129,6 +129,15 @@ export default function GMDashboard() {
         const aOverdue = isOverdue(a.end_date, a.status);
         const bOverdue = isOverdue(b.end_date, b.status);
         if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+        if (aOverdue && bOverdue) {
+          // Both overdue: most-overdue (earliest end_date) first, per the
+          // original design intent — see this plan's Task 4 for why a prior
+          // created_at-descending tiebreak was wrong here.
+          const aEnd = a.end_date ? new Date(a.end_date).getTime() : 0;
+          const bEnd = b.end_date ? new Date(b.end_date).getTime() : 0;
+          return aEnd - bEnd;
+        }
+        // Both unassigned-only (not overdue): newest project first, unchanged.
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       })
       .slice(0, 8);

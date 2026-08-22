@@ -110,4 +110,40 @@ describe('GMDashboard', () => {
       (supabase.from as any) = originalFrom;
     }
   });
+
+  it('sorts the overdue group by end_date ascending (most overdue first), not created_at', async () => {
+    const overdueProjects = [
+      {
+        id: 'p1', project_number: 'TF-1001', site_name: 'Recently created, mildly overdue', status: 'ACTIVE',
+        end_date: '2026-08-01', assigned_to: 'sup-1', created_at: '2026-08-15',
+        site_address: '', client: null, start_date: null,
+      },
+      {
+        id: 'p2', project_number: 'TF-1002', site_name: 'Old project, badly overdue', status: 'ACTIVE',
+        end_date: '2020-01-01', assigned_to: 'sup-1', created_at: '2020-06-01',
+        site_address: '', client: null, start_date: null,
+      },
+    ];
+    const { supabase } = await import('@/integrations/supabase/client');
+    const originalFrom = supabase.from;
+    (supabase.from as any) = vi.fn(() => ({
+      select: () => ({
+        order: () => Promise.resolve({ data: overdueProjects, error: null }),
+        in: () => Promise.resolve({ data: [{ id: 'sup-1', name: 'Supervisor' }], error: null }),
+      }),
+    }));
+
+    try {
+      setup();
+      await waitFor(() => expect(screen.getByText('Needs Attention')).toBeInTheDocument());
+      const rows = screen.getAllByText(/TF-100[12]/).map(el => el.textContent);
+      // TF-1002 is far more overdue (end_date 2020) than TF-1001 (end_date 2026-08) —
+      // it must render first despite being the OLDER (created_at 2020) project, i.e.
+      // this assertion fails under a created_at-descending tiebreak and passes only
+      // under an end_date-ascending one.
+      expect(rows.indexOf('TF-1002')).toBeLessThan(rows.indexOf('TF-1001'));
+    } finally {
+      (supabase.from as any) = originalFrom;
+    }
+  });
 });
