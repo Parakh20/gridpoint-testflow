@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/format';
 import { platformFetch } from './platformFetch';
-import { formatInr } from './BillingTab';
+import { formatInr } from '@/lib/format';
 import { EnterpriseContract } from './billingTypes';
 
 interface Props {
