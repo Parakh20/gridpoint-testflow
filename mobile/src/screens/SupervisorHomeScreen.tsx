@@ -18,7 +18,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useSupProjects, usePendingReviews, useReviewTask, type SupProject, type PendingReview } from '@/hooks/useSupervisor';
-import { theme, statusColor } from '@/theme';
+import { theme, statusColor, statusTextColor } from '@/theme';
 import { useToast } from '@/components/Toast';
 import { explainSupabaseError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
@@ -377,6 +377,7 @@ const ProjectCard = memo(function ProjectCard({
   onPress: () => void;
 }) {
   const sc = statusColor(project.status);
+  const stc = statusTextColor(project.status);
   return (
     <TouchableOpacity activeOpacity={0.75} style={s.card} onPress={onPress}>
       <View style={s.cardRow}>
@@ -385,7 +386,7 @@ const ProjectCard = memo(function ProjectCard({
           <Text style={s.siteName}>{project.site_name}</Text>
         </View>
         <View style={[s.badge, { borderColor: sc }]}>
-          <Text style={[s.badgeText, { color: sc }]}>{project.status}</Text>
+          <Text style={[s.badgeText, { color: stc }]}>{project.status}</Text>
         </View>
       </View>
     </TouchableOpacity>

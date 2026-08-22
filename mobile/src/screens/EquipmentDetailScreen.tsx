@@ -18,7 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTasks, type TaskRow } from '@/hooks/useTasks';
 import { useNameplate, useSaveNameplate } from '@/hooks/useNameplate';
 import { NAMEPLATE_FIELDS, type NameplateFieldDef } from '@/lib/nameplateFields';
-import { theme, statusColor } from '@/theme';
+import { theme, statusColor, statusTextColor } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import { useToast } from '@/components/Toast';
 import { explainSupabaseError } from '@/lib/errors';
@@ -341,7 +341,7 @@ const TestTaskCard = memo(function TestTaskCard({
       <View style={s.taskRow}>
         <Text style={s.taskName}>{task.templateName}</Text>
         <View style={[s.badge, { borderColor: statusColor(task.status) }]}>
-          <Text style={[s.badgeText, { color: statusColor(task.status) }]}>
+          <Text style={[s.badgeText, { color: statusTextColor(task.status) }]}>
             {task.status.replace('_', ' ')}
           </Text>
         </View>
@@ -408,7 +408,7 @@ function ReviewTab({
             <Text style={s.reviewTaskCode}>{task.templateCode}</Text>
           </View>
           <View style={[s.badge, { borderColor: statusColor(task.status) }]}>
-            <Text style={[s.badgeText, { color: statusColor(task.status) }]}>
+            <Text style={[s.badgeText, { color: statusTextColor(task.status) }]}>
               {task.status.replace('_', ' ')}
             </Text>
           </View>

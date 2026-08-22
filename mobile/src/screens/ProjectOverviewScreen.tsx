@@ -14,7 +14,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { theme, statusColor } from '@/theme';
+import { theme, statusColor, statusTextColor } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 
 type R = RouteProp<RootStackParamList, 'ProjectOverview'>;
@@ -119,6 +119,7 @@ export default function ProjectOverviewScreen() {
   if (!data) return null;
 
   const sc = statusColor(data.status);
+  const stc = statusTextColor(data.status);
   const totalTasks = data.instances.reduce((a, i) => a + i.totalTasks, 0);
   const doneTasks = data.instances.reduce((a, i) => a + i.submittedOrApproved, 0);
   const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
@@ -139,7 +140,7 @@ export default function ProjectOverviewScreen() {
             <View style={s.infoRow}>
               <Text style={s.projectNum}>{data.project_number}</Text>
               <View style={[s.badge, { borderColor: sc }]}>
-                <Text style={[s.badgeText, { color: sc }]}>{data.status}</Text>
+                <Text style={[s.badgeText, { color: stc }]}>{data.status}</Text>
               </View>
             </View>
             <Text style={s.siteName}>{data.site_name}</Text>
