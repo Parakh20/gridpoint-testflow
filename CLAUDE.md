@@ -207,10 +207,8 @@ Share the resulting install link (QR code in Expo dashboard) with field engineer
 
 ## Docs
 
-- `MIGRATIONS.md` — migration playbook
-- `SAAS_ROADMAP.md` — multi-tenant roadmap
-- `IMPROVEMENTS.md` — bug + enhancement tracker
-- `AI_REPORT_PLAN.md` — AI report architecture
-- `EMAIL_RATE_LIMIT.md` — SMTP/OAuth options
-- `docs/dev/BILLING_QA_MATRIX.md` — hand-traced billing/subscription QA matrix (trial/upgrade/downgrade/webhook edge cases) + known launch-readiness gaps (no proration/upgrade codepath, no webhook-ordering protection, no cancel_at auto-flip)
+- `docs/dev/MIGRATIONS.md` — migration playbook
+- `docs/dev/BILLING_QA_MATRIX.md` — hand-traced billing/subscription QA matrix (trial/upgrade/downgrade/webhook edge cases) + known launch-readiness gaps (no proration/upgrade codepath, cancellation doesn't stop billing at Razorpay — see gotcha below)
 - `skills/gridpoint-testflow/SKILL.md` — Claude project skill
+
+(`SAAS_ROADMAP.md`, `IMPROVEMENTS.md`, `AI_REPORT_PLAN.md`, `EMAIL_RATE_LIMIT.md` referenced here previously do not exist in this repo — removed as stale pointers.)
