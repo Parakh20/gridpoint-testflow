@@ -9,15 +9,19 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/StatusBadge';
-import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save, HardDrive, ClipboardCheck, SendHorizonal } from 'lucide-react';
+import { DraftStatusIndicator } from '@/components/DraftStatusIndicator';
+import { ReworkBanner } from '@/components/ReworkBanner';
+import { ArrowLeft, Loader2, ChevronDown, ChevronUp, Save, ClipboardCheck, SendHorizonal } from 'lucide-react';
 import { InstrumentSelector } from '@/components/InstrumentSelector';
 import { TestFormV2 } from '@/components/TestFormV2';
+import { EquipmentUnitCard } from '@/components/EquipmentUnitCard';
 import { TEMPLATE_FALLBACKS } from '@/lib/templateFallbacks';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 import { NAMEPLATE_FIELDS, NameplateFieldDef } from '@/lib/nameplateFields';
+import { deriveEquipmentStatus, getDraftStatus } from '@/lib/engineerWorkspace';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -188,6 +192,20 @@ export default function EngineerProjectDetail() {
     [tasks, selectedInstanceId]
   );
 
+  const instanceSummaries = useMemo(
+    () =>
+      instances.map(inst => {
+        const instTasks = tasks.filter(t => t.equipment_instance?.id === inst.id);
+        return {
+          instance: inst,
+          status: deriveEquipmentStatus(instTasks.map(t => t.status), true),
+          completedCount: instTasks.filter(t => t.status === 'APPROVED').length,
+          totalCount: instTasks.length,
+        };
+      }),
+    [instances, tasks]
+  );
+
   const nameplateFields: NameplateFieldDef[] = selectedInstance
     ? NAMEPLATE_FIELDS[selectedInstance.equipment_type] ?? []
     : [];
@@ -234,15 +252,6 @@ export default function EngineerProjectDetail() {
     try { localStorage.removeItem(draftKey(taskId)); } catch { /* storage unavailable */ }
   };
 
-  const deriveEquipmentStatus = (nextTasks: TestTask[]) => {
-    const statuses = nextTasks.map(t => t.status);
-    if (statuses.length > 0 && statuses.every(s => s === 'APPROVED')) return 'APPROVED';
-    if (statuses.includes('REWORK')) return 'REWORK';
-    if (statuses.includes('SUBMITTED')) return 'SUBMITTED';
-    if (statuses.some(s => s === 'IN_PROGRESS' || s === 'APPROVED')) return 'IN_PROGRESS';
-    return nextTasks[0]?.equipment_instance?.assigned_to ? 'ASSIGNED' : 'UNASSIGNED';
-  };
-
   const handleSaveTask = async (task: TestTask, submit = false) => {
     if (!user || !task.equipment_instance?.id) return;
     setSaving(task.id);
@@ -270,7 +279,10 @@ export default function EngineerProjectDetail() {
         t.id === task.id ? { ...t, status: nextTaskStatus } : t
       );
       const nextEquipmentStatus = deriveEquipmentStatus(
-        nextTasks.filter(t => t.equipment_instance?.id === task.equipment_instance?.id)
+        nextTasks
+          .filter(t => t.equipment_instance?.id === task.equipment_instance?.id)
+          .map(t => t.status),
+        true // an assigned engineer is saving a task, so the instance has an assignee by construction
       );
       await supabase.from('equipment_instances')
         .update({ status: nextEquipmentStatus })
@@ -363,7 +375,10 @@ export default function EngineerProjectDetail() {
     instanceTasks.every(t => t.status === 'SUBMITTED' || t.status === 'APPROVED');
 
   return (
-    <DashboardLayout title="Project Tasks">
+    <DashboardLayout
+      title={project?.project_number ?? 'Project Tasks'}
+      breadcrumbs={[{ label: 'My Tasks', href: '/engineer' }, { label: project?.project_number ?? 'Project' }]}
+    >
       <div className="space-y-6">
         {/* Back + project header */}
         <div className="flex items-center gap-3">
@@ -392,31 +407,22 @@ export default function EngineerProjectDetail() {
             {/* ── Equipment Selector ─────────────────────────────────────── */}
             <Card>
               <CardContent className="py-4">
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex items-center gap-3 flex-1 min-w-[260px]">
-                    <Label className="whitespace-nowrap font-medium">Select Equipment Unit</Label>
-                    <Select value={selectedInstanceId} onValueChange={id => { setSelectedInstanceId(id); }}>
-                      <SelectTrigger className="w-64">
-                        <SelectValue placeholder="Select equipment..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {instances.map(inst => (
-                          <SelectItem key={inst.id} value={inst.id}>
-                            {inst.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {selectedInstance && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                        {selectedInstance.equipment_type.replace(/_/g, ' ')}
-                      </span>
-                      <span>·</span>
-                      <span>Total: {instances.length} unit{instances.length !== 1 ? 's' : ''}</span>
-                    </div>
-                  )}
+                <p className="text-micro-label uppercase text-muted-foreground mb-2">
+                  Equipment Unit ({instances.length} total)
+                </p>
+                <div className="flex gap-3 overflow-x-auto pb-1">
+                  {instanceSummaries.map(({ instance, status, completedCount, totalCount }) => (
+                    <EquipmentUnitCard
+                      key={instance.id}
+                      label={instance.label}
+                      equipmentType={instance.equipment_type}
+                      status={status}
+                      completedCount={completedCount}
+                      totalCount={totalCount}
+                      selected={instance.id === selectedInstanceId}
+                      onSelect={() => setSelectedInstanceId(instance.id)}
+                    />
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -577,20 +583,13 @@ export default function EngineerProjectDetail() {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    {!task.existing_record && formData[task.id] && Object.keys(formData[task.id]).length > 0 && (
-                                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <HardDrive className="h-3 w-3" /> Draft
-                                      </span>
-                                    )}
+                                    <DraftStatusIndicator status={getDraftStatus(task, formData[task.id])} />
                                     <StatusBadge status={task.status} />
                                   </div>
                                 </div>
 
                                 {task.status === 'REWORK' && task.rework_reason && (
-                                  <div className="rounded border border-orange-200 bg-orange-50 p-3">
-                                    <p className="text-xs font-semibold text-orange-700 uppercase mb-1">Rework Required</p>
-                                    <p className="text-sm text-orange-900">{task.rework_reason}</p>
-                                  </div>
+                                  <ReworkBanner reason={task.rework_reason} />
                                 )}
 
                                 {/* Test form */}

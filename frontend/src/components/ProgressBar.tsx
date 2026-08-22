@@ -9,6 +9,7 @@ interface ProgressBarProps {
   showPercentage?: boolean;
   tone?: Tone;
   className?: string;
+  ariaLabel?: string;
 }
 
 const TONE_INDICATOR: Record<Tone, string> = {
@@ -24,6 +25,7 @@ export function ProgressBar({
   showPercentage = true,
   tone = 'default',
   className,
+  ariaLabel,
 }: ProgressBarProps) {
   const clamped = Math.min(100, Math.max(0, value));
   return (
@@ -34,7 +36,7 @@ export function ProgressBar({
           {showPercentage && <span>{Math.round(clamped)}%</span>}
         </div>
       )}
-      <Progress value={clamped} className={TONE_INDICATOR[tone]} />
+      <Progress value={clamped} className={TONE_INDICATOR[tone]} aria-label={ariaLabel} />
     </div>
   );
 }

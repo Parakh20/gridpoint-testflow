@@ -3,7 +3,8 @@ import { useRealtimeChannel, usePollingFallback } from '@/lib/realtime';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { AnimatedCounter } from '@/components/AnimatedCounter';
+import { MetricCard } from '@/components/MetricCard';
+import { EmptyState } from '@/components/EmptyState';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,9 +16,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatusBadge } from '@/components/StatusBadge';
+import { ReviewQueueItem } from '@/components/ReviewQueueItem';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/format';
+import { sortPendingTests, rollUpInstanceStatusAfterApproval } from '@/lib/reviewQueue';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Project = Tables<'projects'>;
@@ -29,6 +32,7 @@ interface PendingTest {
   test_template: { test_name: string; test_code: string } | null;
   project_id: string;
   project_number: string;
+  created_at: string;
 }
 
 export default function SupervisorDashboard() {
@@ -77,20 +81,21 @@ export default function SupervisorDashboard() {
 
       const { data: tasks, error } = await supabase
         .from('test_tasks')
-        .select(`id, status, equipment_instance:equipment_instances(id, label, equipment_type), test_template:test_templates(test_name, test_code), equipment_instance_id`)
+        .select(`id, status, created_at, equipment_instance:equipment_instances(id, label, equipment_type), test_template:test_templates(test_name, test_code), equipment_instance_id`)
         .in('equipment_instance_id', instanceIds)
         .eq('status', 'SUBMITTED')
         .order('created_at');
       if (error) return [];
 
-      return (tasks || []).map(t => ({
+      return sortPendingTests((tasks || []).map(t => ({
         id: t.id,
         status: t.status,
+        created_at: t.created_at,
         equipment_instance: t.equipment_instance,
         test_template: t.test_template,
         project_id: instanceProjectMap[t.equipment_instance_id] || '',
         project_number: projectMap[instanceProjectMap[t.equipment_instance_id]] || '',
-      })) as PendingTest[];
+      })) as PendingTest[]);
     },
     enabled: !!user,
   });
@@ -162,7 +167,7 @@ export default function SupervisorDashboard() {
       const equipId = task.equipment_instance?.id;
       if (equipId) {
         const remaining = pendingTests.filter(t => t.id !== task.id && t.equipment_instance?.id === equipId);
-        const newEquipStatus = remaining.length > 0 ? 'SUBMITTED' : (nextStatus === 'APPROVED' ? 'APPROVED' : 'REWORK');
+        const newEquipStatus = rollUpInstanceStatusAfterApproval(remaining.map(t => t.status), nextStatus);
         await supabase.from('equipment_instances').update({ status: newEquipStatus }).eq('id', equipId);
       }
 
@@ -213,7 +218,7 @@ export default function SupervisorDashboard() {
       const instanceIds = [...new Set(pendingTests.filter(t => ids.includes(t.id)).map(t => t.equipment_instance?.id).filter(Boolean))] as string[];
       for (const equipId of instanceIds) {
         const remaining = pendingTests.filter(t => !ids.includes(t.id) && t.equipment_instance?.id === equipId);
-        const newStatus = remaining.length > 0 ? 'SUBMITTED' : 'APPROVED';
+        const newStatus = rollUpInstanceStatusAfterApproval(remaining.map(t => t.status), 'APPROVED');
         await supabase.from('equipment_instances').update({ status: newStatus }).eq('id', equipId);
       }
 
@@ -244,27 +249,16 @@ export default function SupervisorDashboard() {
   };
 
   return (
-    <DashboardLayout title="Manager Dashboard">
+    <DashboardLayout title="Manager Dashboard" breadcrumbs={[{ label: 'Dashboard' }]}>
       <div className="grid gap-6 md:grid-cols-4">
         {[
-          { label: 'Assigned Projects', value: stats.total,        icon: <FolderOpen className="h-4 w-4 text-muted-foreground" />,  color: 'text-foreground',    sub: 'Total projects assigned' },
-          { label: 'Active Projects',   value: stats.active,       icon: <ClipboardCheck className="h-4 w-4 text-cyan-400" />,      color: 'text-cyan-400',      sub: 'Currently in progress' },
-          { label: 'Pending Start',     value: stats.pendingStart, icon: <AlertCircle className="h-4 w-4 text-amber-400" />,        color: 'text-amber-400',     sub: 'Awaiting activation' },
-          { label: 'Pending Review',    value: stats.pendingReview,icon: <ClipboardCheck className="h-4 w-4 text-orange-400" />,    color: 'text-orange-400',    sub: 'Tests awaiting approval' },
+          { label: 'Assigned Projects', value: stats.total,        icon: <FolderOpen className="h-4 w-4" />, tone: 'default' as const },
+          { label: 'Active Projects',   value: stats.active,       icon: <ClipboardCheck className="h-4 w-4" />, tone: 'default' as const },
+          { label: 'Pending Start',     value: stats.pendingStart, icon: <AlertCircle className="h-4 w-4" />, tone: 'warning' as const },
+          { label: 'Pending Review',    value: stats.pendingReview,icon: <ClipboardCheck className="h-4 w-4" />, tone: stats.pendingReview > 0 ? 'danger' as const : 'default' as const },
         ].map(s => (
           <motion.div key={s.label} whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }}>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{s.label}</CardTitle>
-                {s.icon}
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold font-mono ${s.color}`}>
-                  <AnimatedCounter value={s.value} />
-                </div>
-                <p className="text-xs text-muted-foreground">{s.sub}</p>
-              </CardContent>
-            </Card>
+            <MetricCard label={s.label} value={s.value} icon={s.icon} tone={s.tone} />
           </motion.div>
         ))}
       </div>
@@ -282,10 +276,7 @@ export default function SupervisorDashboard() {
         </CardHeader>
         <CardContent>
           {pendingTests.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle2 className="h-10 w-10 mx-auto text-green-500 mb-3" />
-              <p className="text-muted-foreground">No tests pending review</p>
-            </div>
+            <EmptyState icon={<CheckCircle2 size={28} />} title="No tests pending review" />
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between px-2">
@@ -309,52 +300,20 @@ export default function SupervisorDashboard() {
                 )}
               </div>
               {pendingTests.map(task => (
-                <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg bg-orange-50/50">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Checkbox
-                      checked={selectedTaskIds.has(task.id)}
-                      onCheckedChange={() => toggleSelect(task.id)}
-                      aria-label={`Select test ${task.test_template?.test_code}`}
-                    />
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{task.test_template?.test_name}</span>
-                      <span className="text-xs font-mono text-muted-foreground">{task.test_template?.test_code}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{task.equipment_instance?.label}</span>
-                      <span>•</span>
-                      <span>{task.equipment_instance?.equipment_type.replace(/_/g, ' ')}</span>
-                      <span>•</span>
-                      <button
-                        className="text-primary underline-offset-2 hover:underline"
-                        onClick={() => navigate(`/projects/${task.project_id}?tab=tests`)}
-                      >
-                        {task.project_number}
-                      </button>
-                    </div>
-                  </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={reviewingTaskId === task.id}
-                      onClick={() => handleReworkClick(task)}
-                    >
-                      {reviewingTaskId === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3 mr-1" />}
-                      Rework
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={reviewingTaskId === task.id}
-                      onClick={() => handleTaskReview(task, 'APPROVED')}
-                    >
-                      {reviewingTaskId === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
-                      Approve
-                    </Button>
-                  </div>
-                </div>
+                <ReviewQueueItem
+                  key={task.id}
+                  testName={task.test_template?.test_name ?? 'Unknown test'}
+                  testCode={task.test_template?.test_code ?? ''}
+                  equipmentLabel={task.equipment_instance?.label ?? ''}
+                  equipmentType={task.equipment_instance?.equipment_type ?? ''}
+                  projectNumber={task.project_number}
+                  selected={selectedTaskIds.has(task.id)}
+                  reviewing={reviewingTaskId === task.id}
+                  onToggleSelect={() => toggleSelect(task.id)}
+                  onOpenProject={() => navigate(`/projects/${task.project_id}?tab=tests`)}
+                  onRework={() => handleReworkClick(task)}
+                  onApprove={() => handleTaskReview(task, 'APPROVED')}
+                />
               ))}
             </div>
           )}
@@ -369,13 +328,11 @@ export default function SupervisorDashboard() {
         </CardHeader>
         <CardContent>
           {projects.length === 0 ? (
-            <div className="text-center py-12">
-              <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No projects assigned yet</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Projects will appear here when a General Manager assigns them to you
-              </p>
-            </div>
+            <EmptyState
+              icon={<FolderOpen size={28} />}
+              title="No projects assigned yet"
+              description="Projects will appear here when a General Manager assigns them to you."
+            />
           ) : (
             <div className="space-y-4">
               {projects.map(project => (
