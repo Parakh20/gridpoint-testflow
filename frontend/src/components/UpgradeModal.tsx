@@ -47,7 +47,14 @@ export function UpgradeModal({ reason, onOpenChange, onUpgraded }: UpgradeModalP
         body: { action: 'upgrade', target_plan_slug: targetPlan.slug },
       });
       const effectiveData = error ? await parseFunctionsErrorBody(error) : data;
-      if (!effectiveData?.upgraded) throw new Error((effectiveData?.reason as string) ?? 'Failed to upgrade plan');
+      // `reason` is the 409 "not eligible" shape; `error` is the 500/502
+      // shape. Prefer whichever the response actually carried so the real
+      // failure reaches the toast and captureException.
+      if (!effectiveData?.upgraded) {
+        throw new Error(
+          (effectiveData?.reason as string) ?? (effectiveData?.error as string) ?? 'Failed to upgrade plan',
+        );
+      }
       toast({ title: 'Plan upgraded', description: 'Your new plan is active immediately.' });
       onUpgraded?.();
       onOpenChange(false);

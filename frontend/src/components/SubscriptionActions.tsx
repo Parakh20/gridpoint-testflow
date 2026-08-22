@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -49,6 +49,17 @@ export function SubscriptionActions({ currentPlanName, planOptions, upgradeOptio
   const [upgradeTargetSlug, setUpgradeTargetSlug] = useState(upgradeOptions[0]?.slug ?? '');
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeBlockedReason, setUpgradeBlockedReason] = useState<string | null>(null);
+
+  // upgradeOptions arrives from an async query, so the state initializer above
+  // runs against an empty list on first render — leaving the <select> with no
+  // matching option and Confirm Upgrade permanently disabled until the user
+  // manually re-picks. Re-sync whenever the current selection isn't in the
+  // list (including the initial empty-string case).
+  useEffect(() => {
+    if (upgradeOptions.length === 0) return;
+    if (upgradeOptions.some(p => p.slug === upgradeTargetSlug)) return;
+    setUpgradeTargetSlug(upgradeOptions[0].slug);
+  }, [upgradeOptions, upgradeTargetSlug]);
 
   const handleCancel = async () => {
     setCancelling(true);
@@ -112,6 +123,12 @@ export function SubscriptionActions({ currentPlanName, planOptions, upgradeOptio
         toast({ title: 'Plan upgraded', description: 'Your new plan is active immediately.' });
         onChanged();
         setShowUpgradeDialog(false);
+      } else if (!('upgraded' in effectiveData) && effectiveData.error) {
+        // 500/502 shape from manage-subscription: `{ error }`, not the
+        // `{ upgraded: false, reason }` 409 shape. Throw so the catch block's
+        // captureException + destructive toast run — a payment failure must
+        // not be rendered as an inline "you're not eligible" note.
+        throw new Error(effectiveData.error as string);
       } else {
         setUpgradeBlockedReason((effectiveData.reason as string) ?? 'Unable to upgrade to this plan');
       }
@@ -208,7 +225,7 @@ export function SubscriptionActions({ currentPlanName, planOptions, upgradeOptio
           <DialogHeader>
             <DialogTitle>Upgrade Plan</DialogTitle>
             <DialogDescription>
-              Upgrades take effect immediately. You'll be charged a prorated amount for the rest of your current billing period.
+              Upgrades take effect immediately. Your next invoice will reflect the new plan.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
