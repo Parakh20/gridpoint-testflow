@@ -48,6 +48,6 @@ describe('ReviewQueueItem', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(<ReviewQueueItem {...baseProps} />);
     const results = await axe(container);
-    expect(results).toHaveNoViolations();
+    expect(results.violations).toHaveLength(0);
   });
 });

@@ -22,7 +22,7 @@ describe('MetricCard', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(<MetricCard label="Pending Review" value={6} tone="warning" />);
     const results = await axe(container);
-    expect(results).toHaveNoViolations();
+    expect(results.violations).toHaveLength(0);
   });
 
   it('accepts a ReactNode value, not just string | number', () => {

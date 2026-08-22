@@ -15,7 +15,7 @@ vi.mock('@/integrations/supabase/client', () => ({
 // mirroring the drawer's load() Promise.all([get_subscription_detail,
 // get_billing_extras]) call. Track call count so tests can assert the
 // drawer's own refetch (load()) actually re-ran.
-const platformFetchMock = vi.fn((action: string) => {
+const platformFetchMock = vi.fn((action: string, _payload?: unknown) => {
   if (action === 'get_subscription_detail') {
     return Promise.resolve({
       subscription: {

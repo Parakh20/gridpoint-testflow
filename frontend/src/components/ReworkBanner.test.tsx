@@ -16,6 +16,6 @@ describe('ReworkBanner', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(<ReworkBanner reason="Fix the CT ratio entry." />);
     const results = await axe(container);
-    expect(results).toHaveNoViolations();
+    expect(results.violations).toHaveLength(0);
   });
 });
