@@ -161,3 +161,24 @@ export class RazorpayBillingProvider implements BillingProvider {
     return diff === 0;
   }
 }
+
+// Classifies a RazorpayBillingProvider error message (the
+// `Razorpay API error ${status}: ${body}` shape thrown by `request()` above)
+// as an idempotent "this subscription is already cancelled/scheduled to be
+// cancelled" response rather than a genuine failure.
+//
+// ASSUMPTION (unverified against a live Razorpay sandbox — see
+// docs/design/.../razorpay-cancellation-fix plan's Global Constraints):
+// `cancelSubscription(id, true)` sends `cancel_at_cycle_end: 1`, which does
+// NOT immediately move the subscription to Razorpay's terminal `cancelled`
+// status — it stays `active` with cancellation scheduled for cycle end. A
+// double-submit (double-click, retry after timeout, re-cancel after reload)
+// therefore realistically produces "already scheduled to be cancelled at the
+// end of the current billing cycle" wording, not just a terminal "already
+// been cancelled" message. Both shapes are matched here; matching is scoped
+// to require "already" AND "cancel" co-occurring (in either order) so that
+// unrelated 4xx errors (auth failure, bad subscription id, rate limits) are
+// NOT misclassified as idempotent successes.
+export function isAlreadyCancelledError(message: string): boolean {
+  return /already (been )?cancelled|already.*cancel(led)?.*end|cancel_at_cycle_end/i.test(message);
+}

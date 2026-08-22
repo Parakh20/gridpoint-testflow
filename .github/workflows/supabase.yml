@@ -97,6 +97,7 @@ jobs:
           export SUPABASE_SERVICE_ROLE_KEY
           deno test --allow-net --allow-env \
             _shared/entitlements.test.ts \
+            _shared/billing_provider.test.ts \
             razorpay-webhook/index.test.ts \
             reconcile-cancellations/index.test.ts
 

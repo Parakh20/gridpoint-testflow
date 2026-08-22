@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { enforceRateLimit } from '../_shared/rate_limit.ts';
 import { logEdgeError } from '../_shared/monitoring.ts';
-import { RazorpayBillingProvider } from '../_shared/billing_provider.ts';
+import { RazorpayBillingProvider, isAlreadyCancelledError } from '../_shared/billing_provider.ts';
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req.headers.get('Origin'));
@@ -91,18 +91,21 @@ Deno.serve(async (req) => {
         await provider.cancelSubscription(sub.provider_subscription_id, true);
       } catch (providerErr) {
         // ASSUMPTION (flagged per this plan's Global Constraints — unverified
-        // against a live Razorpay sandbox): Razorpay's "already cancelled"
-        // error surfaces as a 4xx whose body contains "already been cancelled"
-        // per Razorpay's public API docs. RazorpayBillingProvider.request()
-        // throws `Razorpay API error ${status}: ${body}` — matching on that
-        // substring is fragile (breaks if Razorpay changes their error copy)
-        // but this repo doesn't currently expose a structured error code from
-        // that method. Treated as idempotent success rather than failure so a
-        // double-cancel (e.g. a retried request after a timeout) doesn't error.
+        // against a live Razorpay sandbox): Razorpay's "already cancelled /
+        // already scheduled to cancel" errors surface as a 4xx whose body
+        // contains that wording. RazorpayBillingProvider.request() throws
+        // `Razorpay API error ${status}: ${body}` — matching on substrings is
+        // fragile (breaks if Razorpay changes their error copy) but this repo
+        // doesn't currently expose a structured error code from that method.
+        // The classifier lives in _shared/billing_provider.ts
+        // (isAlreadyCancelledError) so it has its own unit test coverage
+        // independent of this function. Treated as idempotent success rather
+        // than failure so a double-cancel (e.g. a retried request after a
+        // timeout, or a re-cancel of a subscription already scheduled via
+        // cancel_at_cycle_end) doesn't error.
         const message = providerErr instanceof Error ? providerErr.message : String(providerErr);
-        const alreadyCancelled = /already been cancelled|already cancelled/i.test(message);
 
-        if (!alreadyCancelled) {
+        if (!isAlreadyCancelledError(message)) {
           logEdgeError('manage-subscription', 'payment_failure', providerErr, {
             step: 'cancel_provider_call', companyId: callerProfile.company_id,
             providerSubscriptionId: sub.provider_subscription_id,
