@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatusBadge } from '@/components/StatusBadge';
+import { ReviewQueueItem } from '@/components/ReviewQueueItem';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/format';
@@ -312,52 +313,20 @@ export default function SupervisorDashboard() {
                 )}
               </div>
               {pendingTests.map(task => (
-                <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg bg-orange-50/50">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Checkbox
-                      checked={selectedTaskIds.has(task.id)}
-                      onCheckedChange={() => toggleSelect(task.id)}
-                      aria-label={`Select test ${task.test_template?.test_code}`}
-                    />
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{task.test_template?.test_name}</span>
-                      <span className="text-xs font-mono text-muted-foreground">{task.test_template?.test_code}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{task.equipment_instance?.label}</span>
-                      <span>•</span>
-                      <span>{task.equipment_instance?.equipment_type.replace(/_/g, ' ')}</span>
-                      <span>•</span>
-                      <button
-                        className="text-primary underline-offset-2 hover:underline"
-                        onClick={() => navigate(`/projects/${task.project_id}?tab=tests`)}
-                      >
-                        {task.project_number}
-                      </button>
-                    </div>
-                  </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={reviewingTaskId === task.id}
-                      onClick={() => handleReworkClick(task)}
-                    >
-                      {reviewingTaskId === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3 mr-1" />}
-                      Rework
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={reviewingTaskId === task.id}
-                      onClick={() => handleTaskReview(task, 'APPROVED')}
-                    >
-                      {reviewingTaskId === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
-                      Approve
-                    </Button>
-                  </div>
-                </div>
+                <ReviewQueueItem
+                  key={task.id}
+                  testName={task.test_template?.test_name ?? 'Unknown test'}
+                  testCode={task.test_template?.test_code ?? ''}
+                  equipmentLabel={task.equipment_instance?.label ?? ''}
+                  equipmentType={task.equipment_instance?.equipment_type ?? ''}
+                  projectNumber={task.project_number}
+                  selected={selectedTaskIds.has(task.id)}
+                  reviewing={reviewingTaskId === task.id}
+                  onToggleSelect={() => toggleSelect(task.id)}
+                  onOpenProject={() => navigate(`/projects/${task.project_id}?tab=tests`)}
+                  onRework={() => handleReworkClick(task)}
+                  onApprove={() => handleTaskReview(task, 'APPROVED')}
+                />
               ))}
             </div>
           )}
