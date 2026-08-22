@@ -418,6 +418,25 @@ table). Gap #1 (Razorpay is never told to stop billing —
 this update; re-verify `supabase/functions/manage-subscription/index.ts`
 before assuming otherwise.
 
+**Update (2026-08-22, Razorpay cancellation fix):** gap #1 (Razorpay was
+never told to stop billing) is fixed. `manage-subscription/index.ts`'s
+cancel action now calls `RazorpayBillingProvider.cancelSubscription(
+provider_subscription_id, true)` immediately after
+`request_subscription_cancellation` sets `cancel_at` — `atPeriodEnd=true`
+maps to Razorpay's `cancel_at_cycle_end:1`, matching the existing local
+"access continues until cancel_at" semantics in a single call. If the
+Razorpay call itself fails (network error, already-cancelled response
+treated as idempotent success, or any other provider error),
+`cancel_at` is NOT rolled back — the response carries a
+`provider_cancel_warning` field instead, and `reconcile-cancellations`'s
+existing DB-side backstop (gap #2's fix) remains the safety net if
+Razorpay's confirming `subscription.cancelled` webhook never arrives. See
+`docs/superpowers/plans/2026-08-22-razorpay-cancellation-fix.md` for the
+full design rationale, including the explicitly-flagged assumption that
+Razorpay's "already cancelled" error is currently identified by matching a
+substring of `RazorpayBillingProvider`'s thrown error message (unverified
+against a live sandbox as of this fix).
+
 ---
 
 ## 7. Duplicate webhook delivery — same `X-Razorpay-Event-Id` twice
