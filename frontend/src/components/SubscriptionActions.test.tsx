@@ -123,3 +123,57 @@ describe('SubscriptionActions', () => {
     });
   });
 });
+
+describe('SubscriptionActions upgrade', () => {
+  it('calls the upgrade action and shows a confirmation toast on success', async () => {
+    invokeMock.mockResolvedValueOnce({ data: { upgraded: true, plan_slug: 'business' }, error: null });
+
+    render(
+      <SubscriptionActions
+        currentPlanName="Professional"
+        planOptions={[]}
+        upgradeOptions={[{ slug: 'business', name: 'Business' }]}
+        onChanged={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /upgrade plan/i }));
+    fireEvent.change(screen.getByLabelText(/new plan/i, { selector: '#upgrade-target-plan' }), { target: { value: 'business' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirm upgrade/i }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('manage-subscription', {
+        body: { action: 'upgrade', target_plan_slug: 'business' },
+      });
+    });
+  });
+
+  it('shows the eligibility-blocked reason from a 409 response', async () => {
+    const body = { upgraded: false, reason: 'Your company is on a custom enterprise contract — contact your account manager to change plans' };
+    const context = new Response(JSON.stringify(body), { status: 409 });
+    invokeMock.mockResolvedValueOnce({ data: null, error: new FunctionsHttpError(context) });
+
+    render(
+      <SubscriptionActions
+        currentPlanName="Professional"
+        planOptions={[]}
+        upgradeOptions={[{ slug: 'business', name: 'Business' }]}
+        onChanged={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /upgrade plan/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirm upgrade/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/enterprise contract/i)).toBeInTheDocument();
+    });
+  });
+
+  it('omits the upgrade button when there are no eligible upgrade targets', () => {
+    render(
+      <SubscriptionActions currentPlanName="Enterprise" planOptions={[]} upgradeOptions={[]} onChanged={() => {}} />
+    );
+    expect(screen.queryByRole('button', { name: /upgrade plan/i })).not.toBeInTheDocument();
+  });
+});
