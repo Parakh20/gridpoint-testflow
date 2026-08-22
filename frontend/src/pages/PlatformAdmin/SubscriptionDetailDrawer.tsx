@@ -8,7 +8,9 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/format';
 import { platformFetch } from './platformFetch';
-import { Subscription, BillingAuditLog, ACTION_LABEL } from './billingTypes';
+import { Subscription, BillingAuditLog, ACTION_LABEL, EnterpriseContract, SubscriptionAddon } from './billingTypes';
+import { EnterpriseContractsPanel } from './EnterpriseContractsPanel';
+import { SubscriptionAddonsPanel } from './SubscriptionAddonsPanel';
 
 interface Props {
   companyId: string | null;
@@ -22,6 +24,8 @@ export function SubscriptionDetailDrawer({ companyId, open, onOpenChange, onChan
   const [loading, setLoading] = useState(false);
   const [sub, setSub] = useState<Subscription | null>(null);
   const [auditLog, setAuditLog] = useState<BillingAuditLog[]>([]);
+  const [contract, setContract] = useState<EnterpriseContract | null>(null);
+  const [addons, setAddons] = useState<SubscriptionAddon[]>([]);
   const [acting, setActing] = useState(false);
   const [discountInput, setDiscountInput] = useState('');
   const [creditsInput, setCreditsInput] = useState('');
@@ -31,9 +35,14 @@ export function SubscriptionDetailDrawer({ companyId, open, onOpenChange, onChan
     if (!companyId) return;
     setLoading(true);
     try {
-      const data = await platformFetch('get_subscription_detail', { company_id: companyId });
-      setSub(data.subscription as Subscription);
-      setAuditLog((data.audit_log ?? []) as BillingAuditLog[]);
+      const [detail, extras] = await Promise.all([
+        platformFetch('get_subscription_detail', { company_id: companyId }),
+        platformFetch('get_billing_extras', { company_id: companyId }),
+      ]);
+      setSub(detail.subscription as Subscription);
+      setAuditLog((detail.audit_log ?? []) as BillingAuditLog[]);
+      setContract((extras.contract ?? null) as EnterpriseContract | null);
+      setAddons((extras.addons ?? []) as SubscriptionAddon[]);
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Failed to load subscription', description: err.message });
     } finally {
@@ -137,6 +146,9 @@ export function SubscriptionDetailDrawer({ companyId, open, onOpenChange, onChan
                 ))}
               </div>
             </div>
+
+            <EnterpriseContractsPanel companyId={companyId as string} contract={contract} onChanged={load} />
+            <SubscriptionAddonsPanel companyId={companyId as string} addons={addons} onChanged={load} />
           </div>
         )}
       </SheetContent>

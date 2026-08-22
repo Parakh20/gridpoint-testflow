@@ -66,3 +66,35 @@ export interface BillingAuditLog {
   metadata: Record<string, unknown>;
   created_at: string;
 }
+
+// EnterpriseContract/SubscriptionAddon: platform-admin-data's get_billing_extras
+// action returns raw Postgres rows (snake_case, `.select('*')`) — not the
+// camelCase parsed shapes in packages/shared/src/billing.ts (those assume a
+// parse function like parseEntitlements() that doesn't exist for these two
+// tables). Kept local and in sync with the enterprise_contracts /
+// subscription_addons column lists in
+// supabase/migrations/20260813000013_enterprise_contracts_and_addons.sql.
+export interface EnterpriseContract {
+  id: string;
+  company_id: string;
+  custom_monthly_price_inr: number | null;
+  custom_annual_price_inr: number | null;
+  max_users: number | null;
+  max_active_projects: number | null;
+  max_storage_gb: number | null;
+  contract_start: string;
+  contract_end: string | null;
+  sla_level: string | null;
+  support_level: string | null;
+  custom_features: Record<string, boolean>;
+}
+
+export interface SubscriptionAddon {
+  id: string;
+  subscription_id: string;
+  addon_key: string;
+  quantity: number;
+  unit_price_inr: number | null;
+  status: 'active' | 'cancelled';
+  created_at: string;
+}
