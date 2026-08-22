@@ -203,16 +203,11 @@ export function ProjectEquipmentTab({ projectId, projectStatus: _projectStatus }
 
   if (equipment.length === 0) {
     return (
-      <Card>
-        <CardHeader><CardTitle>Equipment Instances</CardTitle></CardHeader>
-        <CardContent className="py-4">
-          <EmptyState
-            icon={<PackageSearch size={28} />}
-            title="No equipment instances yet"
-            description="Generate equipment and tasks from the Testing Scope tab once scope is finalized."
-          />
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon={<PackageSearch size={28} />}
+        title="No equipment instances yet"
+        description="Generate equipment and tasks from the Testing Scope tab once scope is finalized."
+      />
     );
   }
 

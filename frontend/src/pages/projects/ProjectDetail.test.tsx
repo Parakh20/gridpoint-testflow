@@ -100,4 +100,10 @@ describe('ProjectDetail', () => {
     expect(screen.getByText('In Progress')).toBeInTheDocument();
     expect(screen.getByText('Not Started')).toBeInTheDocument();
   });
+
+  it('renders a heading landmark above the progress MetricCard grid', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('Approved')).toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: 'Project Progress' })).toBeInTheDocument();
+  });
 });

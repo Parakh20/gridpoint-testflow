@@ -71,4 +71,12 @@ describe('ProjectEquipmentTab', () => {
     await user.click(screen.getByText('PTR-001'));
     await waitFor(() => expect(screen.getByText('50%')).toBeInTheDocument()); // 1 of 2 tasks approved
   });
+
+  it('does not wrap the EmptyState in a second bordered Card (avoids a double border)', async () => {
+    mockEmpty();
+    render(<ProjectEquipmentTab projectId="p1" projectStatus="ACTIVE" />);
+    await waitFor(() => expect(screen.getByText('No equipment instances yet')).toBeInTheDocument());
+    const emptyStateRoot = screen.getByText('No equipment instances yet').closest('.border-dashed');
+    expect(emptyStateRoot?.parentElement?.className).not.toMatch(/\bborder\b(?!-dashed)/);
+  });
 });

@@ -52,6 +52,7 @@ export function NeedsAttentionPanel({ projects, onSelect, className }: NeedsAtte
               return (
                 <li key={project.id}>
                   <button
+                    type="button"
                     onClick={() => onSelect(project.id)}
                     className={cn(
                       'flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-left',

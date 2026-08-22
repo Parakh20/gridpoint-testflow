@@ -35,4 +35,14 @@ describe('ProjectScopeTab', () => {
     expect(screen.getByText('CT')).toBeInTheDocument();
     expect(screen.getByText('8')).toBeInTheDocument(); // total row
   });
+
+  it('does not wrap the EmptyState in a second bordered Card (avoids a double border)', async () => {
+    mockScopeItems([]);
+    render(<ProjectScopeTab projectId="p1" />);
+    await waitFor(() => expect(screen.getByText('No equipment scope defined')).toBeInTheDocument());
+    // EmptyState's own border-dashed container should not have a solid-bordered
+    // Card ancestor — the Card wrapper (`rounded-lg border bg-card`) is the bug.
+    const emptyStateRoot = screen.getByText('No equipment scope defined').closest('.border-dashed');
+    expect(emptyStateRoot?.parentElement?.className).not.toMatch(/\bborder\b(?!-dashed)/);
+  });
 });
