@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, PackageSearch } from 'lucide-react';
+import { EmptyState } from '@/components/EmptyState';
 
 interface ScopeItem {
   id: string;
@@ -54,8 +55,12 @@ export function ProjectScopeTab({ projectId }: ProjectScopeTabProps) {
   if (scopeItems.length === 0) {
     return (
       <Card>
-        <CardContent className="text-center py-12">
-          <p className="text-muted-foreground">No equipment scope defined</p>
+        <CardContent className="py-4">
+          <EmptyState
+            icon={<PackageSearch size={28} />}
+            title="No equipment scope defined"
+            description="Define equipment types and quantities in the New Project wizard or Edit Project screen."
+          />
         </CardContent>
       </Card>
     );

@@ -10,7 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { MetricCard } from '@/components/MetricCard';
+import { ProgressBar } from '@/components/ProgressBar';
+import { AnimatedCounter } from '@/components/AnimatedCounter';
 import { Loader2, ArrowLeft, Download, UserCheck, RefreshCw, FileText, Pencil, FileSpreadsheet } from 'lucide-react';
 import type { ExportTask } from '@/lib/projectExcelExport';
 import { ProjectStatusActions } from '@/components/ProjectStatusActions';
@@ -223,7 +225,10 @@ export default function ProjectDetail() {
   }
 
   return (
-    <DashboardLayout title="Project Details">
+    <DashboardLayout
+      title={project.project_number}
+      breadcrumbs={[{ label: 'Projects', href: dashboardPath(userRole) }, { label: project.project_number }]}
+    >
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
@@ -239,7 +244,6 @@ export default function ProjectDetail() {
               </Button>
             </div>
             <div className="flex items-center gap-3 mt-2">
-              <h2 className="text-2xl font-bold">{project.project_number}</h2>
               <StatusBadge status={project.status} />
               {isOverdue(project.end_date, project.status) && (
                 <Badge variant="destructive" className="text-sm">Overdue</Badge>
@@ -310,33 +314,36 @@ export default function ProjectDetail() {
 
           <TabsContent value="overview" className="space-y-4">
             {progressStats && (
-              <Card>
-                <CardHeader><CardTitle>Project Progress</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Tests Approved</span>
-                    <span className="font-semibold tabular-nums">
-                      {progressStats.approved} / {progressStats.total}
-                      {progressStats.total > 0 && ` (${Math.round((progressStats.approved / progressStats.total) * 100)}%)`}
-                    </span>
-                  </div>
-                  <Progress value={progressStats.total > 0 ? Math.round((progressStats.approved / progressStats.total) * 100) : 0} />
-                  <div className="flex flex-wrap gap-5 text-xs">
-                    <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
-                      <span className="text-muted-foreground">{progressStats.submitted} pending review</span>
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-muted-foreground">{progressStats.inProgress} in progress</span>
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-2 h-2 rounded-full bg-muted-foreground/40" />
-                      <span className="text-muted-foreground">{progressStats.draft} not started</span>
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                <MetricCard
+                  label="Approved"
+                  tone="success"
+                  value={<AnimatedCounter value={progressStats.approved} />}
+                  delta={{ value: `of ${progressStats.total}`, direction: 'flat' }}
+                />
+                <MetricCard
+                  label="Pending Review"
+                  tone="warning"
+                  value={<AnimatedCounter value={progressStats.submitted} />}
+                />
+                <MetricCard
+                  label="In Progress"
+                  tone="default"
+                  value={<AnimatedCounter value={progressStats.inProgress} />}
+                />
+                <MetricCard
+                  label="Not Started"
+                  tone="default"
+                  value={<AnimatedCounter value={progressStats.draft} />}
+                />
+                <div className="col-span-2 lg:col-span-4">
+                  <ProgressBar
+                    label="Overall completion"
+                    tone="success"
+                    value={progressStats.total > 0 ? Math.round((progressStats.approved / progressStats.total) * 100) : 0}
+                  />
+                </div>
+              </div>
             )}
             <Card>
               <CardHeader>

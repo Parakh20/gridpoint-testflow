@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Activity } from 'lucide-react';
 import { formatDateTime } from '@/lib/format';
+import { EmptyState } from '@/components/EmptyState';
 
 interface AuditEntry {
   id: string;
@@ -110,10 +111,11 @@ export function ProjectActivityTab({ projectId }: Props) {
 
   if (entries.length === 0) {
     return (
-      <div className="text-center py-16">
-        <Activity className="h-10 w-10 mx-auto text-muted-foreground mb-3 opacity-40" />
-        <p className="text-sm text-muted-foreground">No activity recorded for this project yet.</p>
-      </div>
+      <EmptyState
+        icon={<Activity size={28} />}
+        title="No activity yet"
+        description="Status changes, assignments, and edits to this project will appear here."
+      />
     );
   }
 
