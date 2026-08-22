@@ -161,3 +161,33 @@ export class RazorpayBillingProvider implements BillingProvider {
     return diff === 0;
   }
 }
+
+// Classifies a RazorpayBillingProvider error message (the
+// `Razorpay API error ${status}: ${body}` shape thrown by `request()` above)
+// as an idempotent "this subscription is already cancelled/scheduled to be
+// cancelled" response rather than a genuine failure.
+//
+// ASSUMPTION (unverified against a live Razorpay sandbox — see
+// docs/superpowers/plans/2026-08-22-razorpay-cancellation-fix.md's Global
+// Constraints):
+// `cancelSubscription(id, true)` sends `cancel_at_cycle_end: 1`, which does
+// NOT immediately move the subscription to Razorpay's terminal `cancelled`
+// status — it stays `active` with cancellation scheduled for cycle end. A
+// double-submit (double-click, retry after timeout, re-cancel after reload)
+// therefore realistically produces "already scheduled to be cancelled at the
+// end of the current billing cycle" wording, not just a terminal "already
+// been cancelled" message. Both shapes are matched here; matching is scoped
+// to require "already" AND "cancel" co-occurring (in either order) so that
+// unrelated 4xx errors (auth failure, bad subscription id, rate limits) are
+// NOT misclassified as idempotent successes.
+//
+// The `cancel_at_cycle_end` literal alone is NOT sufficient to match —
+// Razorpay validation-rejection error bodies can legitimately echo
+// `cancel_at_cycle_end` back as a field name (e.g. "cancel_at_cycle_end
+// is/are not required and should not be sent") when Razorpay is REFUSING to
+// cancel, which is the opposite of idempotent success. So the
+// `cancel_at_cycle_end` alternative only counts when "already" also appears
+// somewhere in the message.
+export function isAlreadyCancelledError(message: string): boolean {
+  return /already[\s\S]*cancel|cancel[\s\S]*already/i.test(message);
+}

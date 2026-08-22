@@ -418,6 +418,34 @@ table). Gap #1 (Razorpay is never told to stop billing —
 this update; re-verify `supabase/functions/manage-subscription/index.ts`
 before assuming otherwise.
 
+**Update (2026-08-22, Razorpay cancellation fix):** gap #1 (Razorpay was
+never told to stop billing) is fixed. `manage-subscription/index.ts`'s
+cancel action now calls `RazorpayBillingProvider.cancelSubscription(
+provider_subscription_id, true)` immediately after
+`request_subscription_cancellation` sets `cancel_at` — `atPeriodEnd=true`
+maps to Razorpay's `cancel_at_cycle_end:1`, matching the existing local
+"access continues until cancel_at" semantics in a single call. If the
+Razorpay call genuinely fails (network error, or any other provider error
+that isn't classified as idempotent), `cancel_at` is NOT rolled back — the
+response carries a `provider_cancel_warning` field instead, and
+`reconcile-cancellations`'s existing DB-side backstop (gap #2's fix)
+remains the safety net if Razorpay's confirming `subscription.cancelled`
+webhook never arrives. An already-cancelled response classified as
+idempotent success is NOT a `provider_cancel_warning` case — it means
+Razorpay confirms the cancellation is in place, so it is treated as a
+normal success (now with an info-level log line so the classifier's
+real-world hit rate is auditable). Separately, if the RPC's own returned
+`cancel_at` comes back null (e.g. `current_period_end` was NULL), Razorpay
+is not contacted at all and a `provider_cancel_warning` is returned instead,
+since telling Razorpay to cancel without a corresponding local cancellation
+timestamp would create the same kind of silent divergence this fix exists
+to prevent. See
+`docs/superpowers/plans/2026-08-22-razorpay-cancellation-fix.md` for the
+full design rationale, including the explicitly-flagged assumption that
+Razorpay's "already cancelled" error is currently identified by matching a
+substring of `RazorpayBillingProvider`'s thrown error message (unverified
+against a live sandbox as of this fix).
+
 ---
 
 ## 7. Duplicate webhook delivery — same `X-Razorpay-Event-Id` twice
