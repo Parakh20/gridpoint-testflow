@@ -316,7 +316,8 @@ const Nav = () => (
         <a href="#cta" className="hover:text-white">Contact</a>
       </nav>
       <div className="flex items-center gap-2.5">
-        <a href="#cta" className="btn-primary text-[13.5px] font-medium px-3.5 py-2 rounded-md text-white">Request access</a>
+        <a href="/sign-in" className="text-[13.5px] font-medium px-3.5 py-2 text-white/75 hover:text-white">Sign in</a>
+        <a href="/start-trial" className="btn-primary text-[13.5px] font-medium px-3.5 py-2 rounded-md text-white">Get started</a>
       </div>
     </div>
   </header>

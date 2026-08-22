@@ -343,6 +343,111 @@ Deno.serve(async (req) => {
       return json({ upgraded: true, plan_slug: targetSlug });
     }
 
+    if (action === 'subscribe') {
+      const targetSlug = body?.target_plan_slug;
+      const billingInterval = body?.billing_interval;
+      if (typeof targetSlug !== 'string' || !targetSlug) {
+        return json({ error: 'target_plan_slug is required' }, 400);
+      }
+      if (billingInterval !== 'monthly' && billingInterval !== 'annual') {
+        return json({ error: "billing_interval must be 'monthly' or 'annual'" }, 400);
+      }
+
+      const { data: targetPlan, error: planError } = await adminClient
+        .from('plans')
+        .select('id, name')
+        .eq('slug', targetSlug)
+        .eq('is_active', true)
+        .eq('is_public', true)
+        .eq('is_custom', false)
+        .single();
+
+      if (planError || !targetPlan) return json({ error: `Unknown plan: ${targetSlug}` }, 400);
+
+      const { data: providerMapping } = await adminClient
+        .from('plan_provider_mapping')
+        .select('razorpay_plan_id_monthly, razorpay_plan_id_annual')
+        .eq('plan_id', targetPlan.id)
+        .maybeSingle();
+
+      const providerPlanId = billingInterval === 'annual'
+        ? providerMapping?.razorpay_plan_id_annual
+        : providerMapping?.razorpay_plan_id_monthly;
+
+      if (!providerPlanId) {
+        return json({ error: 'This plan is not yet available for self-service checkout' }, 400);
+      }
+
+      // A company already mid-subscription (has a Razorpay subscription on
+      // file) must use 'upgrade'/'downgrade'/'cancel' instead — 'subscribe'
+      // is only for a trial company starting its first paid subscription.
+      const { data: existingSub } = await adminClient
+        .from('subscriptions')
+        .select('provider_subscription_id, provider_customer_id')
+        .eq('company_id', callerProfile.company_id)
+        .maybeSingle();
+
+      if (existingSub?.provider_subscription_id) {
+        return json({ error: 'This company already has an active subscription — use upgrade/downgrade instead' }, 409);
+      }
+
+      const keyId = Deno.env.get('RAZORPAY_KEY_ID');
+      const keySecret = Deno.env.get('RAZORPAY_KEY_SECRET');
+      if (!keyId || !keySecret) {
+        logEdgeError('manage-subscription', 'payment_failure', new Error('Razorpay credentials not configured'));
+        return json({ error: 'Billing provider not configured' }, 500);
+      }
+
+      const { data: company } = await adminClient
+        .from('companies')
+        .select('name')
+        .eq('id', callerProfile.company_id)
+        .single();
+
+      const billingProvider = new RazorpayBillingProvider(keyId, keySecret);
+
+      try {
+        // Reuse an existing Razorpay customer id if a prior (abandoned)
+        // checkout attempt already created one for this company, rather
+        // than creating a duplicate customer record at Razorpay.
+        let providerCustomerId = existingSub?.provider_customer_id ?? null;
+        if (!providerCustomerId) {
+          const customer = await billingProvider.createCustomer({
+            name: company?.name ?? 'TestFlow customer',
+            email: caller.email ?? '',
+            companyId: callerProfile.company_id,
+          });
+          providerCustomerId = customer.providerCustomerId;
+        }
+
+        const subscription = await billingProvider.createSubscription({
+          providerCustomerId,
+          providerPlanId,
+          companyId: callerProfile.company_id,
+          seatCount: 1,
+        });
+
+        // Deliberately no local subscriptions write here: Razorpay's
+        // checkout modal (client-side, using this subscription_id) is what
+        // actually authorizes payment. razorpay-webhook resolves
+        // company_id from the subscription's notes (set by createSubscription
+        // above) and calls upsert_subscription on the resulting
+        // subscription.authenticated/activated events — that's the single
+        // source of truth for "did this checkout actually complete",
+        // avoiding a local row that claims a subscription exists before the
+        // customer has actually paid anything.
+        return json({
+          subscription_id: subscription.providerSubscriptionId,
+          razorpay_key_id: keyId,
+          plan_name: targetPlan.name,
+        });
+      } catch (err: unknown) {
+        logEdgeError('manage-subscription', 'payment_failure', err);
+        const message = err instanceof Error ? err.message : 'Failed to start checkout with billing provider';
+        return json({ error: message }, 502);
+      }
+    }
+
     return json({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';

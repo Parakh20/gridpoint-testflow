@@ -21,9 +21,9 @@ interface FeatureRow {
 }
 
 const CTA_LABEL: Record<string, string> = {
-  starter: "Get started",
-  professional: "Request access",
-  business: "Talk to sales",
+  starter: "Start free trial",
+  professional: "Start free trial",
+  business: "Start free trial",
   enterprise: "Contact sales",
 };
 
@@ -123,14 +123,14 @@ export function PricingSection() {
                   <div>{plan.max_active_projects ?? "Unlimited"} active projects</div>
                 </div>
                 <a
-                  href="#cta"
+                  href={plan.is_custom ? "#cta" : `/start-trial?plan=${plan.slug}`}
                   className={`mt-5 text-center text-[13.5px] font-medium px-4 py-2.5 rounded-lg transition ${
                     isPopular
                       ? "btn-primary text-white"
                       : "border border-white/15 text-white/85 hover:border-white/30"
                   }`}
                 >
-                  {CTA_LABEL[plan.slug] ?? "Contact sales"}
+                  {plan.is_custom ? "Contact sales" : (CTA_LABEL[plan.slug] ?? "Start free trial")}
                 </a>
               </div>
             );

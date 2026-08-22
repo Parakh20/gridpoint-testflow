@@ -5,6 +5,18 @@ import { useNavigate } from 'react-router-dom';
 import { useCompany } from '@/contexts/CompanyContext';
 import { captureException } from '@/lib/monitoring';
 
+// Keys used throughout the app; values are Supabase Auth's own provider
+// identifiers (https://supabase.com/docs/guides/auth/social-login) — 'azure'
+// is Microsoft/Entra ID, 'linkedin_oidc' is LinkedIn's OIDC flow (LinkedIn
+// deprecated the older 'linkedin' provider).
+export const OAUTH_PROVIDERS = {
+  google: 'google',
+  microsoft: 'azure',
+  linkedin: 'linkedin_oidc',
+  apple: 'apple',
+} as const;
+export type OAuthProviderKey = keyof typeof OAUTH_PROVIDERS;
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -15,7 +27,7 @@ interface AuthContextType {
   accountDisabled: boolean;
   oauthPending: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signInWithGoogle: () => Promise<{ error: any }>;
+  signInWithOAuth: (provider: OAuthProviderKey) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<{ error: any }>;
   updatePassword: (password: string) => Promise<{ error: any }>;
@@ -190,12 +202,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithOAuth = async (providerKey: OAuthProviderKey) => {
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: OAUTH_PROVIDERS[providerKey],
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { access_type: 'offline', prompt: 'consent' },
+        // Only Google's OAuth2 flow uses these query params (offline refresh
+        // token + forced consent screen); harmless no-ops for the others.
+        ...(providerKey === 'google' ? { queryParams: { access_type: 'offline', prompt: 'consent' } } : {}),
       },
     });
     return { error };
@@ -249,7 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   return (
-    <AuthContext.Provider value={{ user, session, userRole, userName, loading, companyMismatch, accountDisabled, oauthPending, signIn, signInWithGoogle, signOut, resetPasswordForEmail, updatePassword }}>
+    <AuthContext.Provider value={{ user, session, userRole, userName, loading, companyMismatch, accountDisabled, oauthPending, signIn, signInWithOAuth, signOut, resetPasswordForEmail, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

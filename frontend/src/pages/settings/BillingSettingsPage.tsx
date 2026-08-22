@@ -3,15 +3,55 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubscriptionActions } from '@/components/SubscriptionActions';
+import { SubscribeCard } from '@/components/SubscribeCard';
 import { MetricCard } from '@/components/MetricCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { useEntitlements } from '@/lib/entitlements';
 import { useUsage } from '@/lib/usage';
 
 export default function BillingSettingsPage() {
   const { entitlements, isLoading: entitlementsLoading } = useEntitlements();
   const { usage, isLoading: usageLoading } = useUsage();
+  const { user } = useAuth();
+  const { company } = useCompany();
+
+  // A company with no Razorpay subscription on file yet (still on trial,
+  // never completed checkout) gets the Subscribe flow instead of the
+  // upgrade/downgrade/cancel actions, which all assume a provider
+  // subscription already exists.
+  const { data: hasProviderSubscription, isLoading: subLoading } = useQuery({
+    queryKey: ['has-provider-subscription', company?.id],
+    queryFn: async () => {
+      if (!company) return false;
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('provider_subscription_id')
+        .eq('company_id', company.id)
+        .maybeSingle();
+      if (error) throw error;
+      return !!data?.provider_subscription_id;
+    },
+    enabled: !!company,
+  });
+
+  const { data: subscribePlanOptions = [] } = useQuery({
+    queryKey: ['subscribe-plan-options'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plans')
+        .select('slug, name')
+        .eq('is_public', true)
+        .eq('is_active', true)
+        .eq('is_custom', false)
+        .order('monthly_price_inr', { ascending: true, nullsFirst: false });
+      if (error) throw error;
+      return (data ?? []).map(p => ({ slug: p.slug, name: p.name }));
+    },
+    enabled: hasProviderSubscription === false,
+  });
 
   // Lower-priced public plans than the current one — request_plan_downgrade
   // (server-side) is the real enforcement of "must be a downgrade"; this
@@ -65,7 +105,7 @@ export default function BillingSettingsPage() {
     enabled: !!entitlements?.planSlug,
   });
 
-  if (entitlementsLoading || usageLoading) {
+  if (entitlementsLoading || usageLoading || subLoading) {
     return (
       <DashboardLayout title="Billing">
         <div className="space-y-4 p-6">
@@ -94,14 +134,29 @@ export default function BillingSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <SubscriptionActions
-              currentPlanName={entitlements?.planName ?? 'your current plan'}
-              planOptions={downgradeOptions}
-              upgradeOptions={upgradeOptions}
-              onChanged={() => window.location.reload()}
-            />
+            {hasProviderSubscription ? (
+              <SubscriptionActions
+                currentPlanName={entitlements?.planName ?? 'your current plan'}
+                planOptions={downgradeOptions}
+                upgradeOptions={upgradeOptions}
+                onChanged={() => window.location.reload()}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                You're on a trial with no active subscription yet — subscribe below to keep access after your trial ends.
+              </p>
+            )}
           </CardContent>
         </Card>
+
+        {!hasProviderSubscription && subscribePlanOptions.length > 0 && (
+          <SubscribeCard
+            planOptions={subscribePlanOptions}
+            companyName={company?.name}
+            userEmail={user?.email}
+            onSubscribed={() => window.location.reload()}
+          />
+        )}
 
         <Card>
           <CardHeader>

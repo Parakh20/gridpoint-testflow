@@ -19,6 +19,7 @@ import {
   UserCircle,
   BarChart2,
   CreditCard,
+  Building2,
   ChevronsLeft,
   ChevronsRight,
   ChevronRight,
@@ -66,6 +67,7 @@ function getNavItems(role: string | null): NavGroup[] {
           heading: 'WORKSPACE',
           items: [
             { label: 'Billing', href: '/settings/billing', icon: <CreditCard size={18} /> },
+            { label: 'Workspace', href: '/settings/workspace', icon: <Building2 size={18} /> },
             { label: 'Profile', href: '/profile', icon: <UserCircle size={18} /> },
           ],
         },

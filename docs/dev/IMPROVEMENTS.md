@@ -15,19 +15,15 @@ Legend: 🔲 Pending | ⚠️ Partial
 
 ## Low Priority
 
-### 🔲 No email notification when task is assigned REWORK
-Engineers currently see rework tasks only via `NotificationBell` (realtime). There is no email notification.
-
-**Fix:** Add a Supabase DB trigger or Edge Function webhook that fires on `test_tasks.status = 'REWORK'` and sends an email to the assigned engineer via Resend/SendGrid.
+### ✅ No email notification when task is assigned REWORK
+Fixed `20260822000010`: `rework_notifications` outbox table + `trg_queue_rework_notification` trigger, drained every 15min by `notify-rework` Edge Function (`.github/workflows/notify-rework.yml`) via Resend. Needs `RESEND_API_KEY` + `RECONCILE_CRON_SECRET` set (already required for other cron functions).
 
 ---
 
 ## Critical (before first paying client / production-scale use)
 
-### 🔲 Frontend has 45 pre-existing TypeScript errors
-`npx tsc --noEmit -p tsconfig.app.json` from `frontend/` returns exit 2 with 45 errors. All stale-type issues — newer migrations added the `instruments` table, `audit_logs.table_name` column, and several RPCs (`clone_project`, `generate_project_equipment`, `offboard_user`, `user_workload_summary`), but `frontend/src/integrations/supabase/types.ts` was never regenerated. Build still succeeds because Vite doesn't enforce TS errors. Mobile is unaffected — `mobile/` tsc is clean.
-
-**Fix:** `supabase gen types typescript --project-id hxfilijpaocogsgjrjnq > frontend/src/integrations/supabase/types.ts`, then `npx tsc --noEmit -p tsconfig.app.json` to confirm zero errors. Add `npx tsc --noEmit` to `.github/workflows/frontend.yml` so this can't drift again.
+### ✅ Frontend TypeScript errors / no type-check CI gate
+Verified 2026-08-22: `npx tsc --noEmit -p tsconfig.app.json` is clean (0 errors) — types.ts has since been regenerated. `.github/workflows/frontend.yml` already runs `npx tsc --noEmit -p tsconfig.app.json` as a required step, so this can't silently drift again.
 
 ### 🔲 Mobile app has never run on a real device
 All `mobile/` work has been static-tested only (tsc, expo export). Never booted on a phone or simulator.
@@ -97,15 +93,13 @@ Each app has its own `integrations/supabase/types.ts`. Schema change = regenerat
 
 **Fix:** Generate once into `packages/shared/supabase-types.ts` and re-export. Or document a single regen command.
 
-### 🔲 Razorpay billing scaffolded, not wired
-`subscriptions` table + `upsert_subscription` RPC + `razorpay-webhook` Edge Function all exist. No account, plans, or checkout flow.
+### ⚠️ Razorpay checkout flow wired, no live account yet
+Fixed the code gap `20260822000013`/`manage-subscription`: a `subscribe` action (creates a Razorpay customer + subscription, returns `subscription_id` for client-side Checkout.js) plus `SubscribeCard` in `BillingSettingsPage` — a trial company with no `subscriptions.provider_subscription_id` on file now sees a plan picker + "Subscribe" button that opens Razorpay's checkout modal, instead of only upgrade/downgrade/cancel actions that assumed a subscription already existed. `vercel.json` CSP `script-src`/`connect-src`/`frame-src` updated for `checkout.razorpay.com`. Also fixed while touching this: `upsert_subscription`'s 10-arg overload (the one actually in use since `20260814000002`) never got `REVOKE FROM PUBLIC`/`GRANT TO service_role` — only the old 9-arg signature did — so it carried Postgres's default PUBLIC execute grant; closed in `20260822000013`.
 
-**Fix:** Create Razorpay account, plans, set `RAZORPAY_WEBHOOK_SECRET`, build the checkout flow in web (Settings → Billing tab in SuperadminDashboard). Out of mobile scope.
+**Still blocking a live launch (not code — needs your Razorpay dashboard):** a real Razorpay account, `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`/`RAZORPAY_WEBHOOK_SECRET` set via `supabase secrets set`, and Plans created in the Razorpay dashboard with their ids inserted into `plan_provider_mapping`. Untested against a live Razorpay sandbox — no Razorpay account available in this environment.
 
-### 🔲 No GDPR/data-export flow for individual users
-Users can be offboarded (work transferred) but can't request a copy of all personal data or request deletion. Matters at EU clients.
-
-**Fix:** `request_data_export(_user_id)` RPC emitting a signed download URL; `delete_user_data(_user_id)` flow gated behind SUPERADMIN + double-confirm.
+### ✅ No GDPR/data-export flow for individual users
+Fixed `20260822000011`: `request_data_export(_user_id)` RPC (returns a JSONB snapshot directly — no storage/signed-URL infra exists yet, so the admin panel offers it as a JSON download) and `erase_user_data(_user_id)` (anonymizes profile name/email + deactivates; requires no open assignments — run `offboard_user` first). Both SUPERADMIN + same-company gated. ⚠️ Not yet wired into the admin panel UI — RPCs only.
 
 ### 🔲 No staging environment
 Pushes to main go straight to prod. One bad migration = downtime.
@@ -144,15 +138,8 @@ Locked to portrait. Tablets in the field aren't unheard of.
 
 **Fix:** Drop `"orientation": "portrait"` from `app.json`; add layout breakpoints where useful (TaskList → TestForm side-by-side).
 
-### 🔲 Audit log retention policy
-`audit_logs` table grows unbounded. No archival.
-
-**Fix:** pg_cron job archiving rows older than 180 days to cold storage.
-
-### 🔲 Soft-deleted projects never hard-deleted
-`deleted_at` is set but rows live forever. Affects index size and storage cost over time.
-
-**Fix:** pg_cron job: hard-delete rows where `deleted_at < NOW() - INTERVAL '90 days'`.
+### ✅ Audit log retention policy / soft-deleted rows never hard-deleted
+Fixed `20260822000012`: no `pg_cron` extension in this project, so both jobs run via the same GH Actions-cron pattern as `reconcile-cancellations` — `retention-cleanup` Edge Function (`.github/workflows/retention-cleanup.yml`, nightly) calls `purge_old_soft_deleted()` (hard-deletes `projects`/`equipment_instances`/`test_records` rows with `deleted_at < NOW() - 90d`) and `archive_old_audit_logs()` (moves `audit_logs` rows older than 180 days into `audit_logs_archive`).
 
 ### 🔲 No load testing
 Edge Functions, RLS-heavy queries (`my_company_id` is `SECURITY DEFINER`), AI report path — none tested under concurrent load.

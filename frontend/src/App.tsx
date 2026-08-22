@@ -10,6 +10,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlatformLogin, PlatformDashboard } from "./pages/PlatformAdmin";
 import Marketing from "./pages/Marketing";
+import StartTrial from "./pages/StartTrial";
+import SignIn from "./pages/SignIn";
 import BlogIndex from "@/pages/blog/BlogIndex";
 import BlogPost from "@/pages/blog/BlogPost";
 import Index from "./pages/Index";
@@ -25,6 +27,7 @@ import ProjectDetail from "@/pages/projects/ProjectDetail";
 import EditProject from "@/pages/projects/EditProject";
 import Profile from "@/pages/Profile";
 import BillingSettingsPage from "@/pages/settings/BillingSettingsPage";
+import WorkspaceSettingsPage from "@/pages/settings/WorkspaceSettingsPage";
 import ReportsList from "@/pages/reports/ReportsList";
 import ReportProjectDetail from "@/pages/reports/ReportProjectDetail";
 import NotFound from "./pages/NotFound";
@@ -68,6 +71,8 @@ const App = () => (
               // Public-facing marketing site at optimustesting.com (apex)
               <Routes>
                 <Route path="/" element={<Marketing />} />
+                <Route path="/start-trial" element={<StartTrial />} />
+                <Route path="/sign-in" element={<SignIn />} />
                 <Route path="/blog" element={<BlogIndex />} />
                 <Route path="/blog/:slug" element={<BlogPost />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -86,6 +91,7 @@ const App = () => (
                 <Route path="/projects/:id/edit" element={<ProtectedRoute requiredRole={['GM', 'SUPERADMIN']}><EditProject /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/settings/billing" element={<ProtectedRoute requiredRole="SUPERADMIN"><BillingSettingsPage /></ProtectedRoute>} />
+                <Route path="/settings/workspace" element={<ProtectedRoute requiredRole="SUPERADMIN"><WorkspaceSettingsPage /></ProtectedRoute>} />
                 <Route path="/supervisor" element={<ProtectedRoute requiredRole="SUPERVISOR"><SupervisorDashboard /></ProtectedRoute>} />
                 <Route path="/engineer" element={<ProtectedRoute requiredRole="ENGINEER"><EngineerDashboard /></ProtectedRoute>} />
                 <Route path="/engineer/projects/:id" element={<ProtectedRoute requiredRole="ENGINEER"><EngineerProjectDetail /></ProtectedRoute>} />
