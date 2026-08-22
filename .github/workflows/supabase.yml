@@ -11,10 +11,57 @@ on:
       - '.github/workflows/supabase.yml'
 
 jobs:
+  # ── Billing/webhook integration tests (Deno, live local stack) ──────────────
+  test-billing-functions:
+    name: Test billing & webhook Edge Functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Write local-only test secrets
+        run: |
+          cat > supabase/.env <<'EOF'
+          RAZORPAY_WEBHOOK_SECRET=test-secret
+          RECONCILE_CRON_SECRET=test-cron-secret
+          EOF
+
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Run Deno integration tests
+        working-directory: supabase/functions
+        env:
+          SUPABASE_URL: http://127.0.0.1:54321
+          RAZORPAY_WEBHOOK_SECRET: test-secret
+          RECONCILE_CRON_SECRET: test-cron-secret
+        run: |
+          SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o json | jq -r '.SERVICE_ROLE_KEY') \
+            deno test --allow-net --allow-env \
+              _shared/entitlements.test.ts \
+              razorpay-webhook/index.test.ts \
+              reconcile-cancellations/index.test.ts
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop
+
   # ── Edge functions deploy (runs AFTER migrations so schema is up to date) ────
   deploy-functions:
     name: Deploy edge functions
-    needs: [run-migrations]
+    needs: [run-migrations, test-billing-functions]
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
