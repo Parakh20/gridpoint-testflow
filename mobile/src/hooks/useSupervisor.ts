@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { sortPendingReviewsByProject } from '@testflow/shared';
 
 export type SupProject = {
   id: string;
@@ -71,20 +72,22 @@ export function usePendingReviews(userId: string | null) {
         .eq('status', 'SUBMITTED');
       if (error) throw error;
 
-      return (tasks ?? []).map((t: any) => {
-        const inst = instanceMap[t.equipment_instance_id] ?? { label: '—', type: '', projectId: '' };
-        return {
-          id: t.id,
-          status: t.status,
-          instanceLabel: inst.label,
-          equipmentType: inst.type,
-          testName: t.test_template?.test_name ?? '—',
-          testCode: t.test_template?.test_code ?? '—',
-          projectNumber: projectMap[inst.projectId] ?? '—',
-          projectId: inst.projectId,
-          rework_reason: t.rework_reason ?? null,
-        } as PendingReview;
-      });
+      return sortPendingReviewsByProject(
+        (tasks ?? []).map((t: any) => {
+          const inst = instanceMap[t.equipment_instance_id] ?? { label: '—', type: '', projectId: '' };
+          return {
+            id: t.id,
+            status: t.status,
+            instanceLabel: inst.label,
+            equipmentType: inst.type,
+            testName: t.test_template?.test_name ?? '—',
+            testCode: t.test_template?.test_code ?? '—',
+            projectNumber: projectMap[inst.projectId] ?? '—',
+            projectId: inst.projectId,
+            rework_reason: t.rework_reason ?? null,
+          } as PendingReview;
+        })
+      );
     },
     enabled: Boolean(userId),
   });
