@@ -116,3 +116,28 @@ Deno.test('getInvoices returns an empty list when the provider omits items', asy
     restore();
   }
 });
+
+Deno.test('getSubscription surfaces the customer id the webhook payload omits', async () => {
+  const { restore } = stubFetch({
+    id: 'sub_1', status: 'active', current_start: 1_700_000_000, current_end: 1_702_000_000,
+    customer_id: 'cust_9',
+  });
+  try {
+    const sub = await provider().getSubscription('sub_1');
+    assertEquals(sub.providerCustomerId, 'cust_9');
+    assertEquals(sub.status, 'active');
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('getSubscription reports a missing customer id as null, not undefined', async () => {
+  const { restore } = stubFetch({
+    id: 'sub_1', status: 'active', current_start: null, current_end: null,
+  });
+  try {
+    assertEquals((await provider().getSubscription('sub_1')).providerCustomerId, null);
+  } finally {
+    restore();
+  }
+});

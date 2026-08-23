@@ -470,17 +470,15 @@ Deno.serve(async (req) => {
         return json({ error: 'Only a SUPERADMIN can view billing invoices' }, 403);
       }
 
-      // provider_customer_id is written by razorpay-webhook on
-      // subscription.authenticated/activated — a company still on trial (or
-      // mid-abandoned-checkout) has no customer at the provider yet, so an
-      // empty list is the correct answer, not an error.
       const { data: sub } = await adminClient
         .from('subscriptions')
-        .select('provider_customer_id')
+        .select('provider_customer_id, provider_subscription_id')
         .eq('company_id', callerProfile.company_id)
         .maybeSingle();
 
-      if (!sub?.provider_customer_id) return json({ invoices: [] });
+      // No subscription at the provider at all (still on trial, or an
+      // abandoned checkout): an empty list is the correct answer, not an error.
+      if (!sub?.provider_subscription_id) return json({ invoices: [] });
 
       const keyId = Deno.env.get('RAZORPAY_KEY_ID');
       const keySecret = Deno.env.get('RAZORPAY_KEY_SECRET');
@@ -489,9 +487,40 @@ Deno.serve(async (req) => {
         return json({ error: 'Billing provider not configured' }, 500);
       }
 
+      const billingProvider = new RazorpayBillingProvider(keyId, keySecret);
+
       try {
-        const invoices = await new RazorpayBillingProvider(keyId, keySecret)
-          .getInvoices(sub.provider_customer_id);
+        // Lazy backfill. Razorpay's subscription.* webhooks carry
+        // customer_id: null, so provider_customer_id can be missing on a
+        // perfectly healthy paid subscription (confirmed live on test1 /
+        // sub_TT8Tw2ktlofRVj). Migration 20260823000002 stops future webhooks
+        // erasing it, but rows that already lost it — and any row whose
+        // customer id no webhook ever delivered — still need recovering, and
+        // the REST read does return it. Persisted so this costs one extra
+        // provider call once per company, not on every billing-page load.
+        let providerCustomerId = sub.provider_customer_id as string | null;
+        if (!providerCustomerId) {
+          const providerSub = await billingProvider.getSubscription(sub.provider_subscription_id);
+          providerCustomerId = providerSub.providerCustomerId ?? null;
+
+          if (providerCustomerId) {
+            const { error: backfillError } = await adminClient
+              .from('subscriptions')
+              .update({ provider_customer_id: providerCustomerId })
+              .eq('company_id', callerProfile.company_id);
+            // A failed backfill is not fatal — it only costs the next caller
+            // the same extra read, so serve the invoices anyway.
+            if (backfillError) {
+              logEdgeError('manage-subscription', 'payment_failure', backfillError);
+            }
+          }
+        }
+
+        // The provider genuinely has no customer for this subscription —
+        // nothing to list, and nothing worth erroring over.
+        if (!providerCustomerId) return json({ invoices: [] });
+
+        const invoices = await billingProvider.getInvoices(providerCustomerId);
         return json({ invoices });
       } catch (err: unknown) {
         logEdgeError('manage-subscription', 'payment_failure', err);

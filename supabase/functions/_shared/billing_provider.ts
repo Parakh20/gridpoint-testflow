@@ -11,6 +11,13 @@ export interface BillingCustomer {
 
 export interface BillingSubscription {
   providerSubscriptionId: string;
+  /**
+   * Present on REST reads (GET /subscriptions/:id) but NOT on Razorpay's
+   * subscription.* webhook payloads, where the entity carries
+   * customer_id: null — which is why subscriptions.provider_customer_id has
+   * to be backfilled from a read rather than trusted from a webhook.
+   */
+  providerCustomerId?: string | null;
   status: string;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
@@ -166,9 +173,11 @@ export class RazorpayBillingProvider implements BillingProvider {
   async getSubscription(providerSubscriptionId: string): Promise<BillingSubscription> {
     const data = await this.request<{
       id: string; status: string; current_start: number | null; current_end: number | null;
+      customer_id?: string | null;
     }>(`/subscriptions/${providerSubscriptionId}`);
     return {
       providerSubscriptionId: data.id,
+      providerCustomerId: data.customer_id ?? null,
       status: data.status,
       currentPeriodStart: data.current_start ? new Date(data.current_start * 1000).toISOString() : null,
       currentPeriodEnd: data.current_end ? new Date(data.current_end * 1000).toISOString() : null,
