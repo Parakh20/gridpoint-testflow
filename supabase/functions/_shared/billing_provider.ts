@@ -18,10 +18,17 @@ export interface BillingSubscription {
 
 export interface BillingInvoice {
   providerInvoiceId: string;
+  /** Human-facing invoice number (Razorpay `invoice_number`), when the provider assigned one. */
+  invoiceNumber: string | null;
+  /** Major currency units (rupees), converted from the provider's minor units. */
   amount: number;
   currency: string;
   status: string;
-  issuedAt: string;
+  /** Null for draft invoices, which the provider has not issued yet. */
+  issuedAt: string | null;
+  paidAt: string | null;
+  /** Provider-hosted invoice page — the download/receipt link shown to the customer. */
+  shortUrl: string | null;
 }
 
 export interface BillingProvider {
@@ -46,7 +53,7 @@ export interface BillingProvider {
     scheduleChangeAt?: 'now' | 'cycle_end'
   ): Promise<BillingSubscription>;
   getSubscription(providerSubscriptionId: string): Promise<BillingSubscription>;
-  getInvoices(providerCustomerId: string): Promise<BillingInvoice[]>;
+  getInvoices(providerCustomerId: string, limit?: number): Promise<BillingInvoice[]>;
   verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean>;
 }
 
@@ -168,17 +175,40 @@ export class RazorpayBillingProvider implements BillingProvider {
     };
   }
 
-  async getInvoices(providerCustomerId: string): Promise<BillingInvoice[]> {
+  async getInvoices(providerCustomerId: string, limit = 24): Promise<BillingInvoice[]> {
+    // Razorpay's list endpoint defaults to 10 items and caps `count` at 100.
+    // Without an explicit count a customer past their tenth billing cycle
+    // would silently lose the oldest invoices from the history page.
+    const count = Math.min(Math.max(limit, 1), 100);
     const data = await this.request<{
-      items: Array<{ id: string; amount: number; currency: string; status: string; issued_at: number }>;
-    }>(`/invoices?customer_id=${encodeURIComponent(providerCustomerId)}`);
-    return data.items.map(item => ({
-      providerInvoiceId: item.id,
-      amount: item.amount / 100, // Razorpay amounts are in paise
-      currency: item.currency,
-      status: item.status,
-      issuedAt: new Date(item.issued_at * 1000).toISOString(),
-    }));
+      items: Array<{
+        id: string;
+        invoice_number: string | null;
+        amount: number;
+        currency: string;
+        status: string;
+        issued_at: number | null;
+        paid_at: number | null;
+        short_url: string | null;
+      }>;
+    }>(`/invoices?customer_id=${encodeURIComponent(providerCustomerId)}&count=${count}`);
+    const toIso = (epochSeconds: number | null | undefined) =>
+      epochSeconds ? new Date(epochSeconds * 1000).toISOString() : null;
+    return (data.items ?? [])
+      .map(item => ({
+        providerInvoiceId: item.id,
+        invoiceNumber: item.invoice_number ?? null,
+        amount: item.amount / 100, // Razorpay amounts are in paise
+        currency: item.currency,
+        status: item.status,
+        issuedAt: toIso(item.issued_at),
+        paidAt: toIso(item.paid_at),
+        shortUrl: item.short_url ?? null,
+      }))
+      // Razorpay returns newest-first already, but it does not guarantee it
+      // across filters — sort explicitly so the UI ordering is deterministic.
+      // Draft invoices (no issued_at) sort last.
+      .sort((a, b) => (b.issuedAt ?? '').localeCompare(a.issuedAt ?? ''));
   }
 
   async verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean> {

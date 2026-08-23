@@ -31,11 +31,23 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    let body: Record<string, unknown> | null = null;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid JSON body' }, 400);
+    }
+    const action = body?.action;
+
     // Rate limit: 10 subscription-management calls per user per hour —
     // this is a low-frequency admin action, tighter than create-user's 30/hr.
+    // `invoices` is read-only and gets its own, looser bucket: it is fetched
+    // on every billing-page load, so sharing the mutation bucket would let
+    // ordinary page views exhaust the quota that cancel/upgrade needs.
+    const isReadOnly = action === 'invoices';
     const rl = await enforceRateLimit(adminClient, req, {
-      key: `manage-subscription:${caller.id}`,
-      limit: 10,
+      key: isReadOnly ? `manage-subscription:invoices:${caller.id}` : `manage-subscription:${caller.id}`,
+      limit: isReadOnly ? 60 : 10,
       windowMinutes: 60,
     }, cors);
     if (!rl.ok) return rl.response;
@@ -47,9 +59,6 @@ Deno.serve(async (req) => {
       .single();
 
     if (!callerProfile?.company_id) return json({ error: 'Caller has no company assigned' }, 400);
-
-    const body = await req.json();
-    const action = body?.action;
 
     if (action === 'cancel') {
       const { data, error } = await callerClient.rpc('request_subscription_cancellation', {
@@ -445,6 +454,48 @@ Deno.serve(async (req) => {
         logEdgeError('manage-subscription', 'payment_failure', err);
         const message = err instanceof Error ? err.message : 'Failed to start checkout with billing provider';
         return json({ error: message }, 502);
+      }
+    }
+
+    if (action === 'invoices') {
+      // Billing data is SUPERADMIN-only. The /settings/billing route already
+      // gates on that client-side, but that is not a security boundary —
+      // this function is callable directly with any signed-in user's JWT.
+      const { data: callerRoles } = await adminClient
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', caller.id);
+
+      if (!(callerRoles ?? []).some(r => r.role === 'SUPERADMIN')) {
+        return json({ error: 'Only a SUPERADMIN can view billing invoices' }, 403);
+      }
+
+      // provider_customer_id is written by razorpay-webhook on
+      // subscription.authenticated/activated — a company still on trial (or
+      // mid-abandoned-checkout) has no customer at the provider yet, so an
+      // empty list is the correct answer, not an error.
+      const { data: sub } = await adminClient
+        .from('subscriptions')
+        .select('provider_customer_id')
+        .eq('company_id', callerProfile.company_id)
+        .maybeSingle();
+
+      if (!sub?.provider_customer_id) return json({ invoices: [] });
+
+      const keyId = Deno.env.get('RAZORPAY_KEY_ID');
+      const keySecret = Deno.env.get('RAZORPAY_KEY_SECRET');
+      if (!keyId || !keySecret) {
+        logEdgeError('manage-subscription', 'payment_failure', new Error('Razorpay credentials not configured'));
+        return json({ error: 'Billing provider not configured' }, 500);
+      }
+
+      try {
+        const invoices = await new RazorpayBillingProvider(keyId, keySecret)
+          .getInvoices(sub.provider_customer_id);
+        return json({ invoices });
+      } catch (err: unknown) {
+        logEdgeError('manage-subscription', 'payment_failure', err);
+        return json({ error: 'Could not load invoices from the billing provider' }, 502);
       }
     }
 

@@ -98,6 +98,7 @@ jobs:
           deno test --allow-net --allow-env \
             _shared/entitlements.test.ts \
             _shared/billing_provider.test.ts \
+            _shared/billing_provider_invoices.test.ts \
             razorpay-webhook/index.test.ts \
             reconcile-cancellations/index.test.ts
 

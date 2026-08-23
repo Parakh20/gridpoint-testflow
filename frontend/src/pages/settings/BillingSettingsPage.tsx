@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubscriptionActions } from '@/components/SubscriptionActions';
 import { SubscribeCard } from '@/components/SubscribeCard';
+import { InvoiceHistoryCard } from '@/components/InvoiceHistoryCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -199,12 +200,7 @@ export default function BillingSettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Invoices</CardTitle>
-            <CardDescription>Invoice history is coming soon.</CardDescription>
-          </CardHeader>
-        </Card>
+        <InvoiceHistoryCard />
       </div>
     </DashboardLayout>
   );
