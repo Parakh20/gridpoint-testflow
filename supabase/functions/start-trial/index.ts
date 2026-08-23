@@ -14,6 +14,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { enforceRateLimit } from '../_shared/rate_limit.ts';
 import { logEdgeError } from '../_shared/monitoring.ts';
+import { resendFrom } from '../_shared/email.ts';
 
 function slugify(name: string): string {
   return name
@@ -192,7 +193,7 @@ Deno.serve(async (req) => {
           method: 'POST',
           headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            from: 'TestFlow <onboarding@resend.dev>',
+            from: resendFrom(),
             to: [email.trim()],
             subject: 'Confirm your TestFlow workspace',
             html: `

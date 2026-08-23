@@ -4,6 +4,7 @@
 // a user — gated by X-Cron-Secret, same pattern as reconcile-cancellations.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { logEdgeError } from '../_shared/monitoring.ts';
+import { resendFrom } from '../_shared/email.ts';
 
 function tokensMatch(provided: string, expected: string): boolean {
   if (provided.length !== expected.length) return false;
@@ -64,7 +65,7 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'TestFlow <onboarding@resend.dev>',
+          from: resendFrom(),
           to: [row.engineer_email],
           subject: `Rework requested — ${row.equipment_label}`,
           html,
