@@ -38,6 +38,12 @@ export interface BillingInvoice {
   shortUrl: string | null;
 }
 
+export interface InvoiceFilter {
+  subscriptionId?: string | null;
+  customerId?: string | null;
+  limit?: number;
+}
+
 export interface BillingProvider {
   createCustomer(params: { name: string; email: string; companyId: string }): Promise<BillingCustomer>;
   createSubscription(params: {
@@ -60,7 +66,13 @@ export interface BillingProvider {
     scheduleChangeAt?: 'now' | 'cycle_end'
   ): Promise<BillingSubscription>;
   getSubscription(providerSubscriptionId: string): Promise<BillingSubscription>;
-  getInvoices(providerCustomerId: string, limit?: number): Promise<BillingInvoice[]>;
+  /**
+   * Razorpay's invoice list can be filtered by subscription or by customer.
+   * Prefer `subscriptionId`: subscriptions we create are not reliably linked
+   * to a customer at the provider, so `customerId` can be null on a perfectly
+   * healthy paid subscription — see getInvoices' implementation note.
+   */
+  getInvoices(filter: InvoiceFilter): Promise<BillingInvoice[]>;
   verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean>;
 }
 
@@ -184,11 +196,28 @@ export class RazorpayBillingProvider implements BillingProvider {
     };
   }
 
-  async getInvoices(providerCustomerId: string, limit = 24): Promise<BillingInvoice[]> {
+  async getInvoices(filter: InvoiceFilter): Promise<BillingInvoice[]> {
+    // Filter by subscription first. Razorpay only links an invoice to a
+    // customer when the subscription itself was created with a customer_id,
+    // and ours were not — verified live on 2026-08-23 against
+    // sub_TT8Tw2ktlofRVj: the subscription is active with paid_count 1, its
+    // one invoice (inv_TT8TwiHBM5ApqG, paid, with a working short_url) exists
+    // and is listable by subscription_id, yet BOTH carry customer_id null.
+    // A customer-keyed query returns nothing for them, so customerId is only
+    // a fallback for invoices with no subscription (one-off fees).
+    const params = new URLSearchParams();
+    if (filter.subscriptionId) {
+      params.set('subscription_id', filter.subscriptionId);
+    } else if (filter.customerId) {
+      params.set('customer_id', filter.customerId);
+    } else {
+      return [];
+    }
     // Razorpay's list endpoint defaults to 10 items and caps `count` at 100.
     // Without an explicit count a customer past their tenth billing cycle
     // would silently lose the oldest invoices from the history page.
-    const count = Math.min(Math.max(limit, 1), 100);
+    params.set('count', String(Math.min(Math.max(filter.limit ?? 24, 1), 100)));
+
     const data = await this.request<{
       items: Array<{
         id: string;
@@ -200,7 +229,7 @@ export class RazorpayBillingProvider implements BillingProvider {
         paid_at: number | null;
         short_url: string | null;
       }>;
-    }>(`/invoices?customer_id=${encodeURIComponent(providerCustomerId)}&count=${count}`);
+    }>(`/invoices?${params.toString()}`);
     const toIso = (epochSeconds: number | null | undefined) =>
       epochSeconds ? new Date(epochSeconds * 1000).toISOString() : null;
     return (data.items ?? [])

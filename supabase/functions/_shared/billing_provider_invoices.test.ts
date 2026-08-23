@@ -34,7 +34,7 @@ Deno.test('getInvoices maps paise to rupees and epoch seconds to ISO', async () 
     }],
   });
   try {
-    const [invoice] = await provider().getInvoices('cust_1');
+    const [invoice] = await provider().getInvoices({ subscriptionId: 'sub_1' });
     assertEquals(invoice.providerInvoiceId, 'inv_1');
     assertEquals(invoice.invoiceNumber, 'INV-0001');
     assertEquals(invoice.amount, 2499);
@@ -56,7 +56,7 @@ Deno.test('getInvoices tolerates draft invoices with null dates and no short_url
     }],
   });
   try {
-    const [invoice] = await provider().getInvoices('cust_1');
+    const [invoice] = await provider().getInvoices({ subscriptionId: 'sub_1' });
     assertEquals(invoice.issuedAt, null);
     assertEquals(invoice.paidAt, null);
     assertEquals(invoice.invoiceNumber, null);
@@ -75,22 +75,57 @@ Deno.test('getInvoices sorts newest first and puts drafts last', async () => {
     ],
   });
   try {
-    const ids = (await provider().getInvoices('cust_1')).map(i => i.providerInvoiceId);
+    const ids = (await provider().getInvoices({ subscriptionId: 'sub_1' })).map(i => i.providerInvoiceId);
     assertEquals(ids, ['new', 'old', 'draft']);
   } finally {
     restore();
   }
 });
 
-Deno.test('getInvoices requests an explicit count and escapes the customer id', async () => {
+Deno.test('getInvoices filters by subscription and escapes the id', async () => {
   const { urls, restore } = stubFetch({ items: [] });
   try {
-    await provider().getInvoices('cust/one', 50);
+    await provider().getInvoices({ subscriptionId: 'sub/one', limit: 50 });
     assertEquals(urls.length, 1);
     assertEquals(
       urls[0],
-      'https://api.razorpay.com/v1/invoices?customer_id=cust%2Fone&count=50',
+      'https://api.razorpay.com/v1/invoices?subscription_id=sub%2Fone&count=50',
     );
+  } finally {
+    restore();
+  }
+});
+
+// Regression guard for the live failure this suite originally missed:
+// sub_TT8Tw2ktlofRVj is an active, paid subscription whose invoice exists but
+// whose customer_id is null at Razorpay. Keying the query on the customer
+// returned nothing; keying it on the subscription returns the invoice.
+Deno.test('getInvoices prefers subscription over customer when both are given', async () => {
+  const { urls, restore } = stubFetch({ items: [] });
+  try {
+    await provider().getInvoices({ subscriptionId: 'sub_1', customerId: 'cust_1' });
+    assertEquals(urls[0].includes('subscription_id=sub_1'), true);
+    assertEquals(urls[0].includes('customer_id'), false);
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('getInvoices falls back to the customer filter for one-off invoices', async () => {
+  const { urls, restore } = stubFetch({ items: [] });
+  try {
+    await provider().getInvoices({ customerId: 'cust_1' });
+    assertEquals(urls[0].includes('customer_id=cust_1'), true);
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('getInvoices makes no provider call when neither filter is set', async () => {
+  const { urls, restore } = stubFetch({ items: [] });
+  try {
+    assertEquals(await provider().getInvoices({}), []);
+    assertEquals(urls.length, 0);
   } finally {
     restore();
   }
@@ -99,8 +134,8 @@ Deno.test('getInvoices requests an explicit count and escapes the customer id', 
 Deno.test('getInvoices clamps the count to Razorpay\'s 1..100 range', async () => {
   const { urls, restore } = stubFetch({ items: [] });
   try {
-    await provider().getInvoices('cust_1', 5000);
-    await provider().getInvoices('cust_1', 0);
+    await provider().getInvoices({ subscriptionId: 'sub_1', limit: 5000 });
+    await provider().getInvoices({ subscriptionId: 'sub_1', limit: 0 });
     assertEquals(urls[0].endsWith('count=100'), true);
     assertEquals(urls[1].endsWith('count=1'), true);
   } finally {
@@ -111,7 +146,7 @@ Deno.test('getInvoices clamps the count to Razorpay\'s 1..100 range', async () =
 Deno.test('getInvoices returns an empty list when the provider omits items', async () => {
   const { restore } = stubFetch({});
   try {
-    assertEquals(await provider().getInvoices('cust_1'), []);
+    assertEquals(await provider().getInvoices({ subscriptionId: 'sub_1' }), []);
   } finally {
     restore();
   }

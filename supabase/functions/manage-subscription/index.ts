@@ -487,40 +487,17 @@ Deno.serve(async (req) => {
         return json({ error: 'Billing provider not configured' }, 500);
       }
 
-      const billingProvider = new RazorpayBillingProvider(keyId, keySecret);
-
       try {
-        // Lazy backfill. Razorpay's subscription.* webhooks carry
-        // customer_id: null, so provider_customer_id can be missing on a
-        // perfectly healthy paid subscription (confirmed live on test1 /
-        // sub_TT8Tw2ktlofRVj). Migration 20260823000002 stops future webhooks
-        // erasing it, but rows that already lost it — and any row whose
-        // customer id no webhook ever delivered — still need recovering, and
-        // the REST read does return it. Persisted so this costs one extra
-        // provider call once per company, not on every billing-page load.
-        let providerCustomerId = sub.provider_customer_id as string | null;
-        if (!providerCustomerId) {
-          const providerSub = await billingProvider.getSubscription(sub.provider_subscription_id);
-          providerCustomerId = providerSub.providerCustomerId ?? null;
-
-          if (providerCustomerId) {
-            const { error: backfillError } = await adminClient
-              .from('subscriptions')
-              .update({ provider_customer_id: providerCustomerId })
-              .eq('company_id', callerProfile.company_id);
-            // A failed backfill is not fatal — it only costs the next caller
-            // the same extra read, so serve the invoices anyway.
-            if (backfillError) {
-              logEdgeError('manage-subscription', 'payment_failure', backfillError);
-            }
-          }
-        }
-
-        // The provider genuinely has no customer for this subscription —
-        // nothing to list, and nothing worth erroring over.
-        if (!providerCustomerId) return json({ invoices: [] });
-
-        const invoices = await billingProvider.getInvoices(providerCustomerId);
+        // Keyed on the subscription, not the customer: Razorpay only links an
+        // invoice to a customer when the subscription was created with a
+        // customer_id, and ours are not — sub_TT8Tw2ktlofRVj is active and
+        // paid yet both it and its invoice carry customer_id null, so a
+        // customer-keyed query returned an empty list for a tenant that
+        // demonstrably has an invoice. provider_customer_id stays in the
+        // table (and migration 20260823000004 stops webhooks erasing it) for
+        // one-off, non-subscription invoices.
+        const invoices = await new RazorpayBillingProvider(keyId, keySecret)
+          .getInvoices({ subscriptionId: sub.provider_subscription_id });
         return json({ invoices });
       } catch (err: unknown) {
         logEdgeError('manage-subscription', 'payment_failure', err);
