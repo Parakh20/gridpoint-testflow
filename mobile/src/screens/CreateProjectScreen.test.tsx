@@ -23,7 +23,16 @@ const mockToast = {
 jest.mock('@/components/Toast', () => ({ useToast: () => mockToast }));
 
 const mockInsert = jest.fn<(...a: any[]) => any>();
-jest.mock('@/lib/supabase', () => ({ supabase: { from: () => ({ insert: (...a: any[]) => mockInsert(...a) }) } }));
+// check_can_create_project is the plan-gate pre-flight the screen runs before
+// inserting; default it to "allowed" so the existing cases exercise the insert
+// path, and override it per-test for the limit-reached case.
+const mockRpc = jest.fn<(...a: any[]) => any>();
+jest.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: () => ({ insert: (...a: any[]) => mockInsert(...a) }),
+    rpc: (...a: any[]) => mockRpc(...a),
+  },
+}));
 
 // DateField renders a real @react-native-community/datetimepicker only
 // while its internal `open` state is true (after the field is pressed).
@@ -68,6 +77,7 @@ function fillRequiredFields() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRpc.mockResolvedValue({ data: { allowed: true }, error: null });
 });
 
 describe('CreateProjectScreen', () => {
@@ -115,6 +125,28 @@ describe('CreateProjectScreen', () => {
     fireEvent.press(screen.getByText('Create Project'));
 
     await waitFor(() => expect(screen.getByText('Project number already exists')).toBeTruthy());
+    expect(mockGoBack).not.toHaveBeenCalled();
+  });
+
+  it('blocks creation with a plan-limit message when the company is at its project cap', async () => {
+    // Arrange
+    mockRpc.mockResolvedValue({
+      data: { allowed: false, current: 5, limit: 5, required_plan: 'business' },
+      error: null,
+    });
+    renderScreen();
+    fillRequiredFields();
+
+    // Act
+    fireEvent.press(screen.getByText('Create Project'));
+
+    // Assert
+    await waitFor(() =>
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Active project limit reached (5 of 5 used). Ask your administrator to upgrade to the business plan.',
+      ),
+    );
+    expect(mockInsert).not.toHaveBeenCalled();
     expect(mockGoBack).not.toHaveBeenCalled();
   });
 });

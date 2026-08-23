@@ -174,6 +174,17 @@ All share CORS via `_shared/cors.ts`. New domains → add to `ALLOWED_ORIGINS`. 
 - Data queries go via `platform-admin-data` Edge Function (service role).
 - Magic links: Supabase ignores `redirectTo` in `admin.generateLink()` — must rewrite `action_link?redirect_to=...` after generation. Requires `https://*.optimustesting.com/**` in Supabase Auth → URL Configuration.
 
+## Mobile Entitlements & Billing Awareness
+
+Mobile has no billing surface (billing is SUPERADMIN-only and lives on the web app), but it does surface billing *state* so field users aren't blocked by an unexplained RLS rejection:
+
+- `mobile/src/lib/entitlements.ts` — `useEntitlements()` / `useFeatureEntitlement()`, mirroring `frontend/src/lib/entitlements.ts` against the same `get_company_entitlements` RPC. The only difference is where the company id comes from: web reads `CompanyContext` (host-derived), mobile reads `profile.company_id` (mobile has no host).
+- `mobile/src/lib/trialStatus.ts` — pure `trialBannerState()` holding the branching that web keeps inline in `TrialBanner.tsx`; unit-tested, same treatment as `taskProgress.ts`. Keep it in lock-step with the web component's thresholds (7-day window, 3-day escalation).
+- `mobile/src/components/TrialBanner.tsx` — renders that state as a bottom strip alongside `NetworkBanner`/`RealtimeStatusBanner` in `App.tsx`. No "Manage billing" CTA by design; it points the user at their administrator.
+- `mobile/src/lib/planLimits.ts` — `planLimitMessage()` / `isPlanGateRlsError()`. `CreateProjectScreen` pre-flights `check_can_create_project` before inserting, so a GM at the plan cap gets a real reason instead of the bare "You don't have permission" that `explainSupabaseError` produces for the `projects` INSERT policy's RLS rejection. Web does the same in `pages/projects/NewProject.tsx` but escalates to `UpgradeModal`.
+
+Mobile deliberately does NOT mirror two web changes: the cookie-backed cross-subdomain session storage (React Native has no shared-cookie concept — mobile stays on SecureStore, changing it would sign every engineer out) and the company-mismatch guard removal (mobile never had one; it has always resolved company from `profiles.company_id`, not a hostname).
+
 ## Mobile Deployment (EAS)
 
 The mobile app uses EAS (Expo Application Services) for builds and OTA updates.

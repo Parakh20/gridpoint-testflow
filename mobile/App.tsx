@@ -9,6 +9,7 @@ import { ToastProvider } from '@/components/Toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { NetworkBanner } from '@/components/NetworkBanner';
 import { RealtimeStatusBanner } from '@/components/RealtimeStatusBanner';
+import { TrialBanner } from '@/components/TrialBanner';
 import { queryClient } from '@/lib/queryClient';
 import RootNavigator from '@/navigation/RootNavigator';
 import { useAppForegroundRefetch } from '@/lib/appLifecycle';
@@ -26,6 +27,7 @@ function AppShell() {
       <RootNavigator />
       <NetworkBanner />
       <RealtimeStatusBanner />
+      <TrialBanner />
     </View>
   );
 }

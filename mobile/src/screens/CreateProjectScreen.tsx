@@ -16,6 +16,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useCreateProject } from '@/hooks/useProjectMutations';
 import { useToast } from '@/components/Toast';
 import { explainSupabaseError } from '@/lib/errors';
+import { supabase } from '@/lib/supabase';
+import { isPlanGateRlsError, planLimitMessage, type CanCreateProjectStatus } from '@/lib/planLimits';
 import { theme } from '@/theme';
 import { isValidDate } from '@/lib/dateInput';
 import { DateField } from '@/components/DateField';
@@ -58,6 +60,16 @@ export default function CreateProjectScreen() {
       return;
     }
     try {
+      // Pre-flight the plan gate so a blocked GM gets a real reason instead of
+      // the bare "permission denied" the projects INSERT policy would produce.
+      // Mirrors frontend/src/pages/projects/NewProject.tsx.
+      const { data: statusRaw, error: statusError } = await supabase.rpc('check_can_create_project');
+      const status = statusRaw as CanCreateProjectStatus | null;
+      if (!statusError && status && !status.allowed) {
+        toast.error(planLimitMessage(status));
+        return;
+      }
+
       await mutation.mutateAsync({
         project_number: projectNumber.trim(),
         site_name: siteName.trim(),
@@ -73,6 +85,10 @@ export default function CreateProjectScreen() {
     } catch (err: any) {
       if (err?.code === '23505') {
         setErrors({ projectNumber: 'Project number already exists' });
+      } else if (isPlanGateRlsError(err)) {
+        // Only reachable if the pre-check above raced another creation; the
+        // real usage count isn't known here, so the message stays generic.
+        toast.error(planLimitMessage(null));
       } else {
         toast.error(explainSupabaseError(err));
       }
