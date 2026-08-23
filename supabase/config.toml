@@ -1,7 +1,25 @@
 project_id = "srlsypemgnkpoamhmbrf"
 
+# Functions that authenticate themselves rather than relying on Supabase's
+# gateway JWT check. Each one below enforces its own gate in the handler:
+# an HMAC signature (razorpay-webhook) or a shared cron secret compared in
+# constant time (the rest). Leaving verify_jwt on would make them
+# unreachable — the caller is Razorpay or a GH Actions cron, neither of
+# which has a user JWT.
 [functions.razorpay-webhook]
 verify_jwt = false
 
 [functions.reconcile-cancellations]
+verify_jwt = false
+
+[functions.notify-rework]
+verify_jwt = false
+
+[functions.retention-cleanup]
+verify_jwt = false
+
+# Also reachable with a user JWT (a SUPERADMIN pressing "Check now"), which
+# the handler validates itself via auth.getUser() — so the gateway check is
+# redundant here and would block the cron path.
+[functions.verify-custom-domain]
 verify_jwt = false
