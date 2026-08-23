@@ -133,6 +133,15 @@ export class RazorpayBillingProvider implements BillingProvider {
       method: 'POST',
       body: JSON.stringify({
         plan_id: params.providerPlanId,
+        // Link the subscription to the customer we just created. Omitting
+        // this is what left sub_TT8Tw2ktlofRVj (and its invoice) with
+        // customer_id null at Razorpay — the caller created a customer, got
+        // an id back, and dropped it, so nothing tied the two together.
+        // Razorpay will not backfill this later and the field is immutable
+        // once the subscription exists, so subscriptions created before this
+        // fix stay unlinked forever; getInvoices keys on subscription_id
+        // precisely so that history still works for them.
+        customer_id: params.providerCustomerId,
         customer_notify: 1,
         quantity: params.seatCount,
         notes: { company_id: params.companyId },
