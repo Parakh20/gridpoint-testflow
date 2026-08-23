@@ -26,6 +26,7 @@ export const FEATURES = {
   SSO: 'sso',
   MULTIPLE_SITES: 'multiple_sites',
   AUDIT_TRAIL: 'audit_trail',
+  CUSTOM_DOMAIN: 'custom_domain',
 } as const;
 
 export type FeatureKey = (typeof FEATURES)[keyof typeof FEATURES];

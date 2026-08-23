@@ -30,31 +30,27 @@ import WorkspaceSettingsPage from "@/pages/settings/WorkspaceSettingsPage";
 import ReportsList from "@/pages/reports/ReportsList";
 import ReportProjectDetail from "@/pages/reports/ReportProjectDetail";
 import NotFound from "./pages/NotFound";
+import { isAdminHost, isMarketingHost } from "@/lib/appOrigin";
 
 const queryClient = new QueryClient();
 
-// Three host modes (single-domain architecture — every tenant shares one app
-// host; the company is resolved from the signed-in user's profile, not the
-// hostname. See CompanyContext):
-//   - `admin.optimustesting.com`             → platform admin (PlatformLogin + PlatformDashboard)
-//   - `optimustesting.com` / www             → public marketing site
-//   - `app.optimustesting.com`               → the tenant app, for ALL companies
-// Legacy per-company subdomains (`acme.optimustesting.com`) are redirected to
-// the app host by vercel.json, but are also treated as the app host here so a
-// stale bookmark that bypasses the redirect still lands somewhere usable.
+// Host modes. The company a user operates as always comes from their own
+// profile (see CompanyContext) — the host never selects the tenant, it only
+// brands the page. See lib/appOrigin for the host taxonomy.
+//   - `admin.optimustesting.com`   → platform admin
+//   - `optimustesting.com` / www   → public marketing site
+//   - everything else              → the tenant app. That covers the canonical
+//     `app.` host, a company subdomain alias (`acme.optimustesting.com`, which
+//     shares the session cookie with `app.`), and a customer's own domain on
+//     the premium custom_domain feature.
 //
-// localhost defaults to the app host (that's what you're normally developing);
+// localhost defaults to the app (that's what you're normally developing);
 // `?marketing` forces the marketing site, `?admin` the admin panel.
-const HOST = window.location.hostname;
 const FORCE_MARKETING = new URLSearchParams(window.location.search).has('marketing');
 const FORCE_ADMIN = new URLSearchParams(window.location.search).has('admin');
 
-const IS_ADMIN_HOST = FORCE_ADMIN || HOST === 'admin.optimustesting.com';
-const IS_MARKETING_HOST =
-  !IS_ADMIN_HOST &&
-  (FORCE_MARKETING ||
-    HOST === 'optimustesting.com' ||
-    HOST === 'www.optimustesting.com');
+const IS_ADMIN_HOST = FORCE_ADMIN || isAdminHost();
+const IS_MARKETING_HOST = !IS_ADMIN_HOST && (FORCE_MARKETING || isMarketingHost());
 
 const App = () => (
   <ErrorBoundary>
