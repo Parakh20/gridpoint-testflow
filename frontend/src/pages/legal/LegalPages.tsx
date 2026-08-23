@@ -8,18 +8,16 @@
 import { type ReactNode } from 'react';
 
 // ─────────────────────────────────────────────────────────────────────────
-// EDIT THESE BEFORE SUBMITTING TO RAZORPAY.
-// Deliberately left as obvious placeholders rather than invented values: a
-// wrong legal name, address or GSTIN on a published policy page is worse
-// than a blank one, and Razorpay rejects submissions where the business
-// name here doesn't match their records.
+// Sole proprietorship: the proprietor is the legal entity, so LEGAL_ENTITY is
+// the proprietor's name and must match the Razorpay account registration
+// exactly — Razorpay rejects submissions where the two differ.
 // ─────────────────────────────────────────────────────────────────────────
-const LEGAL_ENTITY = '[REGISTERED LEGAL ENTITY NAME]';
+const LEGAL_ENTITY = 'Parakh Sharma';
 const CONTACT_EMAIL = 'support@optimustesting.com';
-const CONTACT_PHONE = '[BUSINESS PHONE NUMBER]';
-const CONTACT_ADDRESS = '[REGISTERED BUSINESS ADDRESS]';
+const CONTACT_PHONE = '+91 94135 52887';
+const CONTACT_ADDRESS = 'Hostel 4, IIT Bombay, Powai, Mumbai 400076, Maharashtra, India';
 const LAST_UPDATED = '23 August 2026';
-const GOVERNING_STATE = '[STATE]';
+const GOVERNING_STATE = 'Maharashtra';
 
 const PRODUCT = 'TestFlow';
 
