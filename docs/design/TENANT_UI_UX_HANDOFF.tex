@@ -1,0 +1,378 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+
+\definecolor{tfblue}{HTML}{2563eb}
+\definecolor{tfgray}{HTML}{555555}
+
+\titleformat{\section}{\Large\bfseries\color{tfblue}}{\thesection}{0.5em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.5em}{}
+
+\newcommand{\role}[1]{\textbf{\color{tfblue}#1}}
+\newcommand{\route}[1]{\texttt{#1}}
+
+\hypersetup{colorlinks=true, linkcolor=tfblue, urlcolor=tfblue}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{TestFlow --- Tenant UI/UX Reference}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\title{\color{tfblue}TestFlow \\ \large Tenant UI/UX Reference for Handoff}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{fancy}
+
+\section*{Purpose}
+TestFlow is a multi-tenant B2B SaaS product for electrical substation commissioning. Each client
+company gets an isolated workspace at \route{company.testflow.io}. This document describes the
+tenant-facing UI/UX as it exists in the current codebase, organized by role, so a designer or
+external collaborator can understand the product without reading source code. It covers screens,
+navigation, key workflows, and shared visual/interaction conventions. It does not cover the public
+marketing site or the mobile app (Expo/React Native, ENGINEER-only, same backend).
+
+\section{Product Shell \& Shared UI}
+
+\subsection{Tech / Design System}
+React 18 SPA (Vite, no SSR) styled with \textbf{shadcn/ui} on \textbf{Tailwind CSS v3}. Motion via
+\texttt{framer-motion} (staggered card fade/slide-ins, hover lifts). Charts via \texttt{recharts}
+(bar/pie). Icons via \texttt{lucide-react}. Data layer: TanStack Query v5, with Supabase Realtime
+subscriptions (debounced invalidation) and a polling fallback when realtime is disabled.
+
+\subsection{Host-Based Routing}
+The same codebase serves three distinct experiences based on hostname:
+\begin{itemize}[nosep]
+  \item \texttt{admin.optimustesting.com} --- Platform Admin panel (internal, password-gated, no tenant auth)
+  \item \texttt{optimustesting.com} / \texttt{www} / \texttt{localhost} --- public marketing site
+  \item \texttt{<anything>.optimustesting.com} --- tenant workspace (this document's main subject)
+\end{itemize}
+
+\subsection{Navigation Shell (\texttt{DashboardLayout})}
+Every authenticated tenant screen shares one shell:
+\begin{itemize}[nosep]
+  \item \textbf{Fixed left sidebar} (240px): logo block (``TestFlow / Grid Control''), a
+    ``Workspace'' label showing the user's role as a portal name (e.g. ``GM Portal'',
+    ``Manager Portal'' for SUPERVISOR), a role-specific nav list, and a bottom block with
+    avatar (colored initials), name, a small role pill, theme toggle, notification bell, and
+    sign-out.
+  \item \textbf{Top bar}: sticky, frosted-glass, shows the page title only.
+  \item \textbf{Below top bar}: a \emph{Trial Banner} (shown when in trial or subscription is
+    past-due/paused/expired/cancelled) and a \emph{Realtime Status Banner} (shown when the
+    realtime connection has degraded, prompting a page refresh).
+  \item \textbf{Content area}: page-specific.
+\end{itemize}
+Role pill colors: SUPERADMIN purple, GM blue, SUPERVISOR amber (labeled ``manager''), ENGINEER
+green.
+
+\subsection{Status Badge Convention}
+A single reusable pill component (\texttt{StatusBadge}) renders every status value across the
+product consistently: a small glowing dot + uppercase mono label inside a tinted rounded pill.
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Status & Color \\
+\midrule
+DRAFT / UNASSIGNED / CLOSED & slate/gray \\
+ASSIGNED & blue \\
+IN\_PROGRESS & cyan \\
+SUBMITTED & violet \\
+APPROVED & emerald green \\
+REWORK & red \\
+ACTIVE (project) & amber \\
+\bottomrule
+\end{tabular}
+\end{center}
+This same badge is reused for project status, equipment status, and test-task status everywhere in
+the app.
+
+\subsection{Auth Screen (\texttt{/auth})}
+Two-column layout on desktop (hero panel + form panel), single column on mobile.
+\begin{itemize}[nosep]
+  \item \textbf{Hero panel} (left, desktop only): logo, a ``Live \textperiodcentered{}
+    Multi-tenant SaaS'' pill, headline (``From test sheet to energized bus.''), a 4-item feature
+    list, and 3 stat tiles (Equipment Types: 8, Test Templates: 46, Role Levels: 4).
+  \item \textbf{Form panel}: company name (if resolved from subdomain) + ``Sign in'', email +
+    password fields (password visibility toggle), ``Forgot?'' link opening a reset-email dialog,
+    a primary Sign In button, a divider, and a ``Sign in with Google'' button (disabled per-tenant
+    via a company setting).
+  \item \textbf{Special states} replace the form: \emph{Awaiting approval} (Google sign-in pending
+    admin role assignment), \emph{Account deactivated}, \emph{Wrong workspace} (account belongs to
+    a different tenant subdomain).
+  \item \textbf{Password reset mode} (\texttt{?reset=true}): a minimal centered card with new
+    password + confirm fields.
+  \item No public sign-up exists anywhere --- all accounts are admin-provisioned.
+\end{itemize}
+
+\subsection{Profile Page (\texttt{/profile}, all roles)}
+Avatar + name/email header, an ``Account Information'' card (read-only email, editable display
+name), and a ``Change Password'' card (new + confirm password).
+
+\section{Role: SUPERADMIN}
+
+\subsection{Landing: Superadmin Dashboard (\texttt{/superadmin})}
+\begin{itemize}[nosep]
+  \item \textbf{Stat cards} (top row): Total Users, Active Users, Active Projects.
+  \item \textbf{System Health card}: overall status (Healthy / Degraded / Checking\ldots) with a
+    manual refresh button; auto-refreshes every 30s.
+  \item \textbf{Service Status card}: live per-service health rows (Database, Auth, and three Edge
+    Functions: \texttt{create-user}, \texttt{generate-report}, \texttt{platform-admin-data}) each
+    showing a status icon, latency in ms (yellow above 1000ms), or an error detail string.
+  \item \textbf{Google Sign-In Approvals card}: queue of users who authenticated via Google OAuth
+    and need a role assigned before they can use the app; per-row role dropdown (Engineer /
+    Supervisor / GM) plus Approve / Reject buttons.
+  \item \textbf{User Management card}: embeds the shared \texttt{UserManagementTable} (see below).
+  \item \textbf{Audit Log card}: embeds \texttt{AuditLogViewer}, a company-wide append-only change
+    history (feature-flagged via \texttt{audit\_log\_viewer}).
+\end{itemize}
+
+\subsection{Navigation}
+Dashboard, User Management (same route as Dashboard), Projects (routes to the GM dashboard ---
+SUPERADMIN can see/manage all projects), Reports, Billing, Profile.
+
+\subsection{User Management Table (shared component, SUPERADMIN-only surface)}
+\begin{itemize}[nosep]
+  \item Toolbar: search (name/email), role filter, status filter, ``Bulk Invite'' button, ``Invite
+    User'' button.
+  \item Table columns: Name, Email, Role (colored badge), Status (toggle switch + Active/Inactive
+    label), Actions (Edit Role, Offboard --- amber icon, transfers work then deactivates; Delete
+    --- destructive, permanent).
+  \item Dialogs: \textbf{Invite User} (single), \textbf{Bulk Invite} (paste/import list, 800ms
+    delay between sequential invites, stops on rate limit), \textbf{Edit Role}, \textbf{Offboard}
+    (reassign open work to another user), confirmation alert dialogs for deactivate and delete.
+  \item Self-protection: cannot deactivate or delete your own account.
+\end{itemize}
+
+\subsection{Billing Settings (\texttt{/settings/billing}, SUPERADMIN-only)}
+Plan name/description card with subscription action buttons (upgrade/downgrade/cancel via
+\texttt{SubscriptionActions}), a Usage card with progress bars for Users and Active Projects
+against plan limits plus an AI-reports-this-month counter, and an Invoices card (placeholder,
+``coming soon'').
+
+\section{Role: GM (General Manager)}
+
+\subsection{Landing: GM Dashboard (\texttt{/gm})}
+\begin{itemize}[nosep]
+  \item \textbf{5 stat cards}: Total Projects, Active, Completed, Assigned, Unassigned --- animated
+    counters, hover-lift.
+  \item \textbf{``New Test Plan'' button} (top right) $\to$ project creation wizard.
+  \item \textbf{Two charts} (shown once projects exist): a bar chart of project status breakdown
+    (Draft/Approved/Active/Closed) and a donut chart of Assigned vs.\ Unassigned.
+  \item \textbf{Projects list card}: search box, an ``All / Assigned / Unassigned'' tab filter,
+    paginated list (20 per page, ``Show more'' button) of project rows --- each shows project
+    number, site name/address, client, start date, assigned supervisor (if any), an
+    Assign/Reassign button, an ``Overdue'' badge when past end date and not closed, and the status
+    badge. Clicking a row opens Project Detail.
+  \item Empty states differ for ``no projects yet'' (with a create-first-project CTA) vs.\ ``no
+    results for your filter/search''.
+  \item Live-updates via Supabase Realtime (debounced 800ms) with polling fallback.
+\end{itemize}
+
+\subsection{Navigation}
+Projects, New Project, Reports, Profile.
+
+\subsection{New Project Wizard (\texttt{/projects/new}, GM/SUPERADMIN)}
+A 4-step wizard with a progress-stepper header (numbered circles + connecting bar, checkmark on
+completed steps):
+\begin{enumerate}[nosep]
+  \item \textbf{Basic Info} --- project number, site name, site address, client, start/end date.
+  \item \textbf{Equipment Scope} --- \texttt{ScopeManager}: define equipment types + quantities
+    (types include Power Transformer, SF6 Breaker, VCB, CT, CVT, LA, Isolator, Earth Pit, VT).
+  \item \textbf{Testing Scope} --- \texttt{TestingScopeSelector}: choose which test templates apply
+    per equipment type.
+  \item \textbf{Review} --- read-only summary of all three prior steps (project info definition
+    list, equipment scope table with running total, per-equipment-type testing-scope breakdown
+    showing tests $\times$ units = task count) with a final ``Create Project'' button.
+\end{enumerate}
+On submit, a plan-limit pre-check RPC runs; if the plan's active-project cap is hit, an
+\textbf{Upgrade Modal} appears instead (see \S\ref{sec:upgrade}) rather than creating the project.
+New projects are created with status \texttt{DRAFT}.
+
+\subsection{Project Detail (\texttt{/projects/:id}, all roles, edit actions role-gated)}
+Shared screen across GM/SUPERADMIN/SUPERVISOR (ENGINEER uses a separate task-execution screen, see
+\S\ref{sec:engineer-detail}).
+\begin{itemize}[nosep]
+  \item \textbf{Header}: back button, project number, status badge, ``Overdue'' badge, assigned
+    supervisor name, site name.
+  \item \textbf{Header actions} (role-gated): Edit (GM/SUPERADMIN only), Assign/Reassign
+    (opens \texttt{AssignProjectDialog}), Download PDF, Export Excel (once equipment exists),
+    AI Report (GM/SUPERADMIN, only when project is \texttt{CLOSED}, feature-flagged), and
+    project status transition controls (\texttt{ProjectStatusActions}).
+  \item \textbf{Tabs}: Overview, Scope, Testing Scope, Activity, and Equipment (only shown once
+    equipment instances exist).
+  \begin{itemize}[nosep]
+    \item \emph{Overview}: a progress card (tests approved / total, percentage bar, breakdown of
+      pending-review / in-progress / not-started counts with colored dots) plus a project-info
+      grid (number, status, site name, client, address, start/end/created dates).
+    \item \emph{Scope}: read-only table of equipment types and quantities with a total row.
+    \item \emph{Testing Scope}: accordion per equipment type showing enabled/total test count and
+      equipment quantity; each test row has a checkbox (editable only while project is DRAFT or
+      APPROVED); ``Select All / Deselect All'' per type; ``Save Testing Scope'' and
+      ``Generate Equipment \& Tasks'' buttons (the latter is a one-time, idempotent, server-locked
+      action --- disabled once already run).
+    \item \emph{Activity}: a vertical timeline of audit-log entries (created/updated/status-change
+      events) with actor name and timestamp, colored dot per event severity.
+    \item \emph{Equipment}: accordion per equipment instance (e.g.\ PTR-001) showing a small
+      stacked assignment bar (per-engineer color-coded segments) in the header, and inside each
+      accordion a card grid of that unit's test tasks --- each with an engineer-assignment
+      dropdown (color dot per engineer) editable by SUPERVISOR/GM/SUPERADMIN.
+  \end{itemize}
+  \item \textbf{PDF export dialog}, \textbf{Excel export} (dynamically-imported \texttt{xlsx}),
+    and an \textbf{AI Report dialog} (scrollable markdown viewer with a ``Download .md'' button)
+    are all launched from this screen.
+\end{itemize}
+
+\subsection{Edit Project (\texttt{/projects/:id/edit}, GM/SUPERADMIN)}
+Not read in detail here, but is the write counterpart to project Overview info (same field set as
+step 1 of the New Project wizard).
+
+\section{Role: SUPERVISOR (labeled ``Manager'' in the UI)}
+
+\subsection{Landing: Supervisor Dashboard (\texttt{/supervisor})}
+\begin{itemize}[nosep]
+  \item \textbf{4 stat cards}: Assigned Projects, Active Projects, Pending Start (status
+    APPROVED), Pending Review (SUBMITTED test-task count).
+  \item \textbf{``Tests Pending Approval'' card} --- the primary work queue:
+  \begin{itemize}[nosep]
+    \item Each row: a checkbox, test name + code, equipment label + type, a link to the project
+      (jumps to Project Detail $\to$ Tests tab), and per-row \textbf{Rework} / \textbf{Approve}
+      buttons.
+    \item \textbf{Bulk actions}: ``Select all'' checkbox + count; when items are selected, an
+      ``Approve selected (N)'' button appears. Bulk approve is guarded server-side against
+      concurrent status changes.
+    \item \textbf{Rework dialog}: opened per-task, requires (optional) free-text reason, submits
+      via a destructive-styled ``Send for Rework'' button; the reason is later shown to the
+      engineer inline on the test form.
+    \item Approving a task also rolls the parent equipment-instance status up/down based on
+      remaining sibling tasks.
+    \item Empty state: green checkmark + ``No tests pending review''.
+  \end{itemize}
+  \item \textbf{``Assigned Projects'' card}: list of projects assigned to this supervisor by a GM
+    (project number, site name/address, start date, status badge); empty state explains projects
+    appear once a GM assigns them.
+  \item Live-updates via Realtime with debounced invalidation + polling fallback.
+\end{itemize}
+
+\subsection{Navigation}
+Dashboard, Reports, Profile. (No project-creation or user-management access.)
+
+\subsection{Project Detail}
+Same shared screen as GM (\S{}Project Detail above), minus Edit/AI-report actions, plus the
+Equipment tab's per-task engineer-assignment control (SUPERVISOR can (re)assign engineers to
+tests).
+
+\section{Role: ENGINEER}
+\label{sec:engineer-detail}
+
+\subsection{Landing: Engineer Dashboard (\texttt{/engineer})}
+\begin{itemize}[nosep]
+  \item \textbf{3 stat cards}: Assigned Tests, In Progress, Completed.
+  \item \textbf{``My Projects'' card}: one row per project containing equipment assigned to this
+    engineer --- project number + status badge, site name/address, start date, ``N equipment
+    \textperiodcentered{} X/Y approved'' summary, and an animated per-project completion progress
+    bar. Clicking navigates to the engineer's task-execution screen for that project.
+  \item Empty state: ``No assignments yet --- Your manager will assign test scopes to you.''
+\end{itemize}
+
+\subsection{Navigation}
+``My Tasks'' (dashboard), Profile only --- the narrowest nav of any role.
+
+\subsection{Task Execution Screen (\texttt{/engineer/projects/:id})}
+This is the most complex screen in the product --- a dedicated, form-heavy workspace distinct from
+the shared Project Detail screen used by other roles.
+\begin{itemize}[nosep]
+  \item \textbf{Equipment selector card}: a dropdown of equipment units assigned to this engineer
+    within the project, plus a summary (equipment type badge, total unit count).
+  \item \textbf{3-step sub-navigation} (numbered pill tabs), scoped to the selected equipment unit:
+  \begin{enumerate}[nosep]
+    \item \textbf{Nameplate Details} --- a 2-column field grid generated from a per-equipment-type
+      field schema (label, unit suffix, number/text input); ``Save Nameplate'' button required
+      before proceeding.
+    \item \textbf{Testing Parameters} --- one continuous scrollable form, one section per assigned
+      test: a numbered header with test name/code, a ``Draft'' indicator when unsaved local
+      changes exist, and the status badge. Renders either a \textbf{V2 dynamic form}
+      (\texttt{TestFormV2}, sectioned schema-driven fields) or a legacy V1 fallback (per-field
+      inputs/selects from a JSON Schema, or a single generic ``Reading Value'' input if no schema
+      is defined). Every test section also has: an Instrument Selector, a Pass/Fail/Marginal
+      select, and a Remarks textarea. A \textbf{Rework banner} (orange) surfaces the supervisor's
+      reason when status is REWORK. A sticky action bar offers ``Save All Drafts'' and
+      ``Submit All''. Submitted/Approved tasks render read-only. In-progress edits autosave to
+      \texttt{localStorage} as a draft keyed per task, recovered on reload.
+    \item \textbf{Review \& Submit} --- read-only nameplate summary table, a test summary list
+      (per test: pass/fail chip + status badge), a submitted-count line, and a final ``Submit
+      Equipment'' button.
+  \end{enumerate}
+  \item Saving a test sets task status to \texttt{IN\_PROGRESS}; submitting sets
+    \texttt{SUBMITTED} and clears the local draft; this also recomputes the parent equipment
+    instance's aggregate status (e.g.\ all-approved $\to$ APPROVED, any-rework $\to$ REWORK).
+\end{itemize}
+
+\section{Cross-Role Elements}
+
+\subsection{Reports}
+\texttt{/reports} (GM, SUPERVISOR, SUPERADMIN) --- a card list of all projects (icon, number,
+status badge, site name, client, start/end dates, arrow) that opens \texttt{/reports/:id}, a
+project-scoped report detail view (not read in full detail for this document, but structurally
+parallel to Project Detail's read-only content).
+
+\subsection{Notifications}
+A bell icon in the sidebar (SUPERVISOR and ENGINEER only) opens a popover: SUPERVISORs see newly
+SUBMITTED tests across their assigned projects; ENGINEERs see tasks sent back for REWORK. Each row
+shows a colored status dot, message, project/equipment/test breadcrumb, and relative timestamp.
+Debounced realtime refresh (1.5s) plus polling fallback.
+
+\subsection{Upgrade Modal}
+\label{sec:upgrade}
+A shared dialog (\texttt{UpgradeModal}) triggered wherever a plan limit blocks an action (e.g.\
+creating a project over the active-project cap). Shows the current limit/usage and the cheapest
+plan that would unblock the action, with a ``View plans'' CTA linking to the marketing site's
+pricing section.
+
+\subsection{Trial / Billing Banner}
+Shown across all tenant dashboards when relevant: an amber banner for trial ending within 7 days,
+a red/destructive banner for trial expired or subscription past\_due/paused/expired/cancelled, each
+with a ``Manage billing'' button. Fully hidden for active paid subscriptions.
+
+\section{Platform Admin Panel (Internal, Not Tenant-Facing)}
+Hosted at \texttt{admin.optimustesting.com}; separate password gate (no Supabase Auth session), all
+data access proxied through a service-role Edge Function. Included here only for completeness ---
+this is an internal ops tool, not part of the customer-facing product.
+
+\begin{itemize}[nosep]
+  \item \textbf{Login}: single password field.
+  \item \textbf{Dashboard tabs}: \textbf{Companies} (tenant list/detail, create-tenant flow,
+    activate/deactivate, magic-link generation), \textbf{Users} (global cross-tenant user search),
+    \textbf{Sales} (internal outreach CRM --- 7-stage lead pipeline: New $\to$ Contacted $\to$ Demo
+    Booked $\to$ Pilot $\to$ Won/Lost/Parked, with a lead detail drawer and activity log),
+    \textbf{Billing} (subscription/order inspection, a scaffold around the Razorpay integration).
+\end{itemize}
+
+\section{Design Notes for Whoever Picks This Up}
+\begin{itemize}[nosep]
+  \item The current visual language is dark-capable shadcn/ui defaults with a blue primary accent,
+    mono uppercase micro-labels (status badges, workspace labels), subtle grid-texture background,
+    and glow effects on the primary logo mark. There is a light/dark theme toggle
+    (\texttt{ThemeToggle}) available in the sidebar.
+  \item There is no distinct visual identity per role beyond the sidebar role pill color and the
+    ``Portal'' label --- all four roles share one component library and one visual system.
+  \item The heaviest UX surface by far is the ENGINEER task-execution screen
+    (\S\ref{sec:engineer-detail}) --- long forms, many field types, autosave, and status-driven
+    read-only states. Any redesign effort should prioritize that flow's information density and
+    error/rework messaging.
+  \item Empty states and loading skeletons exist consistently across list-type screens (projects,
+    users, equipment, notifications) and are a good pattern to preserve.
+\end{itemize}
+
+\end{document}
