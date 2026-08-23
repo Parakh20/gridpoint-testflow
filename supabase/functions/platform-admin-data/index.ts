@@ -1917,6 +1917,48 @@ serve(async (req) => {
       return respond({ email: data });
     }
 
+    // ── get_mail_inbox ─────────────────────────────────────────────────────────
+    // Every inbound message across every company, plus the ones that matched no
+    // profile at all (company_id NULL — prospects, vendors, Razorpay's
+    // reviewers). The per-company view in the Companies tab can't show those,
+    // which is why this exists as its own top-level surface.
+    if (action === 'get_mail_inbox') {
+      const onlyUnhandled = payload?.only_unhandled === true;
+      let query = adminClient
+        .from('inbound_emails')
+        .select('id, company_id, from_email, from_name, to_email, subject, text_body, received_at, handled, companies:company_id(name, slug)')
+        .order('received_at', { ascending: false })
+        .limit(200);
+      if (onlyUnhandled) query = query.eq('handled', false);
+
+      const { data, error } = await query;
+      if (error) {
+        if (error.code === '42P01') return respond({ emails: [], unhandled_count: 0 });
+        throw error;
+      }
+
+      const { count } = await adminClient
+        .from('inbound_emails')
+        .select('*', { count: 'exact', head: true })
+        .eq('handled', false);
+
+      return respond({ emails: data ?? [], unhandled_count: count ?? 0 });
+    }
+
+    // ── get_mail_sent ──────────────────────────────────────────────────────────
+    if (action === 'get_mail_sent') {
+      const { data, error } = await adminClient
+        .from('email_log')
+        .select('id, company_id, to_email, subject, template, status, resend_message_id, error, actor, sent_at, companies:company_id(name, slug)')
+        .order('sent_at', { ascending: false })
+        .limit(200);
+      if (error) {
+        if (error.code === '42P01') return respond({ emails: [] });
+        throw error;
+      }
+      return respond({ emails: data ?? [] });
+    }
+
     return respond({ error: `Unknown action: ${action}` }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';

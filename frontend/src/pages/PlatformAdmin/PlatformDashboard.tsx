@@ -63,6 +63,7 @@ import {
   TrendingUp,
   CreditCard,
   Layers,
+  Mail,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { platformFetch } from './platformFetch';
@@ -71,6 +72,7 @@ import { SalesTab } from './SalesTab';
 import { BillingTab } from './BillingTab';
 import { PlansTab } from './PlansTab';
 import { CompanyEmailPanel } from './CompanyEmailPanel';
+import { MailTab } from './MailTab';
 
 const BASE_DOMAIN = 'optimustesting.com';
 
@@ -657,6 +659,9 @@ export default function PlatformDashboard() {
             <TabsTrigger value="plans" className="gap-2">
               <Layers className="h-3.5 w-3.5" /> Plans
             </TabsTrigger>
+            <TabsTrigger value="mail" className="gap-2">
+              <Mail className="h-3.5 w-3.5" /> Mail
+            </TabsTrigger>
           </TabsList>
 
           {/* ── Companies tab ─────────────────────────────────────────────── */}
@@ -1226,6 +1231,10 @@ export default function PlatformDashboard() {
 
           <TabsContent value="plans">
             <PlansTab active={activeTab === 'plans'} />
+          </TabsContent>
+
+          <TabsContent value="mail">
+            <MailTab active={activeTab === 'mail'} />
           </TabsContent>
 
         </Tabs>

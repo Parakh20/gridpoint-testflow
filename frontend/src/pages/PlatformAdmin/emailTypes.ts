@@ -33,3 +33,28 @@ export interface InboundEmail {
   received_at: string;
   handled: boolean;
 }
+
+/** Row shape from get_mail_inbox — inbound plus the company it resolved to. */
+export interface InboxEmail extends InboundEmail {
+  company_id: string | null;
+  companies: { name: string; slug: string } | null;
+}
+
+/** Row shape from get_mail_sent. */
+export interface SentEmailRow extends SentEmail {
+  company_id: string | null;
+  companies: { name: string; slug: string } | null;
+}
+
+export interface MailCompany {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface MailCompanyUser {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+}
