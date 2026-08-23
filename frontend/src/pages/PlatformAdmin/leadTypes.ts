@@ -74,3 +74,54 @@ export interface LeadActivity {
   occurred_at: string;
   created_at: string;
 }
+
+export const CONTACT_SENIORITIES = [
+  'C_SUITE',
+  'DIRECTOR',
+  'MANAGER',
+  'ENGINEER',
+  'GENERIC',
+  'UNKNOWN',
+] as const;
+export type ContactSeniority = (typeof CONTACT_SENIORITIES)[number];
+
+export const SENIORITY_LABEL: Record<ContactSeniority, string> = {
+  C_SUITE: 'C-suite',
+  DIRECTOR: 'Director',
+  MANAGER: 'Manager',
+  ENGINEER: 'Engineer',
+  GENERIC: 'Shared inbox',
+  UNKNOWN: 'Unknown',
+};
+
+export const EMAIL_STATUSES = ['PUBLISHED', 'UNVERIFIED', 'BOUNCED', 'OPTED_OUT'] as const;
+export type EmailStatus = (typeof EMAIL_STATUSES)[number];
+
+/**
+ * How much to trust an address. PUBLISHED means it was read off a page the
+ * company controls; UNVERIFIED means a directory/aggregator or an inferred
+ * name-to-mailbox mapping. Nothing in this table is a first.last@ guess.
+ */
+export const EMAIL_STATUS_LABEL: Record<EmailStatus, string> = {
+  PUBLISHED: 'Published',
+  UNVERIFIED: 'Unverified',
+  BOUNCED: 'Bounced',
+  OPTED_OUT: 'Opted out',
+};
+
+export interface LeadContact {
+  id: string;
+  lead_id: string;
+  full_name: string | null;
+  title: string | null;
+  seniority: ContactSeniority;
+  email: string | null;
+  email_status: EmailStatus;
+  phone: string | null;
+  linkedin_url: string | null;
+  source_url: string | null;
+  is_primary: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}

@@ -20,19 +20,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, ExternalLink, Phone, Mail, Save, Plus } from 'lucide-react';
+import { Loader2, ExternalLink, Phone, Mail, Save, Plus, Linkedin, Star, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatDateTime } from '@/lib/format';
 import { platformFetch } from './platformFetch';
 import {
   Lead,
   LeadActivity,
+  LeadContact,
   LeadStage,
   LeadChannel,
+  ContactSeniority,
   LEAD_STAGES,
   LEAD_CHANNELS,
+  CONTACT_SENIORITIES,
   STAGE_LABEL,
   CHANNEL_LABEL,
+  SENIORITY_LABEL,
+  EMAIL_STATUS_LABEL,
 } from './leadTypes';
 
 interface LeadDetailDrawerProps {
@@ -47,6 +52,15 @@ export function LeadDetailDrawer({ leadId, open, onOpenChange, onLeadChanged }: 
   const [loading, setLoading] = useState(false);
   const [lead, setLead] = useState<Lead | null>(null);
   const [activities, setActivities] = useState<LeadActivity[]>([]);
+  const [contacts, setContacts] = useState<LeadContact[]>([]);
+
+  // new contact form
+  const [cName, setCName] = useState('');
+  const [cTitle, setCTitle] = useState('');
+  const [cEmail, setCEmail] = useState('');
+  const [cPhone, setCPhone] = useState('');
+  const [cSeniority, setCSeniority] = useState<ContactSeniority>('C_SUITE');
+  const [savingContact, setSavingContact] = useState(false);
 
   // editable fields
   const [stage, setStage] = useState<LeadStage>('NEW');
@@ -65,6 +79,7 @@ export function LeadDetailDrawer({ leadId, open, onOpenChange, onLeadChanged }: 
     setLoading(true);
     setLead(null);
     setActivities([]);
+    setContacts([]);
     (async () => {
       try {
         const data = await platformFetch('get_lead_detail', { lead_id: leadId });
@@ -72,6 +87,7 @@ export function LeadDetailDrawer({ leadId, open, onOpenChange, onLeadChanged }: 
         const l = data.lead as Lead;
         setLead(l);
         setActivities((data.activities ?? []) as LeadActivity[]);
+        setContacts((data.contacts ?? []) as LeadContact[]);
         setStage(l.stage);
         setNextActionDate(l.next_action_date ?? '');
         setNotes(l.notes ?? '');
@@ -109,6 +125,72 @@ export function LeadDetailDrawer({ leadId, open, onOpenChange, onLeadChanged }: 
       toast({ variant: 'destructive', title: 'Failed to save', description: err.message });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddContact = async () => {
+    if (!lead) return;
+    if (!cEmail.trim() && !cName.trim()) return;
+    setSavingContact(true);
+    try {
+      const data = await platformFetch('upsert_lead_contact', {
+        lead_id: lead.id,
+        fields: {
+          full_name: cName.trim() || null,
+          title: cTitle.trim() || null,
+          email: cEmail.trim() || null,
+          phone: cPhone.trim() || null,
+          seniority: cSeniority,
+          // Anything typed in by hand is unverified until someone actually
+          // gets a reply from it.
+          email_status: 'UNVERIFIED',
+        },
+      });
+      const saved = data.contact as LeadContact;
+      setContacts(prev => [...prev.filter(c => c.id !== saved.id), saved]);
+      setCName(''); setCTitle(''); setCEmail(''); setCPhone('');
+      toast({ title: 'Contact saved', description: saved.full_name ?? saved.email ?? '' });
+      onLeadChanged();
+    } catch (err: any) {
+      console.error('[Sales] upsert_lead_contact error:', err);
+      toast({ variant: 'destructive', title: 'Failed to save contact', description: err.message });
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const handleMakePrimary = async (contact: LeadContact) => {
+    if (!lead) return;
+    try {
+      const data = await platformFetch('upsert_lead_contact', {
+        lead_id: lead.id,
+        fields: {
+          full_name: contact.full_name,
+          title: contact.title,
+          email: contact.email,
+          phone: contact.phone,
+          seniority: contact.seniority,
+          email_status: contact.email_status,
+          is_primary: true,
+        },
+      });
+      const saved = data.contact as LeadContact;
+      setContacts(prev => prev.map(c => ({ ...c, is_primary: c.id === saved.id })));
+      onLeadChanged();
+    } catch (err: any) {
+      console.error('[Sales] upsert_lead_contact error:', err);
+      toast({ variant: 'destructive', title: 'Failed to set primary', description: err.message });
+    }
+  };
+
+  const handleDeleteContact = async (contact: LeadContact) => {
+    try {
+      await platformFetch('delete_lead_contact', { contact_id: contact.id });
+      setContacts(prev => prev.filter(c => c.id !== contact.id));
+      onLeadChanged();
+    } catch (err: any) {
+      console.error('[Sales] delete_lead_contact error:', err);
+      toast({ variant: 'destructive', title: 'Failed to remove contact', description: err.message });
     }
   };
 
@@ -245,6 +327,118 @@ export function LeadDetailDrawer({ leadId, open, onOpenChange, onLeadChanged }: 
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save
               </Button>
+
+              <Separator />
+
+              {/* Contact book */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Contacts {contacts.length > 0 && <span className="text-muted-foreground">({contacts.length})</span>}
+                </h3>
+                {contacts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No contacts yet — add the decision maker below.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {contacts.map(c => (
+                      <li key={c.id} className="rounded-lg border border-border bg-card/60 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-foreground">
+                                {c.full_name ?? c.title ?? c.email ?? 'Contact'}
+                              </span>
+                              <Badge variant="secondary">{SENIORITY_LABEL[c.seniority]}</Badge>
+                              {c.is_primary && <Badge>Primary</Badge>}
+                            </div>
+                            {c.full_name && c.title && (
+                              <p className="text-xs text-muted-foreground">{c.title}</p>
+                            )}
+                            <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm">
+                              {c.email && (
+                                <a href={`mailto:${c.email}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                                  <Mail className="h-3.5 w-3.5" /> {c.email}
+                                </a>
+                              )}
+                              {c.phone && (
+                                <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                                  <Phone className="h-3.5 w-3.5" /> {c.phone}
+                                </a>
+                              )}
+                              {c.linkedin_url && (
+                                <a href={c.linkedin_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                                  <Linkedin className="h-3.5 w-3.5" /> LinkedIn
+                                </a>
+                              )}
+                              {c.email && (
+                                <Badge
+                                  variant={c.email_status === 'PUBLISHED' ? 'outline' : 'destructive'}
+                                  title={
+                                    c.email_status === 'PUBLISHED'
+                                      ? "Read off the company's own site"
+                                      : 'From a directory or an inferred mapping — verify before sending'
+                                  }
+                                >
+                                  {EMAIL_STATUS_LABEL[c.email_status]}
+                                </Badge>
+                              )}
+                            </div>
+                            {c.notes && (
+                              <p className="mt-1.5 text-xs text-muted-foreground whitespace-pre-wrap">{c.notes}</p>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            {!c.is_primary && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Make primary contact"
+                                title="Make primary contact"
+                                onClick={() => handleMakePrimary(c)}
+                              >
+                                <Star className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Remove contact"
+                              title="Remove contact"
+                              onClick={() => handleDeleteContact(c)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Input value={cName} onChange={e => setCName(e.target.value)} placeholder="Name" />
+                  <Input value={cTitle} onChange={e => setCTitle(e.target.value)} placeholder="Title" />
+                  <Input value={cEmail} onChange={e => setCEmail(e.target.value)} placeholder="Email" type="email" />
+                  <Input value={cPhone} onChange={e => setCPhone(e.target.value)} placeholder="Phone" />
+                  <Select value={cSeniority} onValueChange={v => setCSeniority(v as ContactSeniority)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CONTACT_SENIORITIES.map(sn => (
+                        <SelectItem key={sn} value={sn}>{SENIORITY_LABEL[sn]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={handleAddContact}
+                    disabled={savingContact || (!cEmail.trim() && !cName.trim())}
+                    className="gap-2"
+                  >
+                    {savingContact ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    Add contact
+                  </Button>
+                </div>
+              </div>
 
               <Separator />
 

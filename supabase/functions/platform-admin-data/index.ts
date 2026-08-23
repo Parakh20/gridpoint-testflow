@@ -508,18 +508,29 @@ serve(async (req) => {
       const lead_id = payload?.lead_id as string | undefined;
       if (!lead_id) return respond({ error: 'payload.lead_id is required' }, 400);
 
-      const [leadRes, actsRes] = await Promise.all([
+      const [leadRes, actsRes, contactsRes] = await Promise.all([
         adminClient.from('leads').select('*').eq('id', lead_id).single(),
         adminClient
           .from('lead_activities')
           .select('*')
           .eq('lead_id', lead_id)
           .order('occurred_at', { ascending: false }),
+        adminClient
+          .from('lead_contacts')
+          .select('*')
+          .eq('lead_id', lead_id)
+          .order('is_primary', { ascending: false })
+          .order('seniority', { ascending: true }),
       ]);
       if (leadRes.error) throw leadRes.error;
       if (actsRes.error) throw actsRes.error;
+      if (contactsRes.error) throw contactsRes.error;
 
-      return respond({ lead: leadRes.data, activities: actsRes.data ?? [] });
+      return respond({
+        lead: leadRes.data,
+        activities: actsRes.data ?? [],
+        contacts: contactsRes.data ?? [],
+      });
     }
 
     // ── create_lead ────────────────────────────────────────────────────────────
@@ -603,6 +614,78 @@ serve(async (req) => {
       await adminClient.from('leads').update({ updated_at: new Date().toISOString() }).eq('id', lead_id);
 
       return respond({ activity: data });
+    }
+
+    // ── upsert_lead_contact ────────────────────────────────────────────────────
+    // Contact book for a lead (many contacts per company: MD, Head of T&C, ...).
+    // Keyed on (lead_id, lower(email)) so re-running an enrichment pass updates
+    // instead of duplicating. Setting is_primary also mirrors the contact onto
+    // leads.contact_* so existing single-contact readers stay correct.
+    if (action === 'upsert_lead_contact') {
+      const lead_id = payload?.lead_id as string | undefined;
+      const fields = (payload?.fields ?? {}) as Record<string, unknown>;
+      if (!lead_id) return respond({ error: 'payload.lead_id is required' }, 400);
+
+      const email = typeof fields.email === 'string' ? fields.email.trim().toLowerCase() : null;
+      if (!email && !fields.full_name) {
+        return respond({ error: 'fields.email or fields.full_name is required' }, 400);
+      }
+
+      const ALLOWED = [
+        'full_name', 'title', 'seniority', 'email', 'email_status',
+        'phone', 'linkedin_url', 'source_url', 'is_primary', 'notes',
+      ];
+      const row: Record<string, unknown> = { lead_id };
+      for (const k of ALLOWED) {
+        if (fields[k] !== undefined) row[k] = fields[k];
+      }
+      if (email) row.email = email;
+
+      // Look for an existing row on this lead with the same email.
+      let existingId: string | null = null;
+      if (email) {
+        const { data: found, error: findErr } = await adminClient
+          .from('lead_contacts')
+          .select('id')
+          .eq('lead_id', lead_id)
+          .ilike('email', email)
+          .maybeSingle();
+        if (findErr) return respond({ error: findErr.message }, 400);
+        existingId = found?.id ?? null;
+      }
+
+      // Only one primary per lead — demote the others first.
+      if (row.is_primary === true) {
+        await adminClient
+          .from('lead_contacts')
+          .update({ is_primary: false })
+          .eq('lead_id', lead_id)
+          .neq('id', existingId ?? '00000000-0000-0000-0000-000000000000');
+      }
+
+      const written = existingId
+        ? await adminClient.from('lead_contacts').update(row).eq('id', existingId).select('*').single()
+        : await adminClient.from('lead_contacts').insert(row).select('*').single();
+      if (written.error) return respond({ error: written.error.message }, 400);
+
+      if (row.is_primary === true) {
+        await adminClient.from('leads').update({
+          contact_name: written.data.full_name,
+          contact_email: written.data.email,
+          contact_phone: written.data.phone,
+        }).eq('id', lead_id);
+      }
+
+      return respond({ contact: written.data });
+    }
+
+    // ── delete_lead_contact ────────────────────────────────────────────────────
+    if (action === 'delete_lead_contact') {
+      const contact_id = payload?.contact_id as string | undefined;
+      if (!contact_id) return respond({ error: 'payload.contact_id is required' }, 400);
+      const { error } = await adminClient.from('lead_contacts').delete().eq('id', contact_id);
+      if (error) return respond({ error: error.message }, 400);
+      return respond({ success: true });
     }
 
     // ── get_billing_overview ────────────────────────────────────────────────────
