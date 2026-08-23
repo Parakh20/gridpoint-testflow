@@ -18,6 +18,7 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useToast } from '@/hooks/use-toast';
+import { CustomDomainCard } from '@/components/CustomDomainCard';
 
 export default function WorkspaceSettingsPage() {
   const { company } = useCompany();
@@ -83,6 +84,8 @@ export default function WorkspaceSettingsPage() {
             </Button>
           </CardContent>
         </Card>
+
+        <CustomDomainCard />
 
         <AlertDialog open={confirmOpen} onOpenChange={o => { if (!saving) setConfirmOpen(o); }}>
           <AlertDialogContent>

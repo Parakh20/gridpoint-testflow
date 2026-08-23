@@ -176,38 +176,88 @@ export type Database = {
       companies: {
         Row: {
           allowed_domains: string[]
+          company_size: string | null
+          country: string | null
           created_at: string
           features: Json
           id: string
+          industry: string | null
           is_active: boolean
           name: string
           oauth_provisioning: string
+          phone: string | null
           slug: string
           trial_ends_at: string | null
         }
         Insert: {
           allowed_domains?: string[]
+          company_size?: string | null
+          country?: string | null
           created_at?: string
           features?: Json
           id?: string
+          industry?: string | null
           is_active?: boolean
           name: string
           oauth_provisioning?: string
+          phone?: string | null
           slug: string
           trial_ends_at?: string | null
         }
         Update: {
           allowed_domains?: string[]
+          company_size?: string | null
+          country?: string | null
           created_at?: string
           features?: Json
           id?: string
+          industry?: string | null
           is_active?: boolean
           name?: string
           oauth_provisioning?: string
+          phone?: string | null
           slug?: string
           trial_ends_at?: string | null
         }
         Relationships: []
+      }
+      company_domains: {
+        Row: {
+          company_id: string
+          created_at: string
+          domain: string
+          id: string
+          provisioned_at: string | null
+          verification_token: string
+          verified_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          domain: string
+          id?: string
+          provisioned_at?: string | null
+          verification_token?: string
+          verified_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          domain?: string
+          id?: string
+          provisioned_at?: string | null
+          verification_token?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_domains_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       demo_requests: {
         Row: {
@@ -1373,6 +1423,7 @@ export type Database = {
         }
         Returns: string
       }
+      company_for_domain: { Args: { _domain: string }; Returns: Json }
       erase_user_data: { Args: { _user_id: string }; Returns: Json }
       find_cheapest_plan_for: {
         Args: { _required_count: number; _resource: string }
@@ -1445,6 +1496,8 @@ export type Database = {
         Args: { _project_id: string; _success: boolean }
         Returns: undefined
       }
+      remove_custom_domain: { Args: never; Returns: Json }
+      request_custom_domain: { Args: { _domain: string }; Returns: Json }
       request_data_export: { Args: { _user_id: string }; Returns: Json }
       request_plan_downgrade: {
         Args: { _company_id?: string; _target_plan_id?: string }
