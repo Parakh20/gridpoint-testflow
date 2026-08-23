@@ -13,11 +13,17 @@
 
 const TOLERANCE_SECONDS = 5 * 60;
 
-function base64ToBytes(b64: string): Uint8Array {
+// Returns the ArrayBuffer rather than the Uint8Array view on purpose:
+// `new Uint8Array(n)` is typed `Uint8Array<ArrayBufferLike>`, which newer
+// TypeScript lib.dom rejects as a BufferSource because ArrayBufferLike admits
+// SharedArrayBuffer. An ArrayBuffer is assignable across every lib version we
+// build against, so importKey/sign take it directly.
+function base64ToBuffer(b64: string): ArrayBuffer {
   const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+  const buffer = new ArrayBuffer(binary.length);
+  const view = new Uint8Array(buffer);
+  for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+  return buffer;
 }
 
 function bytesToBase64(bytes: ArrayBuffer): string {
@@ -68,7 +74,7 @@ export async function verifySvixSignature(
   // future (clock skew beyond tolerance is indistinguishable from forgery).
   if (Math.abs(Date.now() / 1000 - ts) > TOLERANCE_SECONDS) return 'timestamp outside tolerance';
 
-  const secretBytes = base64ToBytes(secret.startsWith('whsec_') ? secret.slice(6) : secret);
+  const secretBytes = base64ToBuffer(secret.startsWith('whsec_') ? secret.slice(6) : secret);
   const key = await crypto.subtle.importKey(
     'raw',
     secretBytes,

@@ -15,9 +15,11 @@ const SECRET = `whsec_${SECRET_B64}`;
 async function sign(id: string, timestamp: string, body: string, secret = SECRET): Promise<string> {
   const raw = secret.startsWith('whsec_') ? secret.slice(6) : secret;
   const binary = atob(raw);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const key = await crypto.subtle.importKey('raw', bytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  // ArrayBuffer, not the Uint8Array view — see base64ToBuffer's note in svix.ts.
+  const buffer = new ArrayBuffer(binary.length);
+  const view = new Uint8Array(buffer);
+  for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+  const key = await crypto.subtle.importKey('raw', buffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${timestamp}.${body}`));
   return `v1,${btoa(String.fromCharCode(...new Uint8Array(sig)))}`;
 }
