@@ -11,6 +11,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PlatformLogin, PlatformDashboard } from "./pages/PlatformAdmin";
 import Marketing from "./pages/Marketing";
 import StartTrial from "./pages/StartTrial";
+import { TermsOfService, PrivacyPolicy, RefundPolicy, ContactUs } from "@/pages/legal/LegalPages";
 import BlogIndex from "@/pages/blog/BlogIndex";
 import BlogPost from "@/pages/blog/BlogPost";
 import Index from "./pages/Index";
@@ -71,6 +72,10 @@ const App = () => (
               // Public-facing marketing site at optimustesting.com (apex)
               <Routes>
                 <Route path="/" element={<Marketing />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/refund-policy" element={<RefundPolicy />} />
+                <Route path="/contact" element={<ContactUs />} />
                 <Route path="/blog" element={<BlogIndex />} />
                 <Route path="/blog/:slug" element={<BlogPost />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

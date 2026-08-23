@@ -298,6 +298,18 @@ const PhoneForm = () => (
 /* ============================================================
    NAV
    ============================================================ */
+// Footer destinations. Razorpay's website review checks that policy pages
+// are real and reachable, so these must not be "#" placeholders.
+const FOOTER_LINKS: Record<string, string> = {
+  "Contact": "/contact",
+  "Terms": "/terms",
+  "Privacy": "/privacy",
+  "Refund Policy": "/refund-policy",
+  "Pricing": "#pricing",
+  "Features": "#product",
+  "Mobile app": "#field",
+};
+
 const Nav = () => (
   <header className="sticky top-0 z-40 navblur">
     <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -960,16 +972,16 @@ const FooterCTA = () => (
           <p className="text-white/45 max-w-sm">The commissioning operating system for electrical substations.</p>
         </div>
         {([
-          ["Product", ["Features", "Mobile app", "Changelog"]],
-          ["Company", ["About", "Contact", "Careers"]],
-          ["Resources", ["Docs", "Status", "Security", "Trust"]],
+          ["Product", ["Features", "Mobile app", "Pricing"]],
+          ["Company", ["Contact", "Terms", "Privacy"]],
+          ["Legal", ["Refund Policy", "Terms", "Privacy"]],
         ] as [string, string[]][]).map(([h, ls]) => (
           <div key={h}>
             <div className="font-mono text-[10.5px] uppercase tracking-widest text-white/35 mb-3">{h}</div>
             <ul className="space-y-1.5">
               {ls.map((l) => (
                 <li key={l}>
-                  <a href={l === "Contact" ? "#cta" : "#"} className="hover:text-white">
+                  <a href={FOOTER_LINKS[l] ?? "#"} className="hover:text-white">
                     {l}
                   </a>
                 </li>
