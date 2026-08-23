@@ -15,7 +15,7 @@
 // consistent with how every other suite in this repo is invoked, including
 // in CI — see .github/workflows/supabase.yml.)
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { isAlreadyCancelledError } from './billing_provider.ts';
+import { isAlreadyCancelledError, RazorpayBillingProvider, razorpayKeyMode } from './billing_provider.ts';
 
 Deno.test('matches the terminal "already been cancelled" wording', () => {
   const message = 'Razorpay API error 400: {"error":{"description":"The subscription has already been cancelled"}}';
@@ -65,4 +65,86 @@ Deno.test('does NOT match a validation-rejection error that echoes cancel_at_cyc
   // its own; "already" must also be present.
   const message = 'Razorpay API error 400: {"error":{"code":"BAD_REQUEST_ERROR","description":"cancel_at_cycle_end is/are not required and should not be sent","field":"cancel_at_cycle_end"}}';
   assertEquals(isAlreadyCancelledError(message), false);
+});
+
+// ─── createPlan / razorpayKeyMode ────────────────────────────────────────────
+// createPlan is what makes a price change possible from the admin panel:
+// Razorpay plan amounts are immutable, so a new price always means a NEW plan.
+// What matters here is the request shape (rupees -> integer paise, our
+// 'annual' -> Razorpay's 'yearly') — get that wrong and the operator creates a
+// plan that charges the wrong amount, which is a real-money bug.
+//
+// Stubs globalThis.fetch, same posture as billing_provider_invoices.test.ts —
+// no network, no `supabase start`.
+
+function stubCreatePlanFetch(): { bodies: unknown[]; urls: string[]; restore: () => void } {
+  const bodies: unknown[] = [];
+  const urls: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+    urls.push(typeof input === 'string' ? input : input.toString());
+    bodies.push(JSON.parse(String(init?.body ?? '{}')));
+    return Promise.resolve(
+      new Response(JSON.stringify({ id: 'plan_stub' }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+  }) as typeof fetch;
+  return { bodies, urls, restore: () => { globalThis.fetch = original; } };
+}
+
+Deno.test('createPlan sends rupees as integer paise and maps annual to yearly', async () => {
+  const { bodies, urls, restore } = stubCreatePlanFetch();
+  try {
+    const provider = new RazorpayBillingProvider('rzp_test_key', 'secret');
+    const res = await provider.createPlan({
+      name: 'Starter (annual)', interval: 'annual', amountInr: 249999, planSlug: 'starter',
+    });
+    assertEquals(res.providerPlanId, 'plan_stub');
+    assertEquals(urls[0], 'https://api.razorpay.com/v1/plans');
+    const body = bodies[0] as Record<string, any>;
+    assertEquals(body.period, 'yearly');
+    assertEquals(body.interval, 1);
+    assertEquals(body.item.amount, 24_999_900);
+    assertEquals(body.item.currency, 'INR');
+    assertEquals(body.notes.plan_slug, 'starter');
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('createPlan rounds a fractional rupee price rather than truncating it', async () => {
+  const { bodies, restore } = stubCreatePlanFetch();
+  try {
+    const provider = new RazorpayBillingProvider('rzp_test_key', 'secret');
+    await provider.createPlan({ name: 'x', interval: 'monthly', amountInr: 24999.995, planSlug: 'x' });
+    assertEquals((bodies[0] as Record<string, any>).item.amount, 2_500_000);
+    assertEquals((bodies[0] as Record<string, any>).period, 'monthly');
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('createPlan refuses a non-positive amount before calling Razorpay', async () => {
+  const { urls, restore } = stubCreatePlanFetch();
+  try {
+    const provider = new RazorpayBillingProvider('rzp_test_key', 'secret');
+    let threw = false;
+    try {
+      await provider.createPlan({ name: 'x', interval: 'monthly', amountInr: 0, planSlug: 'x' });
+    } catch {
+      threw = true;
+    }
+    assertEquals(threw, true);
+    assertEquals(urls.length, 0);
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('razorpayKeyMode distinguishes live from test keys', () => {
+  assertEquals(razorpayKeyMode('rzp_live_abc123'), 'live');
+  assertEquals(razorpayKeyMode('rzp_test_abc123'), 'test');
+  // Anything unrecognised is treated as test — the conservative direction:
+  // it flags a mismatch against live-mode mappings rather than silently
+  // asserting a key is live.
+  assertEquals(razorpayKeyMode('something-else'), 'test');
 });

@@ -10,6 +10,11 @@ export const BILLING_AUDIT_ACTIONS = [
   'ADDON_CREATED',
   'ADDON_CANCELLED',
   'SUBSCRIPTION_AUTO_CANCELLED',
+  'PLAN_CATALOG_CREATED',
+  'PLAN_CATALOG_UPDATED',
+  'PLAN_FEATURE_UPDATED',
+  'PLAN_PROVIDER_MAPPING_UPDATED',
+  'COMPANY_FEATURE_FLAGS_UPDATED',
 ] as const;
 export type BillingAuditAction = (typeof BILLING_AUDIT_ACTIONS)[number];
 
@@ -25,6 +30,11 @@ export const ACTION_LABEL: Record<BillingAuditAction, string> = {
   ADDON_CREATED: 'Add-on created',
   ADDON_CANCELLED: 'Add-on cancelled',
   SUBSCRIPTION_AUTO_CANCELLED: 'Subscription auto-cancelled',
+  PLAN_CATALOG_CREATED: 'Plan created',
+  PLAN_CATALOG_UPDATED: 'Plan updated',
+  PLAN_FEATURE_UPDATED: 'Plan feature updated',
+  PLAN_PROVIDER_MAPPING_UPDATED: 'Razorpay mapping updated',
+  COMPANY_FEATURE_FLAGS_UPDATED: 'Company feature flags updated',
 };
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'paused' | 'past_due' | 'cancelled' | 'expired';

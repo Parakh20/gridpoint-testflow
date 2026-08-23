@@ -73,7 +73,25 @@ export interface BillingProvider {
    * healthy paid subscription — see getInvoices' implementation note.
    */
   getInvoices(filter: InvoiceFilter): Promise<BillingInvoice[]>;
+  /**
+   * Create a new provider-side plan. Razorpay plan amounts are IMMUTABLE, so
+   * a price change is always "create a new plan and remap", never an edit —
+   * this is what makes that possible from the admin panel instead of a
+   * migration. Plans also cannot be deleted at Razorpay; an unmapped one is
+   * simply orphaned, which is harmless but permanent.
+   */
+  createPlan(params: {
+    name: string;
+    interval: 'monthly' | 'annual';
+    amountInr: number;
+    planSlug: string;
+  }): Promise<{ providerPlanId: string }>;
   verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean>;
+}
+
+/** 'rzp_live_...' vs 'rzp_test_...' — which Razorpay environment a key targets. */
+export function razorpayKeyMode(keyId: string): 'test' | 'live' {
+  return keyId.startsWith('rzp_live') ? 'live' : 'test';
 }
 
 const RAZORPAY_API_BASE = 'https://api.razorpay.com/v1';
@@ -256,6 +274,36 @@ export class RazorpayBillingProvider implements BillingProvider {
       // across filters — sort explicitly so the UI ordering is deterministic.
       // Draft invoices (no issued_at) sort last.
       .sort((a, b) => (b.issuedAt ?? '').localeCompare(a.issuedAt ?? ''));
+  }
+
+  async createPlan(params: {
+    name: string;
+    interval: 'monthly' | 'annual';
+    amountInr: number;
+    planSlug: string;
+  }): Promise<{ providerPlanId: string }> {
+    // Razorpay takes the amount in paise as an integer. Plan prices are
+    // NUMERIC(12,2) rupees locally, so round rather than truncate — a price
+    // of 24999.995 must not silently become 2499999 paise.
+    const amountPaise = Math.round(params.amountInr * 100);
+    if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
+      throw new Error(`Cannot create a Razorpay plan for a non-positive amount (${params.amountInr})`);
+    }
+
+    const data = await this.request<{ id: string }>('/plans', {
+      method: 'POST',
+      body: JSON.stringify({
+        period: params.interval === 'annual' ? 'yearly' : 'monthly',
+        interval: 1,
+        item: {
+          name: params.name,
+          amount: amountPaise,
+          currency: 'INR',
+        },
+        notes: { plan_slug: params.planSlug, interval: params.interval },
+      }),
+    });
+    return { providerPlanId: data.id };
   }
 
   async verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean> {

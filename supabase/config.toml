@@ -18,6 +18,12 @@ verify_jwt = false
 [functions.retention-cleanup]
 verify_jwt = false
 
+# Resend signs inbound-mail webhooks with Svix, not a Supabase JWT — without
+# this the gateway rejects the delivery before the handler's signature check
+# ever runs. Signature verification happens inside the function.
+[functions.resend-inbound]
+verify_jwt = false
+
 # Also reachable with a user JWT (a SUPERADMIN pressing "Check now"), which
 # the handler validates itself via auth.getUser() — so the gateway check is
 # redundant here and would block the cron path.

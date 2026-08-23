@@ -11,6 +11,7 @@ import { platformFetch } from './platformFetch';
 import { Subscription, BillingAuditLog, ACTION_LABEL, EnterpriseContract, SubscriptionAddon } from './billingTypes';
 import { EnterpriseContractsPanel } from './EnterpriseContractsPanel';
 import { SubscriptionAddonsPanel } from './SubscriptionAddonsPanel';
+import { CompanyFeatureFlagsPanel } from './CompanyFeatureFlagsPanel';
 
 interface Props {
   companyId: string | null;
@@ -149,6 +150,7 @@ export function SubscriptionDetailDrawer({ companyId, open, onOpenChange, onChan
 
             <EnterpriseContractsPanel companyId={companyId as string} contract={contract} onChanged={() => { onChanged(); load(); }} />
             <SubscriptionAddonsPanel companyId={companyId as string} addons={addons} onChanged={() => { onChanged(); load(); }} />
+            <CompanyFeatureFlagsPanel companyId={companyId as string} />
           </div>
         )}
       </SheetContent>

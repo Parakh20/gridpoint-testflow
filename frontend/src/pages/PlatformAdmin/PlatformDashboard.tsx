@@ -62,12 +62,15 @@ import {
   Power,
   TrendingUp,
   CreditCard,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { platformFetch } from './platformFetch';
 import { clearPlatformToken, getPlatformToken } from './platformToken';
 import { SalesTab } from './SalesTab';
 import { BillingTab } from './BillingTab';
+import { PlansTab } from './PlansTab';
+import { CompanyEmailPanel } from './CompanyEmailPanel';
 
 const BASE_DOMAIN = 'optimustesting.com';
 
@@ -651,6 +654,9 @@ export default function PlatformDashboard() {
             <TabsTrigger value="billing" className="gap-2">
               <CreditCard className="h-3.5 w-3.5" /> Billing
             </TabsTrigger>
+            <TabsTrigger value="plans" className="gap-2">
+              <Layers className="h-3.5 w-3.5" /> Plans
+            </TabsTrigger>
           </TabsList>
 
           {/* ── Companies tab ─────────────────────────────────────────────── */}
@@ -910,6 +916,9 @@ export default function PlatformDashboard() {
                                         </table>
                                       )}
                                     </div>
+
+                                    {/* Outbound + inbound mail for this company */}
+                                    <CompanyEmailPanel companyId={company.id} users={detail.users ?? []} />
 
                                     {/* OAuth / Google Sign-In Config */}
                                     <OAuthConfigPanel company={company} onSaved={(updated) => {
@@ -1213,6 +1222,10 @@ export default function PlatformDashboard() {
           {/* ── Billing tab ───────────────────────────────────────────────── */}
           <TabsContent value="billing">
             <BillingTab active={activeTab === 'billing'} />
+          </TabsContent>
+
+          <TabsContent value="plans">
+            <PlansTab active={activeTab === 'plans'} />
           </TabsContent>
 
         </Tabs>
