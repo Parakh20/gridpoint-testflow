@@ -33,6 +33,7 @@ import { formatDate } from '@/lib/format';
 import { EmptyState } from '@/components/EmptyState';
 import { platformFetch } from './platformFetch';
 import { LeadDetailDrawer } from './LeadDetailDrawer';
+import { SelfServeSignupsPanel } from './SelfServeSignupsPanel';
 import { Lead, LeadStage, LEAD_STAGES, STAGE_LABEL } from './leadTypes';
 
 const STAGE_BADGE: Record<LeadStage, string> = {
@@ -166,6 +167,10 @@ export function SalesTab({ active }: { active: boolean }) {
           </button>
         ))}
       </div>
+
+      {/* Companies that signed up with no lead behind them. Rendered above the
+          filters because it is a gap in the pipeline, not another view of it. */}
+      {!loading && <SelfServeSignupsPanel leads={leads} onLinked={fetchLeads} />}
 
       {/* Filters row */}
       <div className="flex flex-wrap items-center gap-3">

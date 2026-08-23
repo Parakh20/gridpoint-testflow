@@ -806,6 +806,79 @@ serve(async (req) => {
       return respond({ contact: written.data });
     }
 
+    // ── get_selfserve_signups ──────────────────────────────────────────────────
+    // Self-serve /start-trial means a company can now exist with no lead row
+    // behind it, because nobody ever worked it. The sales pipeline silently
+    // under-counts those. Rather than fabricate a lead (a signup is a customer,
+    // not a prospect — injecting it into an outreach pipeline would corrupt the
+    // "who have we contacted" record), surface them as their own list.
+    //
+    // A company counts as self-serve when no lead points at it via
+    // leads.company_id AND no lead's company_name matches its name.
+    if (action === 'get_selfserve_signups') {
+      const [companiesRes, leadsRes] = await Promise.all([
+        adminClient
+          .from('companies')
+          .select('id, name, slug, created_at, trial_ends_at')
+          .order('created_at', { ascending: false }),
+        adminClient.from('leads').select('id, company_id, company_name, stage'),
+      ]);
+      if (companiesRes.error) throw companiesRes.error;
+      if (leadsRes.error) throw leadsRes.error;
+
+      const leads = (leadsRes.data ?? []) as {
+        id: string; company_id: string | null; company_name: string; stage: string;
+      }[];
+      const linkedIds = new Set(leads.map(l => l.company_id).filter(Boolean));
+      const norm = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const leadsByName = new Map(leads.map(l => [norm(l.company_name), l]));
+
+      const unlinked = ((companiesRes.data ?? []) as Record<string, unknown>[])
+        .filter(c => !linkedIds.has(c.id as string))
+        .map(c => {
+          // A name match is a strong hint that sales DID work this company and
+          // just never linked the row — surface it as a suggestion rather than
+          // linking automatically, because names collide.
+          const suggestion = leadsByName.get(norm(String(c.name ?? '')));
+          return {
+            ...c,
+            suggested_lead_id: suggestion?.id ?? null,
+            suggested_lead_stage: suggestion?.stage ?? null,
+          };
+        });
+
+      return respond({ companies: unlinked, lead_count: leads.length });
+    }
+
+    // ── link_company_to_lead ───────────────────────────────────────────────────
+    // Attach a signed-up company to the lead that was worked to win it, so the
+    // pipeline reflects reality. Pass stage to close the lead out at the same
+    // time (typically WON).
+    if (action === 'link_company_to_lead') {
+      const lead_id = payload?.lead_id as string | undefined;
+      const company_id = payload?.company_id as string | undefined;
+      const stage = payload?.stage as string | undefined;
+      if (!lead_id || !company_id) {
+        return respond({ error: 'payload.lead_id and payload.company_id are required' }, 400);
+      }
+      const VALID_STAGES = ['NEW', 'CONTACTED', 'DEMO_BOOKED', 'PILOT', 'WON', 'LOST', 'PARKED'];
+      if (stage && !VALID_STAGES.includes(stage)) {
+        return respond({ error: `Invalid stage. Must be one of: ${VALID_STAGES.join(', ')}` }, 400);
+      }
+
+      const update: Record<string, unknown> = { company_id };
+      if (stage) update.stage = stage;
+
+      const { data, error } = await adminClient
+        .from('leads')
+        .update(update)
+        .eq('id', lead_id)
+        .select('*')
+        .single();
+      if (error) return respond({ error: error.message }, 400);
+      return respond({ lead: data });
+    }
+
     // ── delete_lead_contact ────────────────────────────────────────────────────
     if (action === 'delete_lead_contact') {
       const contact_id = payload?.contact_id as string | undefined;

@@ -120,3 +120,19 @@ later.
 
 Setting a contact primary also mirrors it onto `leads.contact_name/email/phone`,
 which is what the leads list column renders.
+
+
+## Self-serve signups are not leads
+
+`/start-trial` lets a company sign up with no sales involvement, so `companies`
+now contains tenants with no `leads` row. The pipeline counts above therefore
+describe *outreach*, not *all customers*.
+
+These are not auto-converted into leads. A signup is a customer, not a prospect —
+writing it into the outreach pipeline would corrupt exactly the record this
+contact book exists to keep ("who have we actually contacted, and how did it
+go"). Instead the Sales tab shows a **Self-serve signups** panel listing
+companies no lead points at, with a name-match suggestion where one exists.
+Linking a company to the lead that won it is a one-click action that also closes
+that lead at `WON` — but it stays a human decision, because company names
+collide.
