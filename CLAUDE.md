@@ -4,7 +4,7 @@
 
 ## What This Project Is
 
-**TestFlow** — multi-tenant B2B SaaS for electrical substation commissioning. Each client gets `company.testflow.io`. Field teams manage test projects, record measurements, generate PDF/AI reports.
+**TestFlow** — multi-tenant B2B SaaS for electrical substation commissioning, sold at `optimustesting.com` and served at `app.optimustesting.com`. Field teams manage test projects, record measurements, generate PDF/AI reports. (Per-company subdomains still resolve as cosmetic aliases — see the host model under Key Workflows — but the tenant comes from the signed-in user, not the URL.)
 
 - **Mobile app (`mobile/`)** — Expo/React Native for ENGINEER role. Same Supabase backend + RLS.
 - **Shared package (`packages/shared/`)** — source-only TS imported by web + mobile via `@testflow/shared`. Holds `EQUIPMENT_LABEL`, `AppRole/ROLE_RANK/highestRole()`, status constants, `explainSupabaseError`, `normalizeFields()`. No build step.
