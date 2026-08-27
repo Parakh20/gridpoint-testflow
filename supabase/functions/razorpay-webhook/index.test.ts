@@ -122,42 +122,26 @@ Deno.test('deduplicates a retried event with the same X-Razorpay-Event-Id', asyn
   }
 });
 
-Deno.test('an out-of-order (older) event does not overwrite newer subscription state', async () => {
-  const { company, subscription } = await seedTestCompanyWithSubscription();
+Deno.test('a subscription.* event is acknowledged but changes nothing', async () => {
+  // Billing moved to prepaid periods (20260827000004): there is no Razorpay
+  // subscription to mirror, so these events must be acknowledged rather than
+  // rejected — a straggler from the autopay era should not be retried
+  // forever — while leaving the row untouched.
+  const { company, subscription } = await seedTestCompanyWithSubscription({ status: 'active' });
   const client = getServiceClient();
   try {
-    const providerSubId = subscription.provider_subscription_id ?? `sub_${crypto.randomUUID()}`;
-    const newerSec = Math.floor(Date.now() / 1000);
-    const olderSec = newerSec - 60;
-
-    // Newer event applied first (simulating a delayed duplicate/retry of an
-    // older event arriving AFTER a newer one has already been processed —
-    // the exact scenario upsert_subscription's last_event_at guard exists
-    // for, per supabase/migrations/20260814000002_webhook_ordering_and_cancel_backstop.sql).
-    const newerRes = await postWebhook(
+    const nowSec = Math.floor(Date.now() / 1000);
+    const res = await postWebhook(
       subscriptionChargedPayload({
         companyId: company.id,
-        subscriptionId: providerSubId,
-        status: 'active',
-        currentStartSec: newerSec,
-        createdAtSec: newerSec,
-      }),
-      `evt_newer_${crypto.randomUUID()}`
-    );
-    assertEquals(newerRes.status, 200);
-
-    // Older (stale) event delivered late — must no-op, not regress status.
-    const staleRes = await postWebhook(
-      subscriptionChargedPayload({
-        companyId: company.id,
-        subscriptionId: providerSubId,
+        subscriptionId: subscription.provider_subscription_id ?? `sub_${crypto.randomUUID()}`,
         status: 'past_due',
-        currentStartSec: olderSec,
-        createdAtSec: olderSec,
+        currentStartSec: nowSec,
+        createdAtSec: nowSec,
       }),
-      `evt_older_${crypto.randomUUID()}`
+      `evt_sub_ignored_${crypto.randomUUID()}`
     );
-    assertEquals(staleRes.status, 200);
+    assertEquals(res.status, 200);
 
     const { data: finalSub, error } = await client
       .from('subscriptions')
@@ -165,7 +149,67 @@ Deno.test('an out-of-order (older) event does not overwrite newer subscription s
       .eq('id', subscription.id)
       .single();
     if (error) throw error;
-    assertEquals(finalSub?.status, 'active'); // NOT 'past_due' — the stale event must not have applied.
+    // 'past_due' from the payload must NOT have been applied.
+    assertEquals(finalSub?.status, 'active');
+  } finally {
+    await cleanupTestCompany(company.id);
+  }
+});
+
+Deno.test('a captured plan_renewal payment extends the paid period exactly once', async () => {
+  const { company, subscription } = await seedTestCompanyWithSubscription();
+  const client = getServiceClient();
+  try {
+    const { data: plan } = await client
+      .from('plans').select('id').eq('slug', 'starter').single();
+
+    const paymentId = `pay_${crypto.randomUUID().replace(/-/g, '').slice(0, 14)}`;
+    const renewalPayload = {
+      event: 'payment.captured',
+      created_at: Math.floor(Date.now() / 1000),
+      payload: {
+        payment: {
+          entity: {
+            id: paymentId,
+            amount: 2499900,
+            currency: 'INR',
+            notes: {
+              company_id: company.id,
+              order_type: 'plan_renewal',
+              plan_slug: 'starter',
+              billing_interval: 'monthly',
+            },
+          },
+        },
+      },
+    };
+
+    const first = await postWebhook(renewalPayload, `evt_renew_${crypto.randomUUID()}`);
+    assertEquals(first.status, 200);
+
+    const { data: afterFirst, error: firstErr } = await client
+      .from('subscriptions')
+      .select('current_period_end, plan_id, last_renewal_payment_id')
+      .eq('id', subscription.id)
+      .single();
+    if (firstErr) throw firstErr;
+    assertEquals(afterFirst?.plan_id, plan?.id);
+    assertEquals(afterFirst?.last_renewal_payment_id, paymentId);
+
+    // Razorpay delivers at least once. The SAME payment redelivered under a
+    // NEW event id clears the dedupe gate, so apply_plan_period's own
+    // idempotency is the only thing standing between a retry and a free
+    // period.
+    const replay = await postWebhook(renewalPayload, `evt_renew_replay_${crypto.randomUUID()}`);
+    assertEquals(replay.status, 200);
+
+    const { data: afterReplay, error: replayErr } = await client
+      .from('subscriptions')
+      .select('current_period_end')
+      .eq('id', subscription.id)
+      .single();
+    if (replayErr) throw replayErr;
+    assertEquals(afterReplay?.current_period_end, afterFirst?.current_period_end);
   } finally {
     await cleanupTestCompany(company.id);
   }

@@ -39,7 +39,7 @@ jobs:
         # branch test/ci-migration-fix, 2026-08-22) the local edge-runtime
         # started by `supabase start` only picked up custom function secrets
         # from `supabase/functions/.env` -- without it, both
-        # razorpay-webhook and reconcile-cancellations saw their secrets as
+        # razorpay-webhook saw its secrets as
         # unset and failed every test (500/401 instead of the expected
         # status). Keep both until this CLI behavior is better understood.
         run: |
@@ -103,8 +103,8 @@ jobs:
             _shared/billing_provider_invoices.test.ts \
             _shared/svix.test.ts \
             _shared/email_templates.test.ts \
-            razorpay-webhook/index.test.ts \
-            reconcile-cancellations/index.test.ts
+            _shared/billing_provider_orders.test.ts \
+            razorpay-webhook/index.test.ts
 
       - name: Stop local Supabase stack
         if: always()
