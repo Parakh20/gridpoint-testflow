@@ -2,8 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SubscriptionActions } from '@/components/SubscriptionActions';
-import { SubscribeCard } from '@/components/SubscribeCard';
+import { RenewPlanCard } from '@/components/RenewPlanCard';
 import { InvoiceHistoryCard } from '@/components/InvoiceHistoryCard';
 import { PlanComparisonCard } from '@/components/PlanComparisonCard';
 import { AddonsCard } from '@/components/AddonsCard';
@@ -14,8 +13,9 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useEntitlements } from '@/lib/entitlements';
 import { useUsage } from '@/lib/usage';
 import { type BillingInterval, type PlanOption } from '@/lib/planOptions';
+import { formatDate } from '@/lib/format';
 
-/** Shared shape for the three plan-picker queries below. */
+/** Shared shape for the plan-picker query below. */
 const PLAN_OPTION_COLUMNS = 'slug, name, monthly_price_inr, annual_price_inr';
 
 type PlanRow = {
@@ -40,17 +40,15 @@ export default function BillingSettingsPage() {
   const { user } = useAuth();
   const { company } = useCompany();
 
-  // A company with no Razorpay subscription on file yet (still on trial,
-  // never completed checkout) gets the Subscribe flow instead of the
-  // upgrade/downgrade/cancel actions, which all assume a provider
-  // subscription already exists.
+  // Prepaid model: the paid-through date is the only thing that matters.
+  // Past it the workspace is read-only until someone renews.
   const { data: subscription, isLoading: subLoading } = useQuery({
-    queryKey: ['has-provider-subscription', company?.id],
+    queryKey: ['subscription-period', company?.id],
     queryFn: async () => {
       if (!company) return null;
       const { data, error } = await supabase
         .from('subscriptions')
-        .select('provider_subscription_id, billing_interval')
+        .select('billing_interval, current_period_end, plan_id')
         .eq('company_id', company.id)
         .maybeSingle();
       if (error) throw error;
@@ -59,15 +57,25 @@ export default function BillingSettingsPage() {
     enabled: !!company,
   });
 
-  const hasProviderSubscription = !!subscription?.provider_subscription_id;
-  // Price the upgrade/downgrade choices in the interval the customer is
-  // actually billed in, so a annual subscriber doesn't compare their bill
-  // against a monthly sticker price.
+  const { data: isFrozen = false } = useQuery({
+    queryKey: ['workspace-frozen', company?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('is_workspace_frozen', {
+        _company_id: company!.id,
+      });
+      if (error) throw error;
+      return !!data;
+    },
+    enabled: !!company,
+  });
+
+  const periodEnd = subscription?.current_period_end ?? null;
+  const hasPaidPeriod = !!periodEnd;
   const currentInterval: BillingInterval =
     subscription?.billing_interval === 'annual' ? 'annual' : 'monthly';
 
-  const { data: subscribePlanOptions = [] } = useQuery({
-    queryKey: ['subscribe-plan-options'],
+  const { data: renewPlanOptions = [] } = useQuery({
+    queryKey: ['renew-plan-options'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('plans')
@@ -79,59 +87,6 @@ export default function BillingSettingsPage() {
       if (error) throw error;
       return (data ?? []).map(toPlanOption);
     },
-    enabled: !subLoading && !hasProviderSubscription,
-  });
-
-  // Lower-priced public plans than the current one — request_plan_downgrade
-  // (server-side) is the real enforcement of "must be a downgrade"; this
-  // list is just so the dropdown doesn't even offer a same/higher-priced
-  // plan in the first place.
-  const { data: downgradeOptions = [] } = useQuery({
-    queryKey: ['downgrade-plan-options', entitlements?.planSlug],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('plans')
-        .select(PLAN_OPTION_COLUMNS)
-        .eq('is_public', true)
-        .eq('is_active', true)
-        .order('monthly_price_inr', { ascending: true, nullsFirst: false });
-      if (error) throw error;
-
-      const current = (data ?? []).find(p => p.slug === entitlements?.planSlug);
-      const currentPrice = current?.monthly_price_inr ?? null;
-
-      return (data ?? [])
-        .filter(p => p.slug !== entitlements?.planSlug && p.monthly_price_inr !== null)
-        .filter(p => currentPrice === null || (p.monthly_price_inr as number) < currentPrice)
-        .map(toPlanOption);
-    },
-    enabled: !!entitlements?.planSlug,
-  });
-
-  // Higher-priced public, non-custom plans than the current one —
-  // check_plan_upgrade_eligibility (server-side) is the real enforcement;
-  // this list keeps the dropdown from offering an ineligible target.
-  const { data: upgradeOptions = [] } = useQuery({
-    queryKey: ['upgrade-plan-options', entitlements?.planSlug],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('plans')
-        .select(PLAN_OPTION_COLUMNS)
-        .eq('is_public', true)
-        .eq('is_active', true)
-        .eq('is_custom', false)
-        .order('monthly_price_inr', { ascending: true, nullsFirst: false });
-      if (error) throw error;
-
-      const current = (data ?? []).find(p => p.slug === entitlements?.planSlug);
-      const currentPrice = current?.monthly_price_inr ?? null;
-
-      return (data ?? [])
-        .filter(p => p.slug !== entitlements?.planSlug && p.monthly_price_inr !== null)
-        .filter(p => currentPrice !== null && (p.monthly_price_inr as number) > currentPrice)
-        .map(toPlanOption);
-    },
-    enabled: !!entitlements?.planSlug,
   });
 
   if (entitlementsLoading || usageLoading || subLoading) {
@@ -161,41 +116,38 @@ export default function BillingSettingsPage() {
                 <CardDescription className="mt-1">
                   {entitlements?.isCustom
                     ? 'Custom pricing — contact your account manager for details.'
-                    : hasProviderSubscription
-                      ? 'Your active subscription.'
-                      : 'No paid subscription yet.'}
+                    : isFrozen
+                      ? 'Your paid period has ended. The workspace is read-only until you renew.'
+                      : hasPaidPeriod
+                        ? <>Paid through {formatDate(periodEnd)}.</>
+                        : 'On trial — no period purchased yet.'}
                 </CardDescription>
               </div>
               <span
                 className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                  hasProviderSubscription
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-amber-500/10 text-amber-500'
+                  isFrozen
+                    ? 'bg-destructive/10 text-destructive'
+                    : hasPaidPeriod
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-amber-500/10 text-amber-500'
                 }`}
               >
-                {hasProviderSubscription ? 'Active' : 'Trial'}
+                {isFrozen ? 'Read-only' : hasPaidPeriod ? 'Active' : 'Trial'}
               </span>
             </div>
           </CardHeader>
-          {hasProviderSubscription && (
-            <CardContent>
-              <SubscriptionActions
-                currentPlanName={entitlements?.planName ?? 'your current plan'}
-                planOptions={downgradeOptions}
-                upgradeOptions={upgradeOptions}
-                billingInterval={currentInterval}
-                onChanged={() => window.location.reload()}
-              />
-            </CardContent>
-          )}
         </Card>
 
-        {!hasProviderSubscription && subscribePlanOptions.length > 0 && (
-          <SubscribeCard
-            planOptions={subscribePlanOptions}
+        {renewPlanOptions.length > 0 && (
+          <RenewPlanCard
+            planOptions={renewPlanOptions}
+            currentPlanSlug={entitlements?.planSlug}
+            currentInterval={currentInterval}
+            periodEnd={periodEnd}
+            isFrozen={isFrozen}
             companyName={company?.name}
             userEmail={user?.email}
-            onSubscribed={() => window.location.reload()}
+            onRenewed={() => window.location.reload()}
           />
         )}
 
@@ -203,7 +155,7 @@ export default function BillingSettingsPage() {
           companyId={company?.id}
           companyName={company?.name}
           userEmail={user?.email}
-          hasSubscription={hasProviderSubscription}
+          hasSubscription={hasPaidPeriod && !isFrozen}
           onPurchased={() => window.location.reload()}
         />
 

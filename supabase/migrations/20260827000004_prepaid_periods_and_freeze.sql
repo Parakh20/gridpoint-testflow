@@ -165,19 +165,29 @@ REVOKE ALL ON FUNCTION apply_plan_period(UUID, UUID, TEXT, TEXT, NUMERIC) FROM P
 GRANT EXECUTE ON FUNCTION apply_plan_period(UUID, UUID, TEXT, TEXT, NUMERIC) TO service_role;
 
 -- ── orders.type gains plan_renewal ─────────────────────────────────────────
+-- The original CHECK is inline and therefore auto-named, so drop whatever
+-- check constraint currently mentions `type` rather than guessing the name —
+-- guessing wrong leaves the old constraint in place and every plan_renewal
+-- order fails at insert time.
 DO $$
+DECLARE
+  constraint_name TEXT;
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'orders_type_check' AND conrelid = 'orders'::regclass
-  ) THEN
-    ALTER TABLE orders DROP CONSTRAINT orders_type_check;
-  END IF;
+  FOR constraint_name IN
+    SELECT conname FROM pg_constraint
+    WHERE conrelid = 'orders'::regclass
+      AND contype = 'c'
+      AND pg_get_constraintdef(oid) ILIKE '%type%'
+  LOOP
+    EXECUTE format('ALTER TABLE orders DROP CONSTRAINT %I', constraint_name);
+  END LOOP;
 END $$;
 
+-- 'subscription' is kept even though autopay is going away: historical orders
+-- from the subscription era must not be invalidated by a constraint change.
 ALTER TABLE orders
   ADD CONSTRAINT orders_type_check
-  CHECK (type IN ('implementation', 'addon', 'custom_development', 'training', 'plan_renewal'));
+  CHECK (type IN ('subscription', 'implementation', 'addon', 'custom_development', 'training', 'plan_renewal'));
 
 -- ── freeze enforcement ─────────────────────────────────────────────────────
 -- can_create_project already gates the projects INSERT policy; adding the

@@ -16,7 +16,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 // which imports the real Supabase client — that client throws at module
 // load ("supabaseUrl is required") because this environment has no
 // VITE_SUPABASE_URL/.env. Other tests touching Supabase-backed components
-// (SubscriptionActions.test.tsx, UpgradeModal.test.tsx) mock the client the
+// (RenewPlanCard.test.tsx, UpgradeModal.test.tsx) mock the client the
 // same way. GM never hits the SUPERVISOR/ENGINEER notification-fetch path,
 // so a minimal chainable stub is enough to satisfy the import and the
 // realtime-channel subscribe/cleanup calls in NotificationBell/lib/realtime.

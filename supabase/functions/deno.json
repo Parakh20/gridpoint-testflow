@@ -4,7 +4,6 @@
     "include": [
       "_shared/",
       "razorpay-webhook/",
-      "reconcile-cancellations/",
       "notify-rework/",
       "retention-cleanup/",
       "start-trial/",
@@ -16,7 +15,6 @@
     "include": [
       "_shared/",
       "razorpay-webhook/",
-      "reconcile-cancellations/",
       "notify-rework/",
       "retention-cleanup/",
       "start-trial/",

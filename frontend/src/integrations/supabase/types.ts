@@ -878,6 +878,69 @@ export type Database = {
           },
         ]
       }
+      outreach_drafts: {
+        Row: {
+          body: string
+          contact_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          lead_id: string
+          message_id: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+          to_email: string
+          to_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          contact_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          lead_id: string
+          message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+          to_email: string
+          to_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          contact_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          lead_id?: string
+          message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          to_email?: string
+          to_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_drafts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "lead_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_drafts_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_features: {
         Row: {
           config: Json
@@ -1175,6 +1238,44 @@ export type Database = {
         }
         Relationships: []
       }
+      renewal_notifications: {
+        Row: {
+          company_id: string
+          created_at: string
+          days_before: number
+          error: string | null
+          id: string
+          period_end: string
+          sent_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          days_before: number
+          error?: string | null
+          id?: string
+          period_end: string
+          sent_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          days_before?: number
+          error?: string | null
+          id?: string
+          period_end?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewal_notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rework_notifications: {
         Row: {
           company_id: string
@@ -1308,6 +1409,8 @@ export type Database = {
           discount_pct: number | null
           id: string
           last_event_at: string | null
+          last_renewal_payment_id: string | null
+          last_renewed_at: string | null
           pending_plan_id: string | null
           pending_plan_requested_at: string | null
           plan_id: string | null
@@ -1316,6 +1419,7 @@ export type Database = {
           provider_plan_id: string | null
           provider_subscription_id: string | null
           raw_provider_payload: Json | null
+          renewal_reminder_sent_at: string | null
           seat_count: number
           status: string
           updated_at: string
@@ -1331,6 +1435,8 @@ export type Database = {
           discount_pct?: number | null
           id?: string
           last_event_at?: string | null
+          last_renewal_payment_id?: string | null
+          last_renewed_at?: string | null
           pending_plan_id?: string | null
           pending_plan_requested_at?: string | null
           plan_id?: string | null
@@ -1339,6 +1445,7 @@ export type Database = {
           provider_plan_id?: string | null
           provider_subscription_id?: string | null
           raw_provider_payload?: Json | null
+          renewal_reminder_sent_at?: string | null
           seat_count?: number
           status?: string
           updated_at?: string
@@ -1354,6 +1461,8 @@ export type Database = {
           discount_pct?: number | null
           id?: string
           last_event_at?: string | null
+          last_renewal_payment_id?: string | null
+          last_renewed_at?: string | null
           pending_plan_id?: string | null
           pending_plan_requested_at?: string | null
           plan_id?: string | null
@@ -1362,6 +1471,7 @@ export type Database = {
           provider_plan_id?: string | null
           provider_subscription_id?: string | null
           raw_provider_payload?: Json | null
+          renewal_reminder_sent_at?: string | null
           seat_count?: number
           status?: string
           updated_at?: string
@@ -1626,6 +1736,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_plan_period: {
+        Args: {
+          _amount_paid_inr: number
+          _company_id: string
+          _interval: string
+          _plan_id: string
+          _provider_payment_id: string
+        }
+        Returns: Json
+      }
       apply_plan_upgrade: {
         Args: {
           _company_id?: string
@@ -1704,6 +1824,7 @@ export type Database = {
         Args: { _company_id: string }
         Returns: boolean
       }
+      is_workspace_frozen: { Args: { _company_id?: string }; Returns: boolean }
       mark_custom_domain_provisioned: {
         Args: { _domain: string }
         Returns: Json
@@ -1727,6 +1848,7 @@ export type Database = {
         }[]
       }
       purge_old_soft_deleted: { Args: never; Returns: Json }
+      queue_renewal_reminders: { Args: never; Returns: number }
       rate_limit_check: {
         Args: { _key: string; _limit: number; _window_minutes: number }
         Returns: boolean

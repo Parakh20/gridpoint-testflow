@@ -1,6 +1,9 @@
-// Razorpay webhook handler — verifies signature, dedupes by event id,
-// dispatches subscription/payment/invoice events, upserts subscription
-// or order rows accordingly.
+// Razorpay webhook handler — verifies signature, dedupes by event id, and
+// turns captured one-time payments into `orders` plus the thing they bought:
+// a billing period (plan_renewal) or an entitlement (addon).
+//
+// Billing is prepaid since 20260827000004, so subscription.* events are
+// acknowledged and ignored rather than mirrored into `subscriptions`.
 //
 // Required secrets (set via `supabase secrets set`):
 //   RAZORPAY_WEBHOOK_SECRET   the secret configured in Razorpay → Webhooks
@@ -17,28 +20,6 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'content-type, x-razorpay-signature',
 };
-
-function mapRazorpayStatus(razorpayStatus: string): string {
-  switch (razorpayStatus) {
-    case 'created':
-    case 'authenticated':
-      return 'trialing';
-    case 'active':
-      return 'active';
-    case 'pending':
-    case 'halted':
-      return 'past_due';
-    case 'paused':
-      return 'paused';
-    case 'cancelled':
-      return 'cancelled';
-    case 'completed':
-    case 'expired':
-      return 'expired';
-    default:
-      return 'active';
-  }
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -102,31 +83,13 @@ Deno.serve(async (req) => {
       return json({ ok: true, deduped: true, event: eventType });
     }
 
-    // Subscription lifecycle events
+    // Subscription lifecycle events are no longer acted on: billing moved to
+    // prepaid periods bought as one-time orders (migration 20260827000004),
+    // so there is no Razorpay subscription to mirror. Acknowledged rather
+    // than rejected — the webhook still has the events enabled, and any
+    // straggler from the autopay era must not be retried forever.
     if (sub && eventType.startsWith('subscription.')) {
-      const { error } = await supabase.rpc('upsert_subscription', {
-        _company_id: companyId,
-        _provider_sub_id: sub.id,
-        _provider_cust_id: sub.customer_id ?? null,
-        _provider_plan_id: sub.plan_id ?? null,
-        _status: mapRazorpayStatus(sub.status),
-        _period_start: sub.current_start ? new Date(sub.current_start * 1000).toISOString() : null,
-        _period_end:   sub.current_end   ? new Date(sub.current_end   * 1000).toISOString() : null,
-        _seat_count: sub.quantity ?? 0,
-        _raw: event,
-        _event_created_at: event.created_at ? new Date(event.created_at * 1000).toISOString() : null,
-      });
-      if (error) {
-        logEdgeError('razorpay-webhook', 'payment_failure', error, { step: 'upsert_subscription', eventType, companyId, subId: sub.id });
-        // Compensating delete: undo the dedupe-gate insert so a legitimate
-        // Razorpay retry isn't silently swallowed as "already processed" —
-        // this event never actually completed.
-        await supabase.from('billing_events').delete()
-          .eq('provider', 'razorpay')
-          .eq('provider_event_id', eventId);
-        return json({ error: error.message }, 500);
-      }
-      return json({ ok: true, event: eventType, company_id: companyId });
+      return json({ ok: true, ignored: eventType, reason: 'prepaid billing — subscriptions not used' });
     }
 
     // Payment events: subscription charges are already covered by
@@ -135,7 +98,7 @@ Deno.serve(async (req) => {
     // and written to `orders` instead.
     if (payment && (eventType === 'payment.captured' || eventType === 'payment.failed')) {
       const orderType = payment.notes?.order_type;
-      if (orderType && ['implementation', 'addon', 'custom_development', 'training'].includes(orderType)) {
+      if (orderType && ['implementation', 'addon', 'custom_development', 'training', 'plan_renewal'].includes(orderType)) {
         const { error } = await supabase.rpc('upsert_order', {
           _company_id: companyId,
           _type: orderType,
@@ -154,6 +117,38 @@ Deno.serve(async (req) => {
             .eq('provider', 'razorpay')
             .eq('provider_event_id', eventId);
           return json({ error: error.message }, 500);
+        }
+
+        // A renewal buys a billing period. Prepaid model: this is the only
+        // thing that moves current_period_end, and therefore the only thing
+        // that lifts a freeze.
+        if (orderType === 'plan_renewal' && eventType === 'payment.captured') {
+          const planSlug = payment.notes?.plan_slug;
+          const { data: plan } = await supabase
+            .from('plans').select('id').eq('slug', planSlug).maybeSingle();
+
+          const { error: periodError } = plan
+            ? await supabase.rpc('apply_plan_period', {
+                _company_id: companyId,
+                _plan_id: plan.id,
+                _interval: payment.notes?.billing_interval ?? 'monthly',
+                _provider_payment_id: payment.id,
+                _amount_paid_inr: (payment.amount ?? 0) / 100,
+              })
+            : { error: { message: `Unknown plan slug in renewal notes: ${planSlug}` } };
+
+          if (periodError) {
+            // Money captured, period not extended — the customer paid and is
+            // still frozen. Loud, and the dedupe gate is released so
+            // Razorpay's retry can finish the job.
+            logEdgeError('razorpay-webhook', 'payment_failure', periodError, {
+              step: 'apply_plan_period', eventType, companyId, paymentId: payment.id, planSlug,
+            });
+            await supabase.from('billing_events').delete()
+              .eq('provider', 'razorpay')
+              .eq('provider_event_id', eventId);
+            return json({ error: periodError.message }, 500);
+          }
         }
 
         // Recording the order is only half of an add-on purchase — the
