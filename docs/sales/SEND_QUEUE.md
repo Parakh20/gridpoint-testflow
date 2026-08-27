@@ -231,8 +231,9 @@ Per message, before hitting send:
 - [ ] Names the company's actual work — the Hook line, not "your organisation"
 - [ ] Says where the address came from (their website)
 - [ ] Carries a real signature: name, Optimus Testing, phone
-- [ ] Has a plain opt-out line — "reply STOP and I won't write again" — honoured
-      permanently
+- [ ] No "reply STOP" boilerplate — it reads as bulk mail. Anyone who asks to
+      stop is marked OPTED_OUT on their contact instead, which send_outreach_draft
+      refuses permanently
 - [ ] Logged as a `lead_activities` row afterwards
 
 Expected: a handful of replies, 1-3 demos. The named contacts are worth more

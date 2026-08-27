@@ -65,8 +65,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-If you'd rather not hear from me, reply STOP and I won't write again.
 ```
 
 ## Template B — role inbox
@@ -102,8 +100,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-Reply STOP and I won't write again.
 ```
 
 ## The hook line is the whole campaign
@@ -135,24 +131,26 @@ a blast.
 - **Subject stays plain and specific.** No "Revolutionize", no "Transform", no
   emoji.
 
-## Follow-up
+## No opt-out line, and no follow-up
 
-One follow-up, five to seven working days later, on the same thread so it threads
-under the original. Never a second.
+Both were in an earlier version and both are gone.
 
-```
-{Salutation},
+**"Reply STOP and I won't write again"** is bulk-campaign boilerplate. On a
+message whose entire claim is that a person sat down and wrote it, that line is
+the tell that says otherwise — nobody writes it to one recipient. The obligation
+it stood for does not change: anyone who asks not to be contacted gets marked
+`OPTED_OUT` on their `lead_contacts` row, and `send_outreach_draft` refuses to
+send to that status permanently. The enforcement lives in the code, which is a
+better place for it than a sentence at the bottom of an email.
 
-Following up once on the below, then I'll leave it.
+**The follow-up email** is gone too. One message per company, and the reply — or
+the silence — is the answer. If a lead is worth chasing, chase it by phone: at
+this size the proprietor answers his mobile, and a call is a different channel
+rather than the same message again.
 
-The offer stands — one project, free, start to finish. If it's not a priority
-right now, just say so and I'll stop.
-
-Parakh
-```
-
-Any reply cancels every later step for that contact. Continuing to send after a
-human has replied is the fastest way to look like a spammer to a real buyer.
+The `next_action_date` the panel sets on send still stands. It puts the lead in
+the queue's Overdue bucket so it comes back for a decision; what that decision
+is no longer defaults to "send another email".
 
 ## After each send
 

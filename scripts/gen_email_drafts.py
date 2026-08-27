@@ -134,8 +134,11 @@ your team time at handover, you've lost nothing but the call.
 
 15 minutes this week?"""
 
-OPT_OUT_NAMED = "If you'd rather not hear from me, reply STOP and I won't write again."
-OPT_OUT_ROLE = "Reply STOP and I won't write again."
+# No "reply STOP" line. It is bulk-campaign boilerplate, and on a message whose
+# entire claim is that a person sat down and wrote it, the line is the tell that
+# says otherwise. The obligation it stood for is unchanged: anyone who asks not
+# to be contacted is marked OPTED_OUT on their lead_contacts row, which
+# send_outreach_draft refuses to send to, permanently.
 
 
 def render_draft(entry):
@@ -146,13 +149,11 @@ def render_draft(entry):
     if named:
         subject = f"Commissioning test records at {short_name(entry['company'])} — from IIT Bombay"
         body = BODY_NAMED.format(domain=domain_of(to['email']), hook=hook)
-        opt_out = OPT_OUT_NAMED
     else:
         subject = 'For your T&C head — commissioning software from IIT Bombay'
         body = BODY_ROLE.format(hook=hook)
-        opt_out = OPT_OUT_ROLE
 
-    return subject, f"{salutation(to)},\n\n{body}\n\n{SIGNATURE}\n\n{opt_out}"
+    return subject, f"{salutation(to)},\n\n{body}\n\n{SIGNATURE}"
 
 
 def main():

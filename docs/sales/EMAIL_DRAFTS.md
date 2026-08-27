@@ -59,8 +59,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-If you'd rather not hear from me, reply STOP and I won't write again.
 ```
 
 
@@ -104,8 +102,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-If you'd rather not hear from me, reply STOP and I won't write again.
 ```
 
 
@@ -148,8 +144,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-Reply STOP and I won't write again.
 ```
 
 
@@ -192,8 +186,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-Reply STOP and I won't write again.
 ```
 
 
@@ -236,8 +228,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-Reply STOP and I won't write again.
 ```
 
 
@@ -280,8 +270,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-Reply STOP and I won't write again.
 ```
 
 
@@ -324,8 +312,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-Reply STOP and I won't write again.
 ```
 
 
@@ -368,8 +354,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-Reply STOP and I won't write again.
 ```
 
 
@@ -412,8 +396,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-Reply STOP and I won't write again.
 ```
 
 
@@ -456,8 +438,6 @@ your team time at handover, you've lost nothing but the call.
 Parakh Sharma
 Optimus Testing
 +91 94135 52887
-
-Reply STOP and I won't write again.
 ```
 
 
