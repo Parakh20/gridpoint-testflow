@@ -8,12 +8,11 @@ only, with 14 large or listed companies deferred (see
 copy: [EMAIL_TEMPLATES.md](EMAIL_TEMPLATES.md). Addresses and bounce fallbacks:
 [SEND_QUEUE.md](SEND_QUEUE.md).
 
-**Every draft has one deliberate blank.** `{HOOK ...}` is the only sentence in
-the message that proves a person read their website, and it is left empty on
-purpose: the research below each draft is notes, not prose, and no template
-turns notes into a sentence that reads like a human wrote it. Write that line
-yourself. It takes about twenty seconds and it is the entire difference between
-this campaign and a blast.
+**These are complete — no blanks left to fill.** The hook sentence in each, the
+one line that proves a person read their website, is hand-written per company in
+`scripts/outreach_hooks.py` from the research shown beneath each draft. Read it
+before sending anyway: if anything on their site has changed, the hook is the
+sentence that will be wrong, and it is the one the prospect will quote back.
 
 Two other rules, repeated here because they are easy to lose while pasting:
 send plain text with no attachment, and never imply a customer that doesn't
@@ -47,7 +46,7 @@ signal. Supervisors approve from anywhere. The handover report — PDF and Excel
 generates itself when the project closes, instead of being assembled by hand
 weeks later from whatever is on which laptop.
 
-{HOOK — one sentence naming their actual work. See research above.}
+You're running erection, T&C and O&M across Gujarat with a lot of substations live at once. That concurrency is exactly where test records stop being findable.
 
 It's live at https://optimustesting.com — worth a two-minute look before you
 decide whether to reply.
@@ -92,7 +91,7 @@ signal. Supervisors approve from anywhere. The handover report — PDF and Excel
 generates itself when the project closes, instead of being assembled by hand
 weeks later from whatever is on which laptop.
 
-{HOOK — one sentence naming their actual work. See research above.}
+Transerect is built purely around T&C, so the site test report isn't a by-product for you — it is the deliverable. That's the part this makes automatic.
 
 It's live at https://optimustesting.com — worth a two-minute look before you
 decide whether to reply.
@@ -136,7 +135,7 @@ signal. Supervisors approve from anywhere. The handover report — PDF and Excel
 generates itself when the project closes, instead of being assembled by hand
 weeks later.
 
-{HOOK — one sentence naming their actual work. See research above.}
+You test every protection relay type on OMICRON, Megger and Doble, and hand over formal IEC/IEEE test reports at the end. Those kits each produce their own output; the report is still assembled afterwards. That assembly is what this removes.
 
 It's live at https://optimustesting.com — worth a two-minute look before you
 decide whether to reply.
@@ -180,7 +179,7 @@ signal. Supervisors approve from anywhere. The handover report — PDF and Excel
 generates itself when the project closes, instead of being assembled by hand
 weeks later.
 
-{HOOK — one sentence naming their actual work. See research above.}
+You're running OMICRON, Megger and Doble across every major relay make, AIS and GIS, and writing site test reports off the back of all of it. The reports are the part I'm trying to make automatic.
 
 It's live at https://optimustesting.com — worth a two-minute look before you
 decide whether to reply.
@@ -224,7 +223,7 @@ signal. Supervisors approve from anywhere. The handover report — PDF and Excel
 generates itself when the project closes, instead of being assembled by hand
 weeks later.
 
-{HOOK — one sentence naming their actual work. See research above.}
+As an independent TPIA your report is the product — clients pay for its credibility precisely because you're not tied to an OEM. Thirty years of that reputation is a lot to leave sitting in files on individual laptops.
 
 It's live at https://optimustesting.com — worth a two-minute look before you
 decide whether to reply.
@@ -268,7 +267,7 @@ signal. Supervisors approve from anywhere. The handover report — PDF and Excel
 generates itself when the project closes, instead of being assembled by hand
 weeks later.
 
-{HOOK — one sentence naming their actual work. See research above.}
+You cover ABB, Siemens, GE, SEL and Alstom relays across Tamil Nadu — every make with its own output format, and one coherent handover pack expected at the end of the job.
 
 It's live at https://optimustesting.com — worth a two-minute look before you
 decide whether to reply.
@@ -312,7 +311,7 @@ signal. Supervisors approve from anywhere. The handover report — PDF and Excel
 generates itself when the project closes, instead of being assembled by hand
 weeks later.
 
-{HOOK — one sentence naming their actual work. See research above.}
+You're growing fast across solar EPC and substation O&M in Maharashtra. Growth is exactly when test records stop fitting in whatever worked at ten projects.
 
 It's live at https://optimustesting.com — worth a two-minute look before you
 decide whether to reply.
@@ -356,7 +355,7 @@ signal. Supervisors approve from anywhere. The handover report — PDF and Excel
 generates itself when the project closes, instead of being assembled by hand
 weeks later.
 
-{HOOK — one sentence naming their actual work. See research above.}
+NABL accreditation means every result has to be traceable to who recorded it and when. That trail is kept automatically here rather than reconstructed when someone asks for it.
 
 It's live at https://optimustesting.com — worth a two-minute look before you
 decide whether to reply.
@@ -400,7 +399,7 @@ signal. Supervisors approve from anywhere. The handover report — PDF and Excel
 generates itself when the project closes, instead of being assembled by hand
 weeks later.
 
-{HOOK — one sentence naming their actual work. See research above.}
+You run a dedicated T&C team on EHV substations up to 765 kV with many projects going at once. At that volume the handover backlog is an arithmetic problem before it's anything else.
 
 It's live at https://optimustesting.com — worth a two-minute look before you
 decide whether to reply.
@@ -444,7 +443,7 @@ signal. Supervisors approve from anywhere. The handover report — PDF and Excel
 generates itself when the project closes, instead of being assembled by hand
 weeks later.
 
-{HOOK — one sentence naming their actual work. See research above.}
+You run T&C to IS standards across EHV substations, transformer yards, RMUs and pad-mount switchgear, on projects in two countries. The more standards and sites in play, the more of the handover pack is manual assembly.
 
 It's live at https://optimustesting.com — worth a two-minute look before you
 decide whether to reply.

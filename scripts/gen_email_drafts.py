@@ -20,6 +20,7 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / 'scripts'))
 
 from gen_send_queue import build_entries, clean  # noqa: E402  (path set above)
+from outreach_hooks import hook_for  # noqa: E402
 
 OUT_PATH = REPO / 'docs/sales/EMAIL_DRAFTS.md'
 
@@ -115,7 +116,7 @@ OPT_OUT_ROLE = "Reply STOP and I won't write again."
 def render_draft(entry):
     to = entry['to']
     named = bool(clean(to.get('name')))
-    hook = HOOK_PLACEHOLDER
+    hook = hook_for(entry['company']) or HOOK_PLACEHOLDER
 
     if named:
         short = entry['company'].split(' Pvt')[0].strip()
@@ -148,12 +149,11 @@ only, with {deferred} large or listed companies deferred (see
 copy: [EMAIL_TEMPLATES.md](EMAIL_TEMPLATES.md). Addresses and bounce fallbacks:
 [SEND_QUEUE.md](SEND_QUEUE.md).
 
-**Every draft has one deliberate blank.** `{{HOOK ...}}` is the only sentence in
-the message that proves a person read their website, and it is left empty on
-purpose: the research below each draft is notes, not prose, and no template
-turns notes into a sentence that reads like a human wrote it. Write that line
-yourself. It takes about twenty seconds and it is the entire difference between
-this campaign and a blast.
+**These are complete — no blanks left to fill.** The hook sentence in each, the
+one line that proves a person read their website, is hand-written per company in
+`scripts/outreach_hooks.py` from the research shown beneath each draft. Read it
+before sending anyway: if anything on their site has changed, the hook is the
+sentence that will be wrong, and it is the one the prospect will quote back.
 
 Two other rules, repeated here because they are easy to lose while pasting:
 send plain text with no attachment, and never imply a customer that doesn't
