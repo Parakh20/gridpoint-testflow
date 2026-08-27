@@ -197,22 +197,102 @@ Deno.serve(async (req) => {
 
       if (planError || !targetPlan) return json({ error: `Unknown plan: ${targetSlug}` }, 400);
 
+      // Everything the provider push needs is read BEFORE request_plan_downgrade
+      // runs, so a company whose plan has no Razorpay mapping is rejected
+      // outright rather than left with a pending downgrade that can never
+      // reach the provider. A company with no provider subscription at all
+      // (still on trial) is a legitimate DB-only downgrade and continues.
+      const { data: subscription } = await adminClient
+        .from('subscriptions')
+        .select('provider_subscription_id, billing_interval, plan_id')
+        .eq('company_id', callerProfile.company_id)
+        .maybeSingle();
+
+      const providerSubscriptionId = subscription?.provider_subscription_id ?? null;
+      let providerPlanId: string | null = null;
+
+      if (providerSubscriptionId) {
+        const { data: providerMapping } = await adminClient
+          .from('plan_provider_mapping')
+          .select('razorpay_plan_id_monthly, razorpay_plan_id_annual')
+          .eq('plan_id', targetPlan.id)
+          .maybeSingle();
+
+        providerPlanId = (subscription?.billing_interval === 'annual'
+          ? providerMapping?.razorpay_plan_id_annual
+          : providerMapping?.razorpay_plan_id_monthly) ?? null;
+
+        if (!providerPlanId) {
+          return json({ error: 'This plan is not yet available for self-service plan changes' }, 400);
+        }
+      }
+
+      // Captured before the change so the audit log records what the company
+      // moved FROM. Same two-FK ambiguity as the upgrade path, so it is a
+      // separate lookup rather than a PostgREST embed.
+      let priorPlanSlug: string | null = null;
+      if (subscription?.plan_id) {
+        const { data: priorPlan } = await adminClient
+          .from('plans')
+          .select('slug')
+          .eq('id', subscription.plan_id)
+          .maybeSingle();
+        priorPlanSlug = priorPlan?.slug ?? null;
+      }
+
       const { data, error } = await callerClient.rpc('request_plan_downgrade', {
         _company_id: callerProfile.company_id,
         _target_plan_id: targetPlan.id,
       });
       if (error) return json({ error: error.message }, 400);
-
-      // TODO(Plan 2): once BillingProvider exists, call
-      // billingProvider.changeSubscription(...) here to update the
-      // provider-side plan/quantity for the NEXT billing cycle, matching
-      // the pending_plan_id this RPC just set. Until Plan 2 lands, the
-      // downgrade is scheduled DB-side only and applied automatically by
-      // upsert_subscription (Task 4) the next time any webhook event
-      // reports a period rollover — which won't happen until Plan 2 wires
-      // real webhook delivery.
-
       if (data?.scheduled === false) return json(data, 409);
+
+      if (!providerSubscriptionId) {
+        // No provider subscription to change — the pending_plan_id the RPC
+        // just set is the whole downgrade, applied by upsert_subscription on
+        // the next period rollover if a subscription later appears.
+        return json(data);
+      }
+
+      const keyId = Deno.env.get('RAZORPAY_KEY_ID');
+      const keySecret = Deno.env.get('RAZORPAY_KEY_SECRET');
+      if (!keyId || !keySecret) {
+        logEdgeError('manage-subscription', 'payment_failure', new Error('Razorpay credentials not configured'));
+        return json({ error: 'Billing provider not configured' }, 500);
+      }
+
+      try {
+        // 'cycle_end' — a downgrade must not take effect mid-cycle: the
+        // company paid for the current period at the higher tier and keeps
+        // those limits until it ends, which is exactly what pending_plan_id
+        // models locally.
+        await new RazorpayBillingProvider(keyId, keySecret).changeSubscription(
+          providerSubscriptionId,
+          providerPlanId as string,
+          'cycle_end',
+        );
+      } catch (err: unknown) {
+        // Deliberately NOT rolled back, matching the cancellation flow: the
+        // tenant confirmed the downgrade and the local schedule stands. A
+        // silent revert here would show the old plan while the operator
+        // believes a downgrade is pending. Surfaced as a warning so the
+        // caller knows the provider side still needs attention.
+        logEdgeError('manage-subscription', 'payment_failure', err);
+        const message = err instanceof Error ? err.message : 'Failed to schedule the plan change with the billing provider';
+        return json({ ...data, provider_downgrade_warning: message });
+      }
+
+      const { error: auditError } = await adminClient.from('billing_audit_logs').insert({
+        actor: caller.email ?? caller.id,
+        company_id: callerProfile.company_id,
+        action: 'PLAN_CHANGED',
+        old_value: { plan_slug: priorPlanSlug },
+        new_value: { plan_slug: targetSlug, trigger: 'self_service_downgrade', effective: 'cycle_end' },
+      });
+      if (auditError) {
+        logEdgeError('manage-subscription', 'payment_failure', auditError);
+      }
+
       return json(data);
     }
 
