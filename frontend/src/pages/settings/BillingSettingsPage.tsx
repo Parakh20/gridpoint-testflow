@@ -11,6 +11,26 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useEntitlements } from '@/lib/entitlements';
 import { useUsage } from '@/lib/usage';
+import { formatPlanPrice, type BillingInterval, type PlanOption } from '@/lib/planOptions';
+
+/** Shared shape for the three plan-picker queries below. */
+const PLAN_OPTION_COLUMNS = 'slug, name, monthly_price_inr, annual_price_inr';
+
+type PlanRow = {
+  slug: string;
+  name: string;
+  monthly_price_inr: number | null;
+  annual_price_inr: number | null;
+};
+
+function toPlanOption(p: PlanRow): PlanOption {
+  return {
+    slug: p.slug,
+    name: p.name,
+    monthlyPriceInr: p.monthly_price_inr,
+    annualPriceInr: p.annual_price_inr,
+  };
+}
 
 export default function BillingSettingsPage() {
   const { entitlements, isLoading: entitlementsLoading } = useEntitlements();
@@ -22,35 +42,59 @@ export default function BillingSettingsPage() {
   // never completed checkout) gets the Subscribe flow instead of the
   // upgrade/downgrade/cancel actions, which all assume a provider
   // subscription already exists.
-  const { data: hasProviderSubscription, isLoading: subLoading } = useQuery({
+  const { data: subscription, isLoading: subLoading } = useQuery({
     queryKey: ['has-provider-subscription', company?.id],
     queryFn: async () => {
-      if (!company) return false;
+      if (!company) return null;
       const { data, error } = await supabase
         .from('subscriptions')
-        .select('provider_subscription_id')
+        .select('provider_subscription_id, billing_interval')
         .eq('company_id', company.id)
         .maybeSingle();
       if (error) throw error;
-      return !!data?.provider_subscription_id;
+      return data;
     },
     enabled: !!company,
   });
+
+  const hasProviderSubscription = !!subscription?.provider_subscription_id;
+  // Price the upgrade/downgrade choices in the interval the customer is
+  // actually billed in, so a annual subscriber doesn't compare their bill
+  // against a monthly sticker price.
+  const currentInterval: BillingInterval =
+    subscription?.billing_interval === 'annual' ? 'annual' : 'monthly';
 
   const { data: subscribePlanOptions = [] } = useQuery({
     queryKey: ['subscribe-plan-options'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('plans')
-        .select('slug, name')
+        .select(PLAN_OPTION_COLUMNS)
         .eq('is_public', true)
         .eq('is_active', true)
         .eq('is_custom', false)
         .order('monthly_price_inr', { ascending: true, nullsFirst: false });
       if (error) throw error;
-      return (data ?? []).map(p => ({ slug: p.slug, name: p.name }));
+      return (data ?? []).map(toPlanOption);
     },
-    enabled: hasProviderSubscription === false,
+    enabled: !subLoading && !hasProviderSubscription,
+  });
+
+  // Every public plan, including custom ones, purely to show the catalogue and
+  // its prices. The pickers below filter this same set down to what the
+  // company may actually switch to; this list is read-only.
+  const { data: allPlans = [] } = useQuery({
+    queryKey: ['all-plan-prices'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plans')
+        .select(PLAN_OPTION_COLUMNS)
+        .eq('is_public', true)
+        .eq('is_active', true)
+        .order('monthly_price_inr', { ascending: true, nullsFirst: false });
+      if (error) throw error;
+      return (data ?? []).map(toPlanOption);
+    },
   });
 
   // Lower-priced public plans than the current one — request_plan_downgrade
@@ -62,7 +106,7 @@ export default function BillingSettingsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('plans')
-        .select('slug, name, monthly_price_inr')
+        .select(PLAN_OPTION_COLUMNS)
         .eq('is_public', true)
         .eq('is_active', true)
         .order('monthly_price_inr', { ascending: true, nullsFirst: false });
@@ -74,7 +118,7 @@ export default function BillingSettingsPage() {
       return (data ?? [])
         .filter(p => p.slug !== entitlements?.planSlug && p.monthly_price_inr !== null)
         .filter(p => currentPrice === null || (p.monthly_price_inr as number) < currentPrice)
-        .map(p => ({ slug: p.slug, name: p.name }));
+        .map(toPlanOption);
     },
     enabled: !!entitlements?.planSlug,
   });
@@ -87,7 +131,7 @@ export default function BillingSettingsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('plans')
-        .select('slug, name, monthly_price_inr, is_custom')
+        .select(PLAN_OPTION_COLUMNS)
         .eq('is_public', true)
         .eq('is_active', true)
         .eq('is_custom', false)
@@ -100,7 +144,7 @@ export default function BillingSettingsPage() {
       return (data ?? [])
         .filter(p => p.slug !== entitlements?.planSlug && p.monthly_price_inr !== null)
         .filter(p => currentPrice !== null && (p.monthly_price_inr as number) > currentPrice)
-        .map(p => ({ slug: p.slug, name: p.name }));
+        .map(toPlanOption);
     },
     enabled: !!entitlements?.planSlug,
   });
@@ -154,6 +198,7 @@ export default function BillingSettingsPage() {
                 currentPlanName={entitlements?.planName ?? 'your current plan'}
                 planOptions={downgradeOptions}
                 upgradeOptions={upgradeOptions}
+                billingInterval={currentInterval}
                 onChanged={() => window.location.reload()}
               />
             </CardContent>
@@ -167,6 +212,53 @@ export default function BillingSettingsPage() {
             userEmail={user?.email}
             onSubscribed={() => window.location.reload()}
           />
+        )}
+
+        {allPlans.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Plans</CardTitle>
+              <CardDescription>
+                Prices exclude taxes. Annual is billed once for the year.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="py-2 pr-4 font-medium">Plan</th>
+                      <th className="py-2 pr-4 font-medium text-right">Monthly</th>
+                      <th className="py-2 font-medium text-right">Annual</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allPlans.map(plan => {
+                      const isCurrent = plan.slug === entitlements?.planSlug;
+                      return (
+                        <tr key={plan.slug} className="border-b last:border-0">
+                          <td className="py-2.5 pr-4">
+                            <span className={isCurrent ? 'font-medium text-foreground' : ''}>{plan.name}</span>
+                            {isCurrent && (
+                              <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                Current
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right tabular-nums">
+                            {formatPlanPrice(plan, 'monthly') ?? 'Contact sales'}
+                          </td>
+                          <td className="py-2.5 text-right tabular-nums">
+                            {formatPlanPrice(plan, 'annual') ?? 'Contact sales'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         <Card>

@@ -7,6 +7,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { parseFunctionsErrorBody } from '@/lib/functionsError';
 import { captureException } from '@/lib/monitoring';
+import {
+  annualSavingPct,
+  formatPlanPrice,
+  planOptionLabel,
+  type BillingInterval,
+  type PlanOption,
+} from '@/lib/planOptions';
 
 declare global {
   interface Window {
@@ -40,8 +47,6 @@ function loadRazorpayCheckout(): Promise<void> {
   });
 }
 
-type PlanOption = { slug: string; name: string };
-
 type Props = {
   planOptions: PlanOption[];
   companyName?: string;
@@ -52,8 +57,12 @@ type Props = {
 export function SubscribeCard({ planOptions, companyName, userEmail, onSubscribed }: Props) {
   const { toast } = useToast();
   const [targetSlug, setTargetSlug] = useState(planOptions[0]?.slug ?? '');
-  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
   const [subscribing, setSubscribing] = useState(false);
+
+  const selectedPlan = planOptions.find(p => p.slug === targetSlug);
+  const selectedPrice = selectedPlan ? formatPlanPrice(selectedPlan, billingInterval) : null;
+  const savingPct = selectedPlan ? annualSavingPct(selectedPlan) : null;
 
   const handleSubscribe = async () => {
     if (!targetSlug) return;
@@ -116,7 +125,7 @@ export function SubscribeCard({ planOptions, companyName, userEmail, onSubscribe
             className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
           >
             {planOptions.map(p => (
-              <option key={p.slug} value={p.slug}>{p.name}</option>
+              <option key={p.slug} value={p.slug}>{planOptionLabel(p, billingInterval)}</option>
             ))}
           </select>
         </div>
@@ -130,10 +139,17 @@ export function SubscribeCard({ planOptions, companyName, userEmail, onSubscribe
             className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
           >
             <option value="monthly">Monthly</option>
-            <option value="annual">Annual</option>
+            <option value="annual">Annual{savingPct !== null ? ` — save ${savingPct}%` : ''}</option>
           </select>
         </div>
         </div>
+        {selectedPlan && (
+          <p className="text-sm text-muted-foreground">
+            {selectedPrice
+              ? <>You'll be charged <span className="font-medium text-foreground">{selectedPrice}</span> for {selectedPlan.name}, starting today.</>
+              : <>{selectedPlan.name} is priced per contract — talk to sales to get set up.</>}
+          </p>
+        )}
         <Button onClick={handleSubscribe} disabled={subscribing || !targetSlug}>
           {subscribing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           Subscribe

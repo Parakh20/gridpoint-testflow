@@ -25,17 +25,24 @@ import { useToast } from '@/hooks/use-toast';
 import { parseDowngradeFeasibility, type DowngradeFeasibility, type DowngradeFeasibilityRpcResponse } from '@testflow/shared';
 import { parseFunctionsErrorBody } from '@/lib/functionsError';
 import { captureException } from '@/lib/monitoring';
-
-type PlanOption = { slug: string; name: string };
+import { planOptionLabel, type BillingInterval, type PlanOption } from '@/lib/planOptions';
 
 type Props = {
   currentPlanName: string;
   planOptions: PlanOption[];
   upgradeOptions?: PlanOption[];
+  /** Interval the company is billed in — prices are labelled to match it. */
+  billingInterval?: BillingInterval;
   onChanged: () => void;
 };
 
-export function SubscriptionActions({ currentPlanName, planOptions, upgradeOptions = [], onChanged }: Props) {
+export function SubscriptionActions({
+  currentPlanName,
+  planOptions,
+  upgradeOptions = [],
+  billingInterval = 'monthly',
+  onChanged,
+}: Props) {
   const { toast } = useToast();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -194,7 +201,7 @@ export function SubscriptionActions({ currentPlanName, planOptions, upgradeOptio
               className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
             >
               {planOptions.map(p => (
-                <option key={p.slug} value={p.slug}>{p.name}</option>
+                <option key={p.slug} value={p.slug}>{planOptionLabel(p, billingInterval)}</option>
               ))}
             </select>
             {feasibility && !feasibility.allowed && (
@@ -238,7 +245,7 @@ export function SubscriptionActions({ currentPlanName, planOptions, upgradeOptio
               className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50"
             >
               {upgradeOptions.map(p => (
-                <option key={p.slug} value={p.slug}>{p.name}</option>
+                <option key={p.slug} value={p.slug}>{planOptionLabel(p, billingInterval)}</option>
               ))}
             </select>
             {upgradeBlockedReason && (
