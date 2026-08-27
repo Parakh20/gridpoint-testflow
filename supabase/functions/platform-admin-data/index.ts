@@ -930,12 +930,12 @@ serve(async (req) => {
     // prohibits cold outreach and the one API key also carries rework notices
     // and trial confirmations.
     if (action === 'send_outreach_draft') {
-      const limited = await enforceRateLimit(
-        adminClient, req,
-        { key: 'platform-admin-send-outreach', limit: 40, windowMinutes: 60 },
-        cors,
-      );
-      if ('response' in limited) return limited.response;
+      const sendLimit = await enforceRateLimit(adminClient, req, {
+        key: 'platform-admin-send-outreach',
+        limit: 40,
+        windowMinutes: 60,
+      }, corsHeaders);
+      if (!sendLimit.ok) return sendLimit.response;
 
       const draft_id = payload?.draft_id as string | undefined;
       const follow_up_days = Number(payload?.follow_up_days ?? 7);
