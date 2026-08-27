@@ -31,6 +31,34 @@ export const FEATURES = {
 
 export type FeatureKey = (typeof FEATURES)[keyof typeof FEATURES];
 
+/**
+ * Human labels for the entitlement keys above, shared by the marketing pricing
+ * table and the in-app billing comparison so the two can never describe the
+ * same feature differently. Deliberately keyed by FeatureKey: adding a key to
+ * FEATURES without a label here is a type error, which is what stopped
+ * `custom_domain` from rendering as a raw key a second time.
+ */
+export const FEATURE_LABELS: Record<FeatureKey, string> = {
+  offline_mobile: 'Offline mobile app',
+  audit_trail: 'Full audit trail',
+  api_access: 'API access',
+  sso: 'SSO',
+  multiple_sites: 'Multiple sites',
+  custom_workflows: 'Custom workflows',
+  advanced_reports: 'Advanced reports',
+  advanced_approvals: 'Advanced approvals',
+  custom_domain: 'Custom domain',
+};
+
+/**
+ * Label for a feature key, falling back to the raw key so an entitlement seeded
+ * in SQL but not yet declared here still renders something readable rather than
+ * disappearing from the comparison table.
+ */
+export function featureLabel(key: string): string {
+  return (FEATURE_LABELS as Record<string, string>)[key] ?? key;
+}
+
 export interface Entitlements {
   planSlug: PlanSlug;
   planName: string;

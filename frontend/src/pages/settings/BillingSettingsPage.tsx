@@ -5,13 +5,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SubscriptionActions } from '@/components/SubscriptionActions';
 import { SubscribeCard } from '@/components/SubscribeCard';
 import { InvoiceHistoryCard } from '@/components/InvoiceHistoryCard';
+import { PlanComparisonCard } from '@/components/PlanComparisonCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useEntitlements } from '@/lib/entitlements';
 import { useUsage } from '@/lib/usage';
-import { formatPlanPrice, type BillingInterval, type PlanOption } from '@/lib/planOptions';
+import { type BillingInterval, type PlanOption } from '@/lib/planOptions';
 
 /** Shared shape for the three plan-picker queries below. */
 const PLAN_OPTION_COLUMNS = 'slug, name, monthly_price_inr, annual_price_inr';
@@ -78,23 +79,6 @@ export default function BillingSettingsPage() {
       return (data ?? []).map(toPlanOption);
     },
     enabled: !subLoading && !hasProviderSubscription,
-  });
-
-  // Every public plan, including custom ones, purely to show the catalogue and
-  // its prices. The pickers below filter this same set down to what the
-  // company may actually switch to; this list is read-only.
-  const { data: allPlans = [] } = useQuery({
-    queryKey: ['all-plan-prices'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('plans')
-        .select(PLAN_OPTION_COLUMNS)
-        .eq('is_public', true)
-        .eq('is_active', true)
-        .order('monthly_price_inr', { ascending: true, nullsFirst: false });
-      if (error) throw error;
-      return (data ?? []).map(toPlanOption);
-    },
   });
 
   // Lower-priced public plans than the current one — request_plan_downgrade
@@ -214,52 +198,7 @@ export default function BillingSettingsPage() {
           />
         )}
 
-        {allPlans.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Plans</CardTitle>
-              <CardDescription>
-                Prices exclude taxes. Annual is billed once for the year.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="py-2 pr-4 font-medium">Plan</th>
-                      <th className="py-2 pr-4 font-medium text-right">Monthly</th>
-                      <th className="py-2 font-medium text-right">Annual</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allPlans.map(plan => {
-                      const isCurrent = plan.slug === entitlements?.planSlug;
-                      return (
-                        <tr key={plan.slug} className="border-b last:border-0">
-                          <td className="py-2.5 pr-4">
-                            <span className={isCurrent ? 'font-medium text-foreground' : ''}>{plan.name}</span>
-                            {isCurrent && (
-                              <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                                Current
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2.5 pr-4 text-right tabular-nums">
-                            {formatPlanPrice(plan, 'monthly') ?? 'Contact sales'}
-                          </td>
-                          <td className="py-2.5 text-right tabular-nums">
-                            {formatPlanPrice(plan, 'annual') ?? 'Contact sales'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <PlanComparisonCard currentPlanSlug={entitlements?.planSlug} />
 
         <Card>
           <CardHeader>

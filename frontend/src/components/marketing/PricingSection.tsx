@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2 } from "lucide-react";
 import { appUrl } from "@/lib/appOrigin";
+import { featureLabel } from "@testflow/shared";
 
 interface PlanRow {
   id: string;
@@ -26,17 +27,6 @@ const CTA_LABEL: Record<string, string> = {
   professional: "Start free trial",
   business: "Start free trial",
   enterprise: "Contact sales",
-};
-
-const FEATURE_LABELS: Record<string, string> = {
-  offline_mobile: "Offline mobile app",
-  audit_trail: "Full audit trail",
-  api_access: "API access",
-  sso: "SSO",
-  multiple_sites: "Multiple sites",
-  custom_workflows: "Custom workflows",
-  advanced_reports: "Advanced reports",
-  advanced_approvals: "Advanced approvals",
 };
 
 function formatPrice(monthlyInr: number | null, isCustom: boolean): string {
@@ -164,7 +154,7 @@ export function PricingSection() {
               <tbody>
                 {featureKeys.map((key) => (
                   <tr key={key} className="border-b border-white/[.06]">
-                    <td className="py-3 text-white/70">{FEATURE_LABELS[key] ?? key}</td>
+                    <td className="py-3 text-white/70">{featureLabel(key)}</td>
                     {plans.map((p) => (
                       <td key={p.id} className="text-center py-3">
                         {isEnabled(p.id, key) ? (
