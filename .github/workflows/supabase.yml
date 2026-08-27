@@ -29,7 +29,9 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: `latest` resolves via the unauthenticated GitHub API and
+          # fails the whole job when the runner hits the rate limit.
+          version: 2.116.0
 
       - name: Write local-only test secrets
         # Written to both locations: `supabase/.env` is the documented
@@ -106,7 +108,9 @@ jobs:
 
       - name: Stop local Supabase stack
         if: always()
-        run: supabase stop
+        # Cleanup only -- never fail the job on teardown (e.g. the stack never
+        # started because CLI setup failed).
+        run: supabase stop || true
 
   # ── Edge functions deploy (runs AFTER migrations so schema is up to date) ────
   # test-billing-functions gates this deploy again as of 2026-08-22: the
@@ -144,7 +148,9 @@ jobs:
         if: steps.secret_check.outputs.ready == 'true'
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: `latest` resolves via the unauthenticated GitHub API and
+          # fails the whole job when the runner hits the rate limit.
+          version: 2.116.0
 
       - name: Deploy edge functions
         if: steps.secret_check.outputs.ready == 'true'
@@ -192,7 +198,9 @@ jobs:
         if: steps.secret_check.outputs.ready == 'true'
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: `latest` resolves via the unauthenticated GitHub API and
+          # fails the whole job when the runner hits the rate limit.
+          version: 2.116.0
 
       - name: Link Supabase project
         if: steps.secret_check.outputs.ready == 'true'
