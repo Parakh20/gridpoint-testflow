@@ -151,7 +151,7 @@ export default function StartTrial() {
                 value={companySize}
                 onChange={e => setCompanySize(e.target.value)}
                 disabled={loading}
-                className="w-full h-10 rounded-md border border-white/15 bg-white/[.03] px-3 text-sm"
+                className="w-full h-10 rounded-md border border-white/15 bg-white/[.03] px-3 text-sm text-white [color-scheme:dark] focus:outline-none focus:ring-1 focus:ring-white/30 [&>option]:bg-neutral-900 [&>option]:text-white"
               >
                 <option value="">Select…</option>
                 {COMPANY_SIZES.map(s => <option key={s} value={s}>{s} people</option>)}
@@ -169,7 +169,7 @@ export default function StartTrial() {
               value={industry}
               onChange={e => setIndustry(e.target.value)}
               disabled={loading}
-              className="w-full h-10 rounded-md border border-white/15 bg-white/[.03] px-3 text-sm"
+              className="w-full h-10 rounded-md border border-white/15 bg-white/[.03] px-3 text-sm text-white [color-scheme:dark] focus:outline-none focus:ring-1 focus:ring-white/30 [&>option]:bg-neutral-900 [&>option]:text-white"
             >
               <option value="">Select…</option>
               {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
