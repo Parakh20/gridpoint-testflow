@@ -35,6 +35,7 @@ import { platformFetch } from './platformFetch';
 import { LeadDetailDrawer } from './LeadDetailDrawer';
 import { SelfServeSignupsPanel } from './SelfServeSignupsPanel';
 import { OutreachQueuePanel } from './OutreachQueuePanel';
+import { OutreachDraftsPanel } from './OutreachDraftsPanel';
 import { Lead, LeadStage, LEAD_STAGES, STAGE_LABEL } from './leadTypes';
 
 const STAGE_BADGE: Record<LeadStage, string> = {
@@ -174,6 +175,10 @@ export function SalesTab({ active }: { active: boolean }) {
       {!loading && leads.length > 0 && (
         <OutreachQueuePanel leads={leads} onChanged={fetchLeads} onOpenLead={openLead} />
       )}
+
+      {/* Written mail waiting to go out. Above the queue's follow-up view because
+          a first send is the thing that has to happen before anything else can. */}
+      {!loading && <OutreachDraftsPanel onSent={fetchLeads} />}
 
       {/* Companies that signed up with no lead behind them. Rendered above the
           filters because it is a gap in the pipeline, not another view of it. */}

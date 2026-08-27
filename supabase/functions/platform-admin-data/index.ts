@@ -12,6 +12,7 @@ import { ADDON_KEYS } from '../_shared/addon_keys.ts';
 import { PLAN_FEATURE_KEYS, COMPANY_FEATURE_FLAGS } from '../_shared/feature_keys.ts';
 import { RazorpayBillingProvider, razorpayKeyMode } from '../_shared/billing_provider.ts';
 import { resendFrom } from '../_shared/email.ts';
+import { readSmtpConfig, sendPlainMail } from '../_shared/smtp.ts';
 import { EMAIL_TEMPLATES, EMAIL_TEMPLATE_KEYS, isTemplateKey } from '../_shared/email_templates.ts';
 
 // Length-independent-ish equality so a wrong token can't be recovered by
@@ -798,6 +799,200 @@ serve(async (req) => {
       if (leadErr) return respond({ error: leadErr.message }, 400);
 
       return respond({ activity, lead });
+    }
+
+    // ── get_smtp_status ────────────────────────────────────────────────────────
+    // Lets the panel say "configure SMTP first" instead of offering a Send
+    // button that always fails.
+    if (action === 'get_smtp_status') {
+      const cfg = readSmtpConfig();
+      return respond({
+        configured: cfg !== null,
+        from: cfg ? (cfg.fromName ? `${cfg.fromName} <${cfg.user}>` : cfg.user) : null,
+        host: cfg?.host ?? null,
+      });
+    }
+
+    // ── get_outreach_drafts ────────────────────────────────────────────────────
+    if (action === 'get_outreach_drafts') {
+      const status = payload?.status as string | undefined;
+
+      let query = adminClient
+        .from('outreach_drafts')
+        .select('*')
+        .order('status', { ascending: true })
+        .order('created_at', { ascending: true });
+      if (status) query = query.eq('status', status);
+
+      const { data: drafts, error } = await query;
+      if (error) throw error;
+
+      const leadIds = [...new Set((drafts ?? []).map((d: { lead_id: string }) => d.lead_id))];
+      const leadMap = new Map<string, { company_name: string; priority: number | null; stage: string }>();
+      if (leadIds.length > 0) {
+        const { data: leads, error: leadErr } = await adminClient
+          .from('leads')
+          .select('id, company_name, priority, stage')
+          .in('id', leadIds);
+        if (leadErr) throw leadErr;
+        for (const l of (leads ?? []) as { id: string; company_name: string; priority: number | null; stage: string }[]) {
+          leadMap.set(l.id, { company_name: l.company_name, priority: l.priority, stage: l.stage });
+        }
+      }
+
+      return respond({
+        drafts: (drafts ?? []).map((d: Record<string, unknown>) => ({
+          ...d,
+          lead: leadMap.get(d.lead_id as string) ?? null,
+        })),
+      });
+    }
+
+    // ── update_outreach_draft ──────────────────────────────────────────────────
+    if (action === 'update_outreach_draft') {
+      const draft_id = payload?.draft_id as string | undefined;
+      const subject = payload?.subject as string | undefined;
+      const body = payload?.body as string | undefined;
+      if (!draft_id) return respond({ error: 'payload.draft_id is required' }, 400);
+
+      const update: Record<string, unknown> = {};
+      if (subject !== undefined) update.subject = subject;
+      if (body !== undefined) update.body = body;
+      if (Object.keys(update).length === 0) {
+        return respond({ error: 'Nothing to update' }, 400);
+      }
+
+      // A sent message is a record of what went out. Editing it would make the
+      // row disagree with the copy in the recipient's inbox.
+      const { data, error } = await adminClient
+        .from('outreach_drafts')
+        .update(update)
+        .eq('id', draft_id)
+        .eq('status', 'DRAFT')
+        .select('*')
+        .maybeSingle();
+      if (error) return respond({ error: error.message }, 400);
+      if (!data) return respond({ error: 'Draft not found, or it has already been sent' }, 409);
+      return respond({ draft: data });
+    }
+
+    // ── send_outreach_draft ────────────────────────────────────────────────────
+    // Sends over SMTP from a real mailbox, never through Resend: Resend's AUP
+    // prohibits cold outreach and the one API key also carries rework notices
+    // and trial confirmations.
+    if (action === 'send_outreach_draft') {
+      const limited = await enforceRateLimit(
+        adminClient, req,
+        { key: 'platform-admin-send-outreach', limit: 40, windowMinutes: 60 },
+        cors,
+      );
+      if ('response' in limited) return limited.response;
+
+      const draft_id = payload?.draft_id as string | undefined;
+      const follow_up_days = Number(payload?.follow_up_days ?? 7);
+      if (!draft_id) return respond({ error: 'payload.draft_id is required' }, 400);
+
+      const cfg = readSmtpConfig();
+      if (!cfg) {
+        return respond({
+          error: 'SMTP is not configured. Set SMTP_USER and SMTP_APP_PASSWORD as function secrets.',
+        }, 501);
+      }
+
+      const { data: draft, error: draftErr } = await adminClient
+        .from('outreach_drafts')
+        .select('*')
+        .eq('id', draft_id)
+        .maybeSingle();
+      if (draftErr) throw draftErr;
+      if (!draft) return respond({ error: 'Draft not found' }, 404);
+      if (draft.status === 'SENT') {
+        return respond({ error: 'This draft has already been sent' }, 409);
+      }
+
+      // The recipient is re-resolved from lead_contacts rather than taken from
+      // the draft row. This is the guard that stops a leaked platform token
+      // turning the panel into an open relay wearing the operator's own Gmail
+      // identity: mail can only ever go to an address already researched into
+      // the contact book.
+      if (!draft.contact_id) {
+        return respond({ error: 'Draft has no linked contact; refusing to send to a free-text address' }, 400);
+      }
+      const { data: contact, error: contactErr } = await adminClient
+        .from('lead_contacts')
+        .select('id, lead_id, full_name, email, email_status')
+        .eq('id', draft.contact_id)
+        .maybeSingle();
+      if (contactErr) throw contactErr;
+      if (!contact?.email) {
+        return respond({ error: 'Linked contact has no email address' }, 400);
+      }
+      if (contact.email_status === 'OPTED_OUT' || contact.email_status === 'BOUNCED') {
+        return respond({
+          error: `Refusing to send: contact is marked ${contact.email_status}`,
+        }, 409);
+      }
+
+      const result = await sendPlainMail({
+        config: cfg,
+        to: contact.email,
+        toName: contact.full_name,
+        subject: draft.subject,
+        text: draft.body,
+      });
+
+      // The draft row records the attempt either way -- a failure that leaves no
+      // trace is the one that gets silently retried into a duplicate send.
+      await adminClient
+        .from('outreach_drafts')
+        .update({
+          status: result.ok ? 'SENT' : 'FAILED',
+          sent_at: result.ok ? new Date().toISOString() : null,
+          message_id: result.messageId,
+          error: result.error,
+          to_email: contact.email,
+        })
+        .eq('id', draft_id);
+
+      await adminClient.from('email_log').insert({
+        to_email: contact.email,
+        subject: draft.subject,
+        template: 'outreach',
+        body_html: null,
+        status: result.ok ? 'sent' : 'failed',
+        resend_message_id: result.messageId,
+        error: result.error,
+        actor: 'platform-admin-outreach',
+      });
+
+      if (!result.ok) {
+        logEdgeError('platform-admin-data', 'smtp_send_failed', result.error ?? 'unknown');
+        return respond({ error: result.error ?? 'SMTP send failed' }, 502);
+      }
+
+      // Logging the touch is part of sending, not a separate step the operator
+      // has to remember. The activity insert is what stamps leads.last_contacted_at
+      // via trigger.
+      await adminClient.from('lead_activities').insert({
+        lead_id: draft.lead_id,
+        channel: 'EMAIL',
+        body: `Sent: ${draft.subject} (to ${contact.email})`,
+      });
+
+      const followUp = new Date();
+      followUp.setDate(followUp.getDate() + (Number.isFinite(follow_up_days) ? follow_up_days : 7));
+      const { data: lead } = await adminClient
+        .from('leads')
+        .update({
+          stage: 'CONTACTED',
+          next_action_date: followUp.toISOString().slice(0, 10),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', draft.lead_id)
+        .select('*')
+        .maybeSingle();
+
+      return respond({ sent: true, message_id: result.messageId, lead: lead ?? null });
     }
 
     // ── upsert_lead_contact ────────────────────────────────────────────────────
