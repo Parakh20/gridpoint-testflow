@@ -672,7 +672,11 @@ serve(async (req) => {
         'company_name', 'segment', 'region', 'size_signal', 'why_fit', 'buyer_title',
         'contact_name', 'contact_phone', 'contact_email', 'outreach_approach',
         'priority', 'confidence', 'source_url', 'stage', 'next_action_date', 'notes', 'company_id',
+        'tech_stack', 'tech_stack_source',
       ];
+      // last_contacted_at is deliberately absent: it is maintained by
+      // trg_leads_touch_stamp from lead_activities, and letting the panel write
+      // it would let the column drift from the log it is meant to summarise.
       const insert: Record<string, unknown> = {};
       for (const k of ALLOWED) {
         if (fields[k] !== undefined) insert[k] = fields[k];
@@ -693,7 +697,11 @@ serve(async (req) => {
         'segment', 'region', 'size_signal', 'why_fit', 'buyer_title',
         'contact_name', 'contact_phone', 'contact_email', 'outreach_approach',
         'priority', 'confidence', 'source_url', 'stage', 'next_action_date', 'notes', 'company_id',
+        'tech_stack', 'tech_stack_source',
       ];
+      // last_contacted_at is deliberately absent: it is maintained by
+      // trg_leads_touch_stamp from lead_activities, and letting the panel write
+      // it would let the column drift from the log it is meant to summarise.
       const update: Record<string, unknown> = {};
       for (const k of ALLOWED) {
         if (fields[k] !== undefined) update[k] = fields[k];
@@ -741,6 +749,55 @@ serve(async (req) => {
       await adminClient.from('leads').update({ updated_at: new Date().toISOString() }).eq('id', lead_id);
 
       return respond({ activity: data });
+    }
+
+    // ── log_touch ──────────────────────────────────────────────────────────────
+    // One call for the thing the outreach queue does all day: record that a lead
+    // was contacted and say when to come back to it. Two round trips (activity,
+    // then next_action_date) is how the follow-up date ends up unset -- the
+    // second call is the one that gets skipped when the operator is moving fast.
+    if (action === 'log_touch') {
+      const lead_id = payload?.lead_id as string | undefined;
+      const channel = payload?.channel as string | undefined;
+      const body = payload?.body as string | undefined;
+      const next_action_date = payload?.next_action_date as string | null | undefined;
+      const stage = payload?.stage as string | undefined;
+
+      const VALID_CHANNELS = ['WHATSAPP', 'PHONE', 'LINKEDIN', 'EMAIL', 'IN_PERSON', 'EVENT', 'NOTE'];
+      const VALID_STAGES = ['NEW', 'CONTACTED', 'DEMO_BOOKED', 'PILOT', 'WON', 'LOST', 'PARKED'];
+
+      if (!lead_id || !channel || !body || !body.trim()) {
+        return respond({ error: 'payload.lead_id, channel, and body are required' }, 400);
+      }
+      if (!VALID_CHANNELS.includes(channel)) {
+        return respond({ error: `Invalid channel. Must be one of: ${VALID_CHANNELS.join(', ')}` }, 400);
+      }
+      if (stage && !VALID_STAGES.includes(stage)) {
+        return respond({ error: `Invalid stage. Must be one of: ${VALID_STAGES.join(', ')}` }, 400);
+      }
+
+      const { data: activity, error: actErr } = await adminClient
+        .from('lead_activities')
+        .insert({ lead_id, channel, body })
+        .select('*')
+        .single();
+      if (actErr) return respond({ error: actErr.message }, 400);
+
+      // The activity insert is what stamps last_contacted_at, via trigger. Only
+      // the operator-chosen fields are written here.
+      const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (next_action_date !== undefined) update.next_action_date = next_action_date;
+      if (stage) update.stage = stage;
+
+      const { data: lead, error: leadErr } = await adminClient
+        .from('leads')
+        .update(update)
+        .eq('id', lead_id)
+        .select('*')
+        .single();
+      if (leadErr) return respond({ error: leadErr.message }, 400);
+
+      return respond({ activity, lead });
     }
 
     // ── upsert_lead_contact ────────────────────────────────────────────────────

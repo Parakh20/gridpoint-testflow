@@ -57,6 +57,12 @@ export interface Lead {
   source_url: string | null;
   stage: LeadStage;
   next_action_date: string | null;
+  /** Maintained by trg_leads_touch_stamp from lead_activities; NOTE rows don't count. */
+  last_contacted_at: string | null;
+  /** What they use to record and report test results today. Free text. */
+  tech_stack: string | null;
+  /** Where the tech_stack claim came from. Unsourced research is a guess. */
+  tech_stack_source: string | null;
   notes: string | null;
   company_id: string | null;
   created_at: string;

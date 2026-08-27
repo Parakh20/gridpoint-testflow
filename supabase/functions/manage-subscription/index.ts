@@ -537,6 +537,114 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (action === 'purchase_addon') {
+      // Same reasoning as `invoices`: the /settings/billing route gates on
+      // SUPERADMIN client-side, which is not a security boundary — this
+      // function is callable directly with any signed-in user's JWT, and this
+      // action spends the company's money.
+      const { data: callerRoles } = await adminClient
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', caller.id);
+
+      if (!(callerRoles ?? []).some(r => r.role === 'SUPERADMIN')) {
+        return json({ error: 'Only a SUPERADMIN can purchase add-ons' }, 403);
+      }
+
+      const addonKey = body?.addon_key;
+      const quantity = Math.trunc(Number(body?.quantity ?? 1));
+      if (typeof addonKey !== 'string' || !addonKey) {
+        return json({ error: 'addon_key is required' }, 400);
+      }
+      if (!Number.isFinite(quantity) || quantity < 1) {
+        return json({ error: 'quantity must be a positive whole number' }, 400);
+      }
+
+      const { data: addon } = await adminClient
+        .from('addon_catalog')
+        .select('addon_key, name, unit_price_inr, kind, max_quantity, is_active')
+        .eq('addon_key', addonKey)
+        .maybeSingle();
+
+      if (!addon || !addon.is_active) {
+        return json({ error: `Add-on not available for self-service purchase: ${addonKey}` }, 400);
+      }
+      if (quantity > addon.max_quantity) {
+        return json({ error: `At most ${addon.max_quantity} of this add-on can be bought at once` }, 400);
+      }
+
+      // A flag add-on is a single grant; buying a second is always a mistake
+      // and the money would have to be refunded. Blocked before the charge,
+      // not after it.
+      const effectiveQuantity = addon.kind === 'quantity' ? quantity : 1;
+
+      // Add-ons hang off a subscription row (subscription_addons.subscription_id
+      // is NOT NULL), so a trial company has nothing to attach one to. Fail
+      // with a reason rather than taking the payment and stranding it.
+      const { data: subscription } = await adminClient
+        .from('subscriptions')
+        .select('id, provider_subscription_id')
+        .eq('company_id', callerProfile.company_id)
+        .maybeSingle();
+
+      if (!subscription?.provider_subscription_id) {
+        return json({ error: 'Add-ons require an active subscription — subscribe to a plan first' }, 409);
+      }
+
+      if (addon.kind === 'flag') {
+        const { data: existingAddon } = await adminClient
+          .from('subscription_addons')
+          .select('id')
+          .eq('subscription_id', subscription.id)
+          .eq('addon_key', addonKey)
+          .eq('status', 'active')
+          .maybeSingle();
+        if (existingAddon) {
+          return json({ error: `${addon.name} is already active on this subscription` }, 409);
+        }
+      }
+
+      const keyId = Deno.env.get('RAZORPAY_KEY_ID');
+      const keySecret = Deno.env.get('RAZORPAY_KEY_SECRET');
+      if (!keyId || !keySecret) {
+        logEdgeError('manage-subscription', 'payment_failure', new Error('Razorpay credentials not configured'));
+        return json({ error: 'Billing provider not configured' }, 500);
+      }
+
+      const amountInr = Number(addon.unit_price_inr) * effectiveQuantity;
+
+      try {
+        // The price is computed server-side from the catalogue and never
+        // taken from the request body — the client chooses what and how many,
+        // never how much.
+        const order = await new RazorpayBillingProvider(keyId, keySecret).createOrder({
+          amountInr,
+          companyId: callerProfile.company_id,
+          receipt: `addon-${addonKey}-${Date.now()}`,
+          notes: {
+            order_type: 'addon',
+            addon_key: addonKey,
+            quantity: String(effectiveQuantity),
+          },
+        });
+
+        // No local write here, same discipline as `subscribe`: the entitlement
+        // is granted by razorpay-webhook on payment.captured, which is the
+        // only proof the customer actually paid.
+        return json({
+          order_id: order.providerOrderId,
+          amount_inr: amountInr,
+          quantity: effectiveQuantity,
+          addon_name: addon.name,
+          razorpay_key_id: keyId,
+        });
+      } catch (err: unknown) {
+        logEdgeError('manage-subscription', 'payment_failure', err);
+        const message = err instanceof Error ? err.message : 'Failed to start add-on checkout';
+        return json({ error: message }, 502);
+      }
+    }
+
     if (action === 'invoices') {
       // Billing data is SUPERADMIN-only. The /settings/billing route already
       // gates on that client-side, but that is not a security boundary —

@@ -87,6 +87,18 @@ export interface BillingProvider {
     planSlug: string;
   }): Promise<{ providerPlanId: string }>;
   verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean>;
+  /**
+   * One-time charge, as opposed to a recurring subscription. `notes` is the
+   * only channel that survives the round trip out to the customer's browser
+   * and back in on the webhook, so everything needed to fulfil the purchase
+   * has to travel there.
+   */
+  createOrder(params: {
+    amountInr: number;
+    companyId: string;
+    notes: Record<string, string>;
+    receipt?: string;
+  }): Promise<{ providerOrderId: string; amountPaise: number }>;
 }
 
 /** 'rzp_live_...' vs 'rzp_test_...' — which Razorpay environment a key targets. */
@@ -304,6 +316,32 @@ export class RazorpayBillingProvider implements BillingProvider {
       }),
     });
     return { providerPlanId: data.id };
+  }
+
+  async createOrder(params: {
+    amountInr: number;
+    companyId: string;
+    notes: Record<string, string>;
+    receipt?: string;
+  }): Promise<{ providerOrderId: string; amountPaise: number }> {
+    // Same rounding discipline as createPlan: rupees are NUMERIC(12,2)
+    // locally, Razorpay wants an integer number of paise.
+    const amountPaise = Math.round(params.amountInr * 100);
+    if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
+      throw new Error(`Cannot create a Razorpay order for a non-positive amount (${params.amountInr})`);
+    }
+
+    const data = await this.request<{ id: string; amount: number }>('/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        amount: amountPaise,
+        currency: 'INR',
+        // Razorpay caps receipt at 40 chars.
+        receipt: (params.receipt ?? `addon-${params.companyId}`).slice(0, 40),
+        notes: { ...params.notes, company_id: params.companyId },
+      }),
+    });
+    return { providerOrderId: data.id, amountPaise: data.amount ?? amountPaise };
   }
 
   async verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean> {

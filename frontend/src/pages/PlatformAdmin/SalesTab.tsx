@@ -34,6 +34,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { platformFetch } from './platformFetch';
 import { LeadDetailDrawer } from './LeadDetailDrawer';
 import { SelfServeSignupsPanel } from './SelfServeSignupsPanel';
+import { OutreachQueuePanel } from './OutreachQueuePanel';
 import { Lead, LeadStage, LEAD_STAGES, STAGE_LABEL } from './leadTypes';
 
 const STAGE_BADGE: Record<LeadStage, string> = {
@@ -167,6 +168,12 @@ export function SalesTab({ active }: { active: boolean }) {
           </button>
         ))}
       </div>
+
+      {/* The day's work, above the pipeline view: which leads to contact now,
+          rather than what the pipeline looks like in aggregate. */}
+      {!loading && leads.length > 0 && (
+        <OutreachQueuePanel leads={leads} onChanged={fetchLeads} onOpenLead={openLead} />
+      )}
 
       {/* Companies that signed up with no lead behind them. Rendered above the
           filters because it is a gap in the pipeline, not another view of it. */}

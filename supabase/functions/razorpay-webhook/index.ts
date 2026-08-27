@@ -155,6 +155,33 @@ Deno.serve(async (req) => {
             .eq('provider_event_id', eventId);
           return json({ error: error.message }, 500);
         }
+
+        // Recording the order is only half of an add-on purchase — the
+        // entitlement it was bought for has to be granted too, and only on a
+        // captured payment. record_addon_purchase is idempotent on
+        // provider_payment_id, so a redelivered webhook cannot grant twice.
+        if (orderType === 'addon' && eventType === 'payment.captured') {
+          const { error: addonError } = await supabase.rpc('record_addon_purchase', {
+            _company_id: companyId,
+            _addon_key: payment.notes?.addon_key ?? null,
+            _quantity: Number(payment.notes?.quantity ?? 1),
+            _provider_payment_id: payment.id,
+            _amount_paid_inr: (payment.amount ?? 0) / 100,
+          });
+          if (addonError) {
+            // The order row is already written and the money is captured, so
+            // this is a paid-but-ungranted add-on: loud, and the dedupe gate
+            // is released so Razorpay's retry can complete the grant.
+            logEdgeError('razorpay-webhook', 'payment_failure', addonError, {
+              step: 'record_addon_purchase', eventType, companyId, paymentId: payment.id,
+              addonKey: payment.notes?.addon_key,
+            });
+            await supabase.from('billing_events').delete()
+              .eq('provider', 'razorpay')
+              .eq('provider_event_id', eventId);
+            return json({ error: addonError.message }, 500);
+          }
+        }
       }
       return json({ ok: true, event: eventType, company_id: companyId });
     }
