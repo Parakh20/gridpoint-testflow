@@ -6,6 +6,7 @@
 // These are plain content pages with no auth and no data access, served on
 // the marketing host.
 import { type ReactNode } from 'react';
+import { SUPPORT_EMAIL } from '@/lib/contact';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Sole proprietorship: the proprietor is the legal entity, so LEGAL_ENTITY is
@@ -13,7 +14,7 @@ import { type ReactNode } from 'react';
 // exactly — Razorpay rejects submissions where the two differ.
 // ─────────────────────────────────────────────────────────────────────────
 const LEGAL_ENTITY = 'Parakh Sharma';
-const CONTACT_EMAIL = 'support@optimustesting.com';
+const CONTACT_EMAIL = SUPPORT_EMAIL;
 const CONTACT_PHONE = '+91 94135 52887';
 const CONTACT_ADDRESS = 'Hostel 4, IIT Bombay, Powai, Mumbai 400076, Maharashtra, India';
 const LAST_UPDATED = '23 August 2026';

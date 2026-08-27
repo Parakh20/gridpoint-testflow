@@ -79,3 +79,6 @@ texput.log
 *storybook.log
 .gstack/
 .superpowers/
+
+# Python bytecode from scripts/
+scripts/__pycache__/

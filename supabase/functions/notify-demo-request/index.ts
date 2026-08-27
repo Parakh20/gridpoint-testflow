@@ -4,7 +4,11 @@ import { enforceRateLimit } from '../_shared/rate_limit.ts';
 import { logEdgeError } from '../_shared/monitoring.ts';
 import { resendFrom } from '../_shared/email.ts';
 
-const NOTIFY_EMAIL = Deno.env.get('DEMO_NOTIFY_EMAIL') ?? 'sharmaparakh05@gmail.com';
+// Where inbound demo requests land. Defaults to the published support address
+// rather than a personal mailbox: a personal default silently becomes the
+// production destination the moment DEMO_NOTIFY_EMAIL is unset in a new
+// environment, and leads then arrive somewhere nobody treats as a work inbox.
+const NOTIFY_EMAIL = Deno.env.get('DEMO_NOTIFY_EMAIL') ?? 'support@optimustesting.com';
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req.headers.get('Origin'));

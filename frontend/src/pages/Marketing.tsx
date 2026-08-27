@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PricingSection } from "@/components/marketing/PricingSection";
 import { RoiCalculatorSection } from "@/components/marketing/RoiCalculatorSection";
 import { appUrl } from "@/lib/appOrigin";
+import { SUPPORT_EMAIL } from '@/lib/contact';
 import {
   ArrowRight,
   PlayCircle,
@@ -898,7 +899,7 @@ function DemoRequestForm() {
           <textarea rows={3} value={form.message} onChange={set('message')} className={`${fieldBase} resize-none`} />
         </div>
         {status === 'error' && (
-          <p className="text-red-400 text-sm">Something went wrong — email us at sharmaparakh05@gmail.com</p>
+          <p className="text-red-400 text-sm">Something went wrong — email us at {SUPPORT_EMAIL}</p>
         )}
         <button
           type="submit"
