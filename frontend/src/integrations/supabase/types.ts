@@ -10,10 +10,49 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
+      addon_catalog: {
+        Row: {
+          addon_key: string
+          created_at: string
+          description: string | null
+          is_active: boolean
+          kind: string
+          max_quantity: number
+          name: string
+          sort_order: number
+          unit_price_inr: number
+          updated_at: string
+        }
+        Insert: {
+          addon_key: string
+          created_at?: string
+          description?: string | null
+          is_active?: boolean
+          kind?: string
+          max_quantity?: number
+          name: string
+          sort_order?: number
+          unit_price_inr: number
+          updated_at?: string
+        }
+        Update: {
+          addon_key?: string
+          created_at?: string
+          description?: string | null
+          is_active?: boolean
+          kind?: string
+          max_quantity?: number
+          name?: string
+          sort_order?: number
+          unit_price_inr?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -292,6 +331,66 @@ export type Database = {
         }
         Relationships: []
       }
+      email_log: {
+        Row: {
+          actor: string
+          body_html: string | null
+          company_id: string | null
+          error: string | null
+          id: string
+          resend_message_id: string | null
+          sent_at: string
+          status: string
+          subject: string
+          template: string
+          to_email: string
+          to_user_id: string | null
+        }
+        Insert: {
+          actor?: string
+          body_html?: string | null
+          company_id?: string | null
+          error?: string | null
+          id?: string
+          resend_message_id?: string | null
+          sent_at?: string
+          status: string
+          subject: string
+          template?: string
+          to_email: string
+          to_user_id?: string | null
+        }
+        Update: {
+          actor?: string
+          body_html?: string | null
+          company_id?: string | null
+          error?: string | null
+          id?: string
+          resend_message_id?: string | null
+          sent_at?: string
+          status?: string
+          subject?: string
+          template?: string
+          to_email?: string
+          to_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_log_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enterprise_contracts: {
         Row: {
           company_id: string
@@ -411,6 +510,62 @@ export type Database = {
           },
         ]
       }
+      inbound_emails: {
+        Row: {
+          attachments: Json
+          company_id: string | null
+          from_email: string
+          from_name: string | null
+          handled: boolean
+          html_body: string | null
+          id: string
+          provider_event_id: string
+          raw_payload: Json | null
+          received_at: string
+          subject: string | null
+          text_body: string | null
+          to_email: string | null
+        }
+        Insert: {
+          attachments?: Json
+          company_id?: string | null
+          from_email: string
+          from_name?: string | null
+          handled?: boolean
+          html_body?: string | null
+          id?: string
+          provider_event_id: string
+          raw_payload?: Json | null
+          received_at?: string
+          subject?: string | null
+          text_body?: string | null
+          to_email?: string | null
+        }
+        Update: {
+          attachments?: Json
+          company_id?: string | null
+          from_email?: string
+          from_name?: string | null
+          handled?: boolean
+          html_body?: string | null
+          id?: string
+          provider_event_id?: string
+          raw_payload?: Json | null
+          received_at?: string
+          subject?: string | null
+          text_body?: string | null
+          to_email?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_emails_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instruments: {
         Row: {
           calibration_due_at: string | null
@@ -493,6 +648,65 @@ export type Database = {
           },
         ]
       }
+      lead_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          email_status: string
+          full_name: string | null
+          id: string
+          is_primary: boolean
+          lead_id: string
+          linkedin_url: string | null
+          notes: string | null
+          phone: string | null
+          seniority: string
+          source_url: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          email_status?: string
+          full_name?: string | null
+          id?: string
+          is_primary?: boolean
+          lead_id: string
+          linkedin_url?: string | null
+          notes?: string | null
+          phone?: string | null
+          seniority?: string
+          source_url?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          email_status?: string
+          full_name?: string | null
+          id?: string
+          is_primary?: boolean
+          lead_id?: string
+          linkedin_url?: string | null
+          notes?: string | null
+          phone?: string | null
+          seniority?: string
+          source_url?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_contacts_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           buyer_title: string | null
@@ -504,6 +718,7 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           id: string
+          last_contacted_at: string | null
           next_action_date: string | null
           notes: string | null
           outreach_approach: string | null
@@ -513,6 +728,8 @@ export type Database = {
           size_signal: string | null
           source_url: string | null
           stage: string
+          tech_stack: string | null
+          tech_stack_source: string | null
           updated_at: string
           why_fit: string | null
         }
@@ -526,6 +743,7 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          last_contacted_at?: string | null
           next_action_date?: string | null
           notes?: string | null
           outreach_approach?: string | null
@@ -535,6 +753,8 @@ export type Database = {
           size_signal?: string | null
           source_url?: string | null
           stage?: string
+          tech_stack?: string | null
+          tech_stack_source?: string | null
           updated_at?: string
           why_fit?: string | null
         }
@@ -548,6 +768,7 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          last_contacted_at?: string | null
           next_action_date?: string | null
           notes?: string | null
           outreach_approach?: string | null
@@ -557,6 +778,8 @@ export type Database = {
           size_signal?: string | null
           source_url?: string | null
           stage?: string
+          tech_stack?: string | null
+          tech_stack_source?: string | null
           updated_at?: string
           why_fit?: string | null
         }
@@ -689,19 +912,31 @@ export type Database = {
       }
       plan_provider_mapping: {
         Row: {
+          annual_price_inr_at_mapping: number | null
+          monthly_price_inr_at_mapping: number | null
           plan_id: string
+          provider_mode: string | null
           razorpay_plan_id_annual: string | null
           razorpay_plan_id_monthly: string | null
+          updated_at: string
         }
         Insert: {
+          annual_price_inr_at_mapping?: number | null
+          monthly_price_inr_at_mapping?: number | null
           plan_id: string
+          provider_mode?: string | null
           razorpay_plan_id_annual?: string | null
           razorpay_plan_id_monthly?: string | null
+          updated_at?: string
         }
         Update: {
+          annual_price_inr_at_mapping?: number | null
+          monthly_price_inr_at_mapping?: number | null
           plan_id?: string
+          provider_mode?: string | null
           razorpay_plan_id_annual?: string | null
           razorpay_plan_id_monthly?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1022,6 +1257,7 @@ export type Database = {
           addon_key: string
           created_at: string
           id: string
+          provider_payment_id: string | null
           quantity: number
           status: string
           subscription_id: string
@@ -1032,6 +1268,7 @@ export type Database = {
           addon_key: string
           created_at?: string
           id?: string
+          provider_payment_id?: string | null
           quantity?: number
           status?: string
           subscription_id: string
@@ -1042,6 +1279,7 @@ export type Database = {
           addon_key?: string
           created_at?: string
           id?: string
+          provider_payment_id?: string | null
           quantity?: number
           status?: string
           subscription_id?: string
@@ -1466,6 +1704,11 @@ export type Database = {
         Args: { _company_id: string }
         Returns: boolean
       }
+      mark_custom_domain_provisioned: {
+        Args: { _domain: string }
+        Returns: Json
+      }
+      mark_custom_domain_verified: { Args: { _domain: string }; Returns: Json }
       mark_rework_notification_sent: {
         Args: { _notification_id: string }
         Returns: undefined
@@ -1475,12 +1718,30 @@ export type Database = {
         Args: { _from_user: string; _to_user: string }
         Returns: Json
       }
+      pending_custom_domains: {
+        Args: never
+        Returns: {
+          domain: string
+          verification_token: string
+          verified_at: string
+        }[]
+      }
       purge_old_soft_deleted: { Args: never; Returns: Json }
       rate_limit_check: {
         Args: { _key: string; _limit: number; _window_minutes: number }
         Returns: boolean
       }
       rate_limit_gc: { Args: never; Returns: undefined }
+      record_addon_purchase: {
+        Args: {
+          _addon_key: string
+          _amount_paid_inr: number
+          _company_id: string
+          _provider_payment_id: string
+          _quantity: number
+        }
+        Returns: Json
+      }
       record_billing_event: {
         Args: {
           _company_id: string
@@ -1488,6 +1749,20 @@ export type Database = {
           _provider: string
           _provider_event_id: string
           _raw: Json
+        }
+        Returns: boolean
+      }
+      record_inbound_email: {
+        Args: {
+          _attachments: Json
+          _from_email: string
+          _from_name: string
+          _html_body: string
+          _provider_event_id: string
+          _raw: Json
+          _subject: string
+          _text_body: string
+          _to_email: string
         }
         Returns: boolean
       }

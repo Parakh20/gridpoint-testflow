@@ -28,6 +28,31 @@ SIGNATURE = """Parakh Sharma
 Optimus Testing
 +91 94135 52887"""
 
+# Words that start the generic tail of a company name. "Akuntha Projects Pvt Ltd"
+# and "Transerect Testing & Commissioning Engineers Pvt Ltd" both need to reach a
+# subject line, and neither the legal suffix nor the sector description belongs
+# there.
+NAME_TAIL = {'testing', 'commissioning', 'engineers', 'engineering', 'consultants',
+             'projects', 'services', 'solutions', 'power', 'infra', 'electricals',
+             'electrical', 'laboratories', 'labs', 'group', 'pvt', 'ltd', 'limited',
+             'co', 'company', '&', 'and'}
+
+
+def short_name(company):
+    """The name a person would actually say out loud.
+
+    Possessive forms are avoided entirely at the call site -- "Akuntha Projects's"
+    was the earlier output, which is both wrong and long.
+    """
+    words = company.replace('/', ' ').split()
+    kept = []
+    for w in words:
+        if w.strip('.,').lower() in NAME_TAIL and kept:
+            break
+        kept.append(w.strip('.,'))
+    return ' '.join(kept) if kept else company
+
+
 def domain_of(email):
     return email.split('@', 1)[1] if '@' in email else email
 
@@ -119,8 +144,7 @@ def render_draft(entry):
     hook = hook_for(entry['company']) or HOOK_PLACEHOLDER
 
     if named:
-        short = entry['company'].split(' Pvt')[0].strip()
-        subject = f"{short}'s commissioning test records — from IIT Bombay"
+        subject = f"Commissioning test records at {short_name(entry['company'])} — from IIT Bombay"
         body = BODY_NAMED.format(domain=domain_of(to['email']), hook=hook)
         opt_out = OPT_OUT_NAMED
     else:

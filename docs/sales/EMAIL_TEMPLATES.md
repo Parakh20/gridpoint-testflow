@@ -40,7 +40,7 @@ Two of the twenty-four go to a named human (Akuntha, Transerect). These get the
 most effort; they are the likeliest replies in the whole list.
 
 ```
-Subject: {Company}'s commissioning test records — from IIT Bombay
+Subject: Commissioning test records at {Company} — from IIT Bombay
 
 {Salutation},
 

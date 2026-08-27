@@ -6,6 +6,7 @@ import { SubscriptionActions } from '@/components/SubscriptionActions';
 import { SubscribeCard } from '@/components/SubscribeCard';
 import { InvoiceHistoryCard } from '@/components/InvoiceHistoryCard';
 import { PlanComparisonCard } from '@/components/PlanComparisonCard';
+import { AddonsCard } from '@/components/AddonsCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -197,6 +198,14 @@ export default function BillingSettingsPage() {
             onSubscribed={() => window.location.reload()}
           />
         )}
+
+        <AddonsCard
+          companyId={company?.id}
+          companyName={company?.name}
+          userEmail={user?.email}
+          hasSubscription={hasProviderSubscription}
+          onPurchased={() => window.location.reload()}
+        />
 
         <PlanComparisonCard currentPlanSlug={entitlements?.planSlug} />
 

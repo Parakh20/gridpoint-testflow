@@ -27,7 +27,7 @@ exist yet.
 
 **If it bounces:** `info@akuntha.com`, `sales@akuntha.com`
 
-**Subject:** `Akuntha Projects's commissioning test records — from IIT Bombay`
+**Subject:** `Commissioning test records at Akuntha — from IIT Bombay`
 
 **Research — turn one of these into the hook sentence:**
 
@@ -72,7 +72,7 @@ If you'd rather not hear from me, reply STOP and I won't write again.
 
 **If it bounces:** `info@transerect.com`
 
-**Subject:** `Transerect Testing & Commissioning Engineers's commissioning test records — from IIT Bombay`
+**Subject:** `Commissioning test records at Transerect — from IIT Bombay`
 
 **Research — turn one of these into the hook sentence:**
 
