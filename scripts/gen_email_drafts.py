@@ -131,10 +131,18 @@ def render_draft(entry):
 
 
 def main():
-    entries, published_count = build_entries()
+    all_entries, published_count = build_entries()
+    # Phase 1 is small companies only -- see the reasoning in SEND_QUEUE.md.
+    # A listed EPC's procurement cycle outlasts a pre-revenue runway however
+    # well the product fits, so the large firms get no draft until there is a
+    # reference customer to name.
+    entries = [e for e in all_entries if e['tier'] in ('SMALL', 'MID')]
+    deferred = len(all_entries) - len(entries)
 
     out = ['# Email drafts — first campaign\n']
-    out.append(f'''One message per company, {len(entries)} in total, generated from
+    out.append(f'''One message per company. {len(entries)} drafts — small and mid-size firms
+only, with {deferred} large or listed companies deferred (see
+[SEND_QUEUE.md](SEND_QUEUE.md) for why). Generated from
 `outreach_contacts.csv` and the `leads` seed. Regenerate with
 `python3 scripts/gen_email_drafts.py`. Templates and the reasoning behind the
 copy: [EMAIL_TEMPLATES.md](EMAIL_TEMPLATES.md). Addresses and bounce fallbacks:
@@ -188,8 +196,9 @@ second. Any reply cancels every later step for that contact.
     OUT_PATH.write_text('\n'.join(out), encoding='utf-8')
     named = sum(1 for e in entries if clean(e['to'].get('name')))
     print(f'wrote {OUT_PATH.relative_to(REPO)}')
-    print(f'{len(entries)} drafts from {published_count} published addresses '
-          f'({named} to a named person, {len(entries) - named} to role inboxes)')
+    print(f'{len(entries)} drafts ({named} to a named person, '
+          f'{len(entries) - named} to role inboxes); '
+          f'{deferred} large firms deferred; {published_count} published addresses total')
 
 
 if __name__ == '__main__':

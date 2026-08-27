@@ -72,9 +72,39 @@ def load_leads():
         if len(parts) != LEADS_COLUMNS:
             continue
         v = [unquote(p) for p in parts]
-        leads[v[0]] = dict(segment=v[1], region=v[2], why_fit=v[4],
+        leads[v[0]] = dict(segment=v[1], region=v[2], size_signal=v[3], why_fit=v[4],
                            buyer_title=v[5], approach=v[8], priority=v[9], url=v[11])
     return leads
+
+
+# Phase 1 targets small teams. A 50-person T&C outfit has one decision maker who
+# can say yes on a call; a listed EPC has a procurement process that outlasts a
+# pre-revenue runway, however good the fit looks on paper. Size is therefore a
+# ranking dimension in its own right and not a by-product of `priority` -- Voltage
+# Infra sits at priority 4 with 50-200 staff, below several 400+ engineer firms.
+LARGE_MARKERS = ('listed', '1,000+', '1000+', 'invit', 'global', 'large',
+                 'multi-lab', 'pan-india', '400+', '750+', '500+ ')
+MID_MARKERS = ('200-500', 'mid-size', '300+')
+
+
+def size_tier(size_signal):
+    """SMALL | MID | LARGE from the seed's free-text size_signal.
+
+    Deliberately conservative: anything listed on an exchange is LARGE no matter
+    how small the market cap, because the blocker is the procurement process
+    rather than the headcount.
+    """
+    text = (size_signal or '').lower()
+    if not text:
+        return 'SMALL'  # no scale marker recorded usually means a small outfit
+    if any(m in text for m in LARGE_MARKERS):
+        return 'LARGE'
+    if any(m in text for m in MID_MARKERS):
+        return 'MID'
+    return 'SMALL'
+
+
+TIER_ORDER = {'SMALL': 0, 'MID': 1, 'LARGE': 2}
 
 
 def normalise(s):
@@ -126,10 +156,12 @@ def build_entries():
         lead = match_lead(company, leads)
         priority = int(contacts[0].get('priority') or lead.get('priority') or 0)
         entries.append(dict(company=company, priority=priority, lead=lead,
+                            tier=size_tier(lead.get('size_signal')),
                             to=contacts[0], alternates=contacts[1:]))
 
-    # Highest priority first; a named human outranks a role inbox at equal priority.
-    entries.sort(key=lambda e: (-e['priority'],
+    # Small first, then priority, then a named human over a role inbox.
+    entries.sort(key=lambda e: (TIER_ORDER[e['tier']],
+                                -e['priority'],
                                 0 if (e['to'].get('name') or '').strip() else 1,
                                 e['company']))
     return entries, len(published)
@@ -140,66 +172,80 @@ def clean(value):
 
 
 def render(entries, published_count):
+    phase1 = [e for e in entries if e['tier'] in ('SMALL', 'MID')]
+    deferred = [e for e in entries if e['tier'] == 'LARGE']
+
     out = ['# Send queue — first campaign\n']
-    out.append(f'''Generated from `outreach_contacts.csv` joined against the `leads` seed
-(`20260530000004_seed_leads.sql`). Regenerate with `scripts/gen_send_queue.py`.
+    out.append(
+        'Generated from `outreach_contacts.csv` joined against the `leads` seed\n'
+        '(`20260530000004_seed_leads.sql`). Regenerate with `scripts/gen_send_queue.py`.\n\n'
+        '## Phase 1 targets small companies only\n\n'
+        f'{len(phase1)} of the {len(entries)} companies with a published address, and it is the\n'
+        'size filter doing the cutting rather than the fit score. A 50-person T&C outfit\n'
+        'has one decision maker who can say yes on a call. A listed EPC has a procurement\n'
+        'process that outlasts a pre-revenue runway however well the product fits, and a\n'
+        'pilot there is measured in quarters.\n\n'
+        f'The {len(deferred)} larger firms are listed at the end. They are not disqualified — they\n'
+        'are the wrong *first* customer. Come back to them with a reference.\n\n'
+        'Ranking is by size first, not by the `priority` score: Voltage Infra sits at\n'
+        'priority 4 with 50-200 staff, above several priority-5 firms with 400+ engineers.\n\n'
+        f'**One message per company, not per address.** The {published_count} PUBLISHED addresses\n'
+        f'collapse to {len(entries)} companies — Akuntha alone publishes three. Mailing every\n'
+        'address at one company reads as spray and burns the best contact along with the\n'
+        'worst. The extras are bounce fallbacks, not additional sends.\n\n'
+        'Rules from `OUTREACH_SENDING_PLAN.md` that still apply:\n\n'
+        '- PUBLISHED addresses only. The UNVERIFIED rows are directory-sourced or inferred\n'
+        '  and are not in this queue.\n'
+        '- ~20/day maximum, spaced through the day, never a burst. Phase 1 fits in one day.\n'
+        '- Log every send as a `lead_activities` row, channel `EMAIL`. Without it the\n'
+        '  campaign leaves no record and Phase 2 automation has nothing to read.\n'
+        '- Hand-write the hook. `Angle` below is the per-company research already done.\n'
+    )
 
-**One message per company, not per address.** The {published_count} PUBLISHED addresses collapse
-to **{len(entries)} companies** — Akuntha alone publishes three. Mailing every address at one
-company reads as spray and burns the best contact along with the worst. The extra
-addresses are listed as bounce fallbacks, not as additional sends.
+    def block(i, entry):
+        to, lead = entry['to'], entry['lead']
+        who = clean(to.get('name')) or '(role inbox)'
+        title = clean(to.get('title'))
+        out.append(f"### {i}. {entry['company']}  · {entry['tier']} · priority {entry['priority']}\n")
+        out.append(f"**To:** `{to['email']}` — {who}" + (f", {title}" if title else "") + "\n")
+        if entry['alternates']:
+            fallbacks = ", ".join(f"`{a['email']}`" for a in entry['alternates'])
+            out.append(f"**If it bounces:** {fallbacks}\n")
+        for field, label in (('size_signal', 'Size'), ('why_fit', 'Hook'), ('approach', 'Angle')):
+            if clean(lead.get(field)):
+                out.append(f"**{label}:** {clean(lead[field])}\n")
+        if lead.get('segment'):
+            out.append(f"**Who they are:** {clean(lead['segment'])} · {clean(lead['region'])}\n")
+        if clean(to.get('notes')):
+            out.append(f"**Note:** {clean(to['notes'])}\n")
+        if lead.get('url'):
+            out.append(f"**Source:** {clean(lead['url'])}\n")
+        out.append("")
 
-Rules that still apply, from `OUTREACH_SENDING_PLAN.md`:
+    out.append(f'\n## Phase 1 — {len(phase1)} small and mid-size companies\n')
+    for i, entry in enumerate(phase1, 1):
+        block(i, entry)
 
-- PUBLISHED addresses only. The UNVERIFIED rows are directory-sourced or
-  inferred and are not in this queue.
-- ~20/day maximum, spaced through the day, never a burst.
-- Log every send as a `lead_activities` row, channel `EMAIL`. That log is what
-  Phase 2 automation reads; without it this campaign leaves no trace.
-- Hand-write each one. `Angle` below is the per-company research already done —
-  it exists so no message has to be generic.
-''')
+    out.append(f'\n## Deferred — {len(deferred)} large or listed firms\n')
+    out.append('Not in the first campaign. Each has a published address ready for the day\n'
+               'there is a reference customer to name.\n')
+    for entry in deferred:
+        size = clean(entry['lead'].get('size_signal')) or 'size unknown'
+        out.append(f"- **{entry['company']}** — `{entry['to']['email']}` · {size}")
+    out.append("")
 
-    days = [entries[i:i + PER_DAY] for i in range(0, len(entries), PER_DAY)]
-    for day_no, chunk in enumerate(days, 1):
-        out.append(f'\n## Day {day_no} — {len(chunk)} companies\n')
-        for i, entry in enumerate(chunk, 1):
-            to, lead = entry['to'], entry['lead']
-            who = clean(to.get('name')) or '(role inbox)'
-            title = clean(to.get('title'))
-            out.append(f"### {i}. {entry['company']}  · priority {entry['priority']}\n")
-            out.append(f"**To:** `{to['email']}` — {who}" + (f", {title}" if title else "") + "\n")
-            if entry['alternates']:
-                fallbacks = ", ".join(f"`{a['email']}`" for a in entry['alternates'])
-                out.append(f"**If it bounces:** {fallbacks}\n")
-            if lead.get('segment'):
-                out.append(f"**Who they are:** {clean(lead['segment'])} · {clean(lead['region'])}\n")
-            if lead.get('why_fit'):
-                out.append(f"**Hook:** {clean(lead['why_fit'])}\n")
-            if lead.get('approach'):
-                out.append(f"**Angle:** {clean(lead['approach'])}\n")
-            if clean(to.get('notes')):
-                out.append(f"**Note:** {clean(to['notes'])}\n")
-            if lead.get('url'):
-                out.append(f"**Source:** {clean(lead['url'])}\n")
-            out.append("")
-
-    out.append('''
-## Sending checklist
-
-Per message, before hitting send:
-
-- [ ] Names the company's actual work — the Hook line, not "your organisation"
-- [ ] Says where the address came from (their website). Honesty is cheap and it
-      is what DPDP-era compliance looks like in practice
-- [ ] Carries a real signature: name, Optimus Testing, optimustesting.com, phone
-- [ ] Has a plain opt-out line — "reply STOP and I won't write again" — and it
-      gets honoured permanently
-- [ ] Logged as a `lead_activities` row afterwards
-
-Expected, per `OUTREACH_SENDING_PLAN.md`: a handful of replies, 1-3 demos. The
-named contacts are worth more effort than the role inboxes.
-''')
+    out.append(
+        '\n## Sending checklist\n\n'
+        'Per message, before hitting send:\n\n'
+        '- [ ] Names the company\'s actual work — the Hook line, not "your organisation"\n'
+        '- [ ] Says where the address came from (their website)\n'
+        '- [ ] Carries a real signature: name, Optimus Testing, phone\n'
+        '- [ ] Has a plain opt-out line — "reply STOP and I won\'t write again" — honoured\n'
+        '      permanently\n'
+        '- [ ] Logged as a `lead_activities` row afterwards\n\n'
+        'Expected: a handful of replies, 1-3 demos. The named contacts are worth more\n'
+        'effort than the role inboxes.\n'
+    )
     return '\n'.join(out)
 
 

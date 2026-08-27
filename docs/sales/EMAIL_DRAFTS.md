@@ -1,6 +1,8 @@
 # Email drafts — first campaign
 
-One message per company, 24 in total, generated from
+One message per company. 10 drafts — small and mid-size firms
+only, with 14 large or listed companies deferred (see
+[SEND_QUEUE.md](SEND_QUEUE.md) for why). Generated from
 `outreach_contacts.csv` and the `leads` seed. Regenerate with
 `python3 scripts/gen_email_drafts.py`. Templates and the reasoning behind the
 copy: [EMAIL_TEMPLATES.md](EMAIL_TEMPLATES.md). Addresses and bounce fallbacks:
@@ -154,95 +156,7 @@ Reply STOP and I won't write again.
 
 ---
 
-## 4. Elite Powertech Pvt Ltd (EPPL)
-
-**To:** `info@elitepowertech.in` — General enquiry  ·  priority 5
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- Pure T&C + EPC · Pan-India
-- Why they fit: Dedicated T&C team for EHV substations up to 765kV; protection, SCADA, PMC, O&M - runs many projects simultaneously
-- Angle: LinkedIn; show how report templates cut site-to-handover cycle
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 5. Eternergy Engineering Pvt Ltd
-
-**To:** `info@eternergy.com.in` — General enquiry  ·  priority 5
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- T&C specialist - HV/LV systems · India
-- Why they fit: Explicit T&C specialisation for EHV/HV substations, transformer yards, RMUs, pad-mount switchgear; IS standards-aligned
-- Angle: Website form + LinkedIn; international experience signals structured reporting pain
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 6. GK Expertise / GK Power Expertise Pvt Ltd
+## 4. GK Expertise / GK Power Expertise Pvt Ltd
 
 **To:** `enquiry@gkexpertise.com` — Enquiries  ·  priority 5
 
@@ -286,53 +200,7 @@ Reply STOP and I won't write again.
 
 ---
 
-## 7. INEL Power Group
-
-**To:** `chennai@inelpse.com` — Chennai office (HQ)  ·  priority 5
-
-**If it bounces:** `anandvarma@inelpse.com`, `bangalore@inelpse.com`, `hyderabad@inelpse.com`, `vizag@inelpse.com`
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- Pure T&C contractor · Chennai
-- Why they fit: Since 1997; testing, commissioning, PM, O&M from 400V to 400kV across power, oil & gas, steel, cement; 100+ sites concurrent
-- Angle: Direct LinkedIn + phone; reference from TANGEDCO/TSGENCO project connections
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 8. Powertest Asia Pvt Ltd (PtA)
+## 5. Powertest Asia Pvt Ltd (PtA)
 
 **To:** `info@powertestasia.com` — General enquiry  ·  priority 5
 
@@ -376,7 +244,7 @@ Reply STOP and I won't write again.
 
 ---
 
-## 9. Sun and Jay Engineering Consultants Pvt Ltd
+## 6. Sun and Jay Engineering Consultants Pvt Ltd
 
 **To:** `cv@sunjay.in` — General enquiry  ·  priority 5
 
@@ -420,233 +288,7 @@ Reply STOP and I won't write again.
 
 ---
 
-## 10. HEC Infra Projects Ltd
-
-**To:** `elect@hecproject.com` — Electrical division  ·  priority 4
-
-**If it bounces:** `cs@hecproject.com`
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- EPC - substations + transmission · Ahmedabad, Gujarat
-- Why they fit: SITC substations up to 220kV; GETCO license; PowerGrid contracts (400/220kV substation augmentation); field teams
-- Angle: LinkedIn; target Gujarat + Rajasthan field ops
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 11. Hartek Power Pvt Ltd / Hartek Group
-
-**To:** `info@hartek.com` — General enquiry  ·  priority 4
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- T&D EPC - top 3 India · Mohali, Punjab
-- Why they fit: India Top-3 substation EPC; 765kV, 400kV, solar + substation; multiple concurrent sites nationally
-- Angle: LinkedIn Sales Navigator; attend ELECRAMA / Hartek events; pilot at Punjab/Himachal project
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 12. Jyoti Structures Ltd
-
-**To:** `contact@jsl.co.in` — General enquiry  ·  priority 4
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- T&D EPC (mid-large) · Mumbai
-- Why they fit: Substation EPC 11kV-765kV; recently won ₹639 Cr order for 765kV/400kV TL; substation T&C embedded in EPC delivery
-- Angle: LinkedIn; target their commissioning/project management team
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 13. NCC Limited (Electrical T&D Division)
-
-**To:** `info@nccltd.in` — Corporate office  ·  priority 4
-
-**If it bounces:** `ro.mumbai@nccltd.in`
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- T&D EPC · Hyderabad
-- Why they fit: Expertise in EHV/HV substation ETC + transmission lines; RDSS/33-11kV substations in Maharashtra currently
-- Angle: LinkedIn; cite Maharashtra RDSS substation recruitment
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 14. Techno Electric & Engineering Co Ltd (TEECL)
-
-**To:** `techno.email@techno.co.in` — General enquiry  ·  priority 4
-
-**If it bounces:** `desk.investors@techno.co.in`
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- T&D EPC (large) · Kolkata
-- Why they fit: Substation EPC 765kV; 17 concurrent project sites; internal T&C teams; field engineers need digital test tracking
-- Angle: LinkedIn + annual report contacts; position as project tracking tool
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 15. Voltage Infra Pvt Ltd
+## 7. Voltage Infra Pvt Ltd
 
 **To:** `marketing@volt-age.in` — Marketing  ·  priority 4
 
@@ -690,51 +332,7 @@ Reply STOP and I won't write again.
 
 ---
 
-## 16. Bharat Test House Pvt Ltd (BTHPL)
-
-**To:** `bthrai@bharattesthouse.com` — General enquiry  ·  priority 3
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- NABL testing lab (electrical + solar) · Delhi NCR
-- Why they fit: Multi-disciplinary testing including electrical; solar PV; BIS/NABL approved; some substation equipment testing
-- Angle: Email + lab directory
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 17. Ghaziabad Testing Laboratories Pvt Ltd
+## 8. Ghaziabad Testing Laboratories Pvt Ltd
 
 **To:** `info@gtllab.org` — General enquiry  ·  priority 3
 
@@ -778,17 +376,17 @@ Reply STOP and I won't write again.
 
 ---
 
-## 18. InGrid (IndiGrid Investment Managers)
+## 9. Elite Powertech Pvt Ltd (EPPL)
 
-**To:** `info@indigrid.com` — General enquiry  ·  priority 3
+**To:** `info@elitepowertech.in` — General enquiry  ·  priority 5
 
 **Subject:** `For your T&C head — commissioning software from IIT Bombay`
 
 **Research — turn one of these into the hook sentence:**
 
-- Private transmission infra · Mumbai
-- Why they fit: 16 substations, 25,050 MVA transformation; TEECL executes projects; T&C embedded
-- Angle: LinkedIn; TEECL connection
+- Pure T&C + EPC · Pan-India
+- Why they fit: Dedicated T&C team for EHV substations up to 765kV; protection, SCADA, PMC, O&M - runs many projects simultaneously
+- Angle: LinkedIn; show how report templates cut site-to-handover cycle
 
 ```
 Hello,
@@ -822,241 +420,17 @@ Reply STOP and I won't write again.
 
 ---
 
-## 19. Navayuga Engineering Co Ltd
+## 10. Eternergy Engineering Pvt Ltd
 
-**To:** `nec@navayuga.com` — Corporate  ·  priority 3
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- EPC · Hyderabad
-- Why they fit: Power sector EPC; hydro + thermal + T&D
-- Angle: LinkedIn + industry events
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 20. Power Mech Projects Ltd
-
-**To:** `info@powermech.net` — General enquiry  ·  priority 3
-
-**If it bounces:** `mumbai@powermech.net`
+**To:** `info@eternergy.com.in` — General enquiry  ·  priority 5
 
 **Subject:** `For your T&C head — commissioning software from IIT Bombay`
 
 **Research — turn one of these into the hook sentence:**
 
-- EPC + O&M (power) · Secunderabad
-- Why they fit: BOP, electrical works, substations; T&C embedded in project delivery
-- Angle: LinkedIn
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 21. SPML Infra Ltd
-
-**To:** `info@spml.co.in` — General enquiry  ·  priority 3
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- Infrastructure EPC (incl. power) · New Delhi
-- Why they fit: BESS + power EPC; substation integration; DISCOM projects
-- Angle: LinkedIn
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 22. Tata Power (T&C / O&M arm)
-
-**To:** `transmission_tp@tatapower.com` — Transmission business  ·  priority 3
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- Integrated power utility · Mumbai
-- Why they fit: Tata Power Renewable Energy Ltd's EPC arm; solar + wind substations; DISCOM O&M in Delhi/Mumbai
-- Angle: LinkedIn; corporate procurement
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 23. KEC International Ltd
-
-**To:** `kecindia@kecrpg.com` — General enquiry  ·  priority 2
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- T&D EPC · Mumbai
-- Why they fit: Transmission lines + substations; T&C embedded
-- Angle: LinkedIn; KEC annual conference
-
-```
-Hello,
-
-I'm Parakh Sharma, at IIT Bombay. I've built commissioning software for
-substation testing teams, and I got this address from your website. **If this
-isn't your area, please forward it to whoever runs testing & commissioning.**
-
-What it does: engineers record test results on site, offline if there's no
-signal. Supervisors approve from anywhere. The handover report — PDF and Excel —
-generates itself when the project closes, instead of being assembled by hand
-weeks later.
-
-{HOOK — one sentence naming their actual work. See research above.}
-
-It's live at https://optimustesting.com — worth a two-minute look before you
-decide whether to reply.
-
-I'd like to run one of your projects on it end to end, free. If it doesn't save
-your team time at handover, you've lost nothing but the call.
-
-15 minutes this week?
-
-Parakh Sharma
-Optimus Testing
-+91 94135 52887
-
-Reply STOP and I won't write again.
-```
-
-
----
-
-## 24. Sterling & Wilson (Pvt) Ltd
-
-**To:** `info@sterlingwilson.com` — General enquiry  ·  priority 2
-
-**If it bounces:** `mumbai@sterlingwilson.com`
-
-**Subject:** `For your T&C head — commissioning software from IIT Bombay`
-
-**Research — turn one of these into the hook sentence:**
-
-- Solar EPC + services · Mumbai
-- Why they fit: Solar project EPC + O&M; commissioning substations
-- Angle: LinkedIn
+- T&C specialist - HV/LV systems · India
+- Why they fit: Explicit T&C specialisation for EHV/HV substations, transformer yards, RMUs, pad-mount switchgear; IS standards-aligned
+- Angle: Website form + LinkedIn; international experience signals structured reporting pain
 
 ```
 Hello,
