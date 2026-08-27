@@ -848,6 +848,53 @@ serve(async (req) => {
       });
     }
 
+    // ── create_outreach_draft ──────────────────────────────────────────────────
+    // Needed for two things the seeded drafts can't cover: a safe smoke test
+    // before the first real send, and any ad-hoc message later. Still routed
+    // through lead_contacts rather than a free-text address, so the open-relay
+    // guard holds for hand-made drafts too -- a test send goes to a contact you
+    // created for yourself, not to an arbitrary address typed into a panel.
+    if (action === 'create_outreach_draft') {
+      const contact_id = payload?.contact_id as string | undefined;
+      const subject = payload?.subject as string | undefined;
+      const body = payload?.body as string | undefined;
+      if (!contact_id || !subject?.trim() || !body?.trim()) {
+        return respond({ error: 'payload.contact_id, subject and body are required' }, 400);
+      }
+
+      const { data: contact, error: contactErr } = await adminClient
+        .from('lead_contacts')
+        .select('id, lead_id, full_name, email')
+        .eq('id', contact_id)
+        .maybeSingle();
+      if (contactErr) throw contactErr;
+      if (!contact?.email) {
+        return respond({ error: 'Contact not found, or has no email address' }, 400);
+      }
+
+      const { data, error } = await adminClient
+        .from('outreach_drafts')
+        .insert({
+          lead_id: contact.lead_id,
+          contact_id: contact.id,
+          to_email: contact.email,
+          to_name: contact.full_name,
+          subject: subject.trim(),
+          body: body.trim(),
+        })
+        .select('*')
+        .maybeSingle();
+      // The unique index on contact_id is the "don't mail them twice" guard, so
+      // a collision is a meaningful answer rather than an error to paper over.
+      if (error) {
+        const duplicate = error.code === '23505';
+        return respond({
+          error: duplicate ? 'A draft already exists for this contact' : error.message,
+        }, duplicate ? 409 : 400);
+      }
+      return respond({ draft: data });
+    }
+
     // ── update_outreach_draft ──────────────────────────────────────────────────
     if (action === 'update_outreach_draft') {
       const draft_id = payload?.draft_id as string | undefined;

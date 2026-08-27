@@ -178,7 +178,7 @@ export function SalesTab({ active }: { active: boolean }) {
 
       {/* Written mail waiting to go out. Above the queue's follow-up view because
           a first send is the thing that has to happen before anything else can. */}
-      {!loading && <OutreachDraftsPanel onSent={fetchLeads} />}
+      {!loading && <OutreachDraftsPanel leads={leads} onSent={fetchLeads} />}
 
       {/* Companies that signed up with no lead behind them. Rendered above the
           filters because it is a gap in the pipeline, not another view of it. */}

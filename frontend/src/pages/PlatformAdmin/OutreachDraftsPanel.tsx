@@ -22,6 +22,8 @@ import { useToast } from '@/hooks/use-toast';
 import { formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { platformFetch } from './platformFetch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Lead, LeadContact } from './leadTypes';
 
 export type DraftStatus = 'DRAFT' | 'SENT' | 'FAILED';
 
@@ -61,7 +63,7 @@ export function sortDrafts(drafts: OutreachDraft[]): OutreachDraft[] {
   });
 }
 
-export function OutreachDraftsPanel({ onSent }: { onSent: () => void }) {
+export function OutreachDraftsPanel({ leads, onSent }: { leads: Lead[]; onSent: () => void }) {
   const { toast } = useToast();
   const [drafts, setDrafts] = useState<OutreachDraft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +75,16 @@ export function OutreachDraftsPanel({ onSent }: { onSent: () => void }) {
   const [followUpDays, setFollowUpDays] = useState(7);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+
+  // New-draft composer. Exists mainly so the first SMTP send can be a test to
+  // yourself rather than a real cold email to the best contact in the list.
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeLeadId, setComposeLeadId] = useState('');
+  const [composeContacts, setComposeContacts] = useState<LeadContact[]>([]);
+  const [composeContactId, setComposeContactId] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeBody, setComposeBody] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -153,6 +165,50 @@ export function OutreachDraftsPanel({ onSent }: { onSent: () => void }) {
     }
   };
 
+  const pickLead = async (leadId: string) => {
+    setComposeLeadId(leadId);
+    setComposeContactId('');
+    setComposeContacts([]);
+    if (!leadId) return;
+    try {
+      const data = await platformFetch('get_lead_detail', { lead_id: leadId });
+      setComposeContacts(((data.contacts ?? []) as LeadContact[]).filter(c => !!c.email));
+    } catch (err) {
+      console.error('get_lead_detail failed', err);
+      toast({
+        title: 'Could not load contacts',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const createDraft = async () => {
+    if (!composeContactId || !composeSubject.trim() || !composeBody.trim()) return;
+    setCreating(true);
+    try {
+      await platformFetch('create_outreach_draft', {
+        contact_id: composeContactId,
+        subject: composeSubject,
+        body: composeBody,
+      });
+      toast({ title: 'Draft created' });
+      setComposeOpen(false);
+      setComposeLeadId(''); setComposeContactId('');
+      setComposeSubject(''); setComposeBody('');
+      await load();
+    } catch (err) {
+      console.error('create_outreach_draft failed', err);
+      toast({
+        title: 'Could not create the draft',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const pending = drafts.filter(d => d.status !== 'SENT').length;
 
   return (
@@ -167,7 +223,10 @@ export function OutreachDraftsPanel({ onSent }: { onSent: () => void }) {
             {smtp.from ? ` Sending as ${smtp.from}.` : ''}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading}>Refresh</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setComposeOpen(true)}>New draft</Button>
+          <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading}>Refresh</Button>
+        </div>
       </header>
 
       {!loading && !smtp.configured && (
@@ -292,6 +351,83 @@ export function OutreachDraftsPanel({ onSent }: { onSent: () => void }) {
                 </Button>
               </>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>New draft</DialogTitle>
+            <DialogDescription>
+              Addressed by contact, not by typing an address — the same guard the
+              seeded drafts use. To test SMTP safely, add yourself as a contact on
+              a throwaway lead and send to that first.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Lead</label>
+                <Select value={composeLeadId} onValueChange={v => void pickLead(v)}>
+                  <SelectTrigger><SelectValue placeholder="Pick a lead" /></SelectTrigger>
+                  <SelectContent>
+                    {leads.map(l => (
+                      <SelectItem key={l.id} value={l.id}>{l.company_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Contact</label>
+                <Select
+                  value={composeContactId}
+                  onValueChange={setComposeContactId}
+                  disabled={composeContacts.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={composeLeadId ? 'Pick a contact' : 'Pick a lead first'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {composeContacts.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.full_name ? `${c.full_name} — ${c.email}` : c.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {composeLeadId && composeContacts.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    This lead has no contact with an email address.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Subject</label>
+              <Input value={composeSubject} onChange={e => setComposeSubject(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Message (plain text)</label>
+              <Textarea
+                rows={12}
+                value={composeBody}
+                onChange={e => setComposeBody(e.target.value)}
+                className="font-mono text-xs"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setComposeOpen(false)} disabled={creating}>Cancel</Button>
+            <Button
+              onClick={createDraft}
+              disabled={creating || !composeContactId || !composeSubject.trim() || !composeBody.trim()}
+            >
+              {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create draft
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
