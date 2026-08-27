@@ -8,7 +8,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { clearPlatformToken, setPlatformToken } from './platformToken';
 
 export default function PlatformLogin() {
-  const [password, setPassword] = useState('');
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,16 +24,10 @@ export default function PlatformLogin() {
     setLoading(true);
     setError('');
 
-    if (password !== import.meta.env.VITE_PLATFORM_ADMIN_PASSWORD) {
-      setError('Invalid platform password');
-      setLoading(false);
-      return;
-    }
-
-    // The token is the real credential (the password gate is client-side only,
-    // so it proves nothing to the server). Verify it against the Edge Function
-    // before letting the operator in, so a typo fails here instead of leaving
-    // a broken dashboard.
+    // The token is the only credential: a client-side password gate proves
+    // nothing to the server, so it was removed. Verify the token against the
+    // Edge Function before letting the operator in, so a typo fails here
+    // instead of leaving a broken dashboard.
     try {
       const { data, error: fnError } = await supabase.functions.invoke('platform-admin-data', {
         body: { action: 'get_stats' },
@@ -73,25 +66,6 @@ export default function PlatformLogin() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label
-                htmlFor="platform-password"
-                className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
-              >
-                Platform Password
-              </Label>
-              <Input
-                id="platform-password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                className="h-11"
-                autoFocus
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label
                 htmlFor="platform-token"
                 className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
               >
@@ -106,6 +80,7 @@ export default function PlatformLogin() {
                 required
                 className="h-11 font-mono"
                 autoComplete="off"
+                autoFocus
               />
             </div>
 
