@@ -674,6 +674,7 @@ serve(async (req) => {
         'contact_name', 'contact_phone', 'contact_email', 'outreach_approach',
         'priority', 'confidence', 'source_url', 'stage', 'next_action_date', 'notes', 'company_id',
         'tech_stack', 'tech_stack_source',
+        'employee_count_min', 'employee_count_max',
       ];
       // last_contacted_at is deliberately absent: it is maintained by
       // trg_leads_touch_stamp from lead_activities, and letting the panel write
@@ -699,6 +700,7 @@ serve(async (req) => {
         'contact_name', 'contact_phone', 'contact_email', 'outreach_approach',
         'priority', 'confidence', 'source_url', 'stage', 'next_action_date', 'notes', 'company_id',
         'tech_stack', 'tech_stack_source',
+        'employee_count_min', 'employee_count_max',
       ];
       // last_contacted_at is deliberately absent: it is maintained by
       // trg_leads_touch_stamp from lead_activities, and letting the panel write

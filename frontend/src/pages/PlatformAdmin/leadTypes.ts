@@ -59,6 +59,10 @@ export interface Lead {
   next_action_date: string | null;
   /** Maintained by trg_leads_touch_stamp from lead_activities; NOTE rows don't count. */
   last_contacted_at: string | null;
+  /** Headcount lower bound. "400+" is min 400 with max null. */
+  employee_count_min: number | null;
+  /** Headcount upper bound; null when the source gives no ceiling. */
+  employee_count_max: number | null;
   /** What they use to record and report test results today. Free text. */
   tech_stack: string | null;
   /** Where the tech_stack claim came from. Unsourced research is a guess. */
@@ -70,6 +74,21 @@ export interface Lead {
   // augmented by get_all_leads
   activity_count?: number;
   last_activity_at?: string | null;
+}
+
+/**
+ * Headcount as a short label. A band is shown as a band rather than a midpoint:
+ * the source data is banded, and averaging it would invent precision nobody
+ * measured.
+ */
+export function employeeCountLabel(
+  min: number | null,
+  max: number | null,
+): string | null {
+  if (min == null && max == null) return null;
+  if (min != null && max != null) return min === max ? `${min}` : `${min}–${max}`;
+  if (min != null) return `${min}+`;
+  return `<${max}`;
 }
 
 export interface LeadActivity {

@@ -37,8 +37,7 @@ import {
   STAGE_LABEL,
   CHANNEL_LABEL,
   SENIORITY_LABEL,
-  EMAIL_STATUS_LABEL,
-} from './leadTypes';
+  EMAIL_STATUS_LABEL, employeeCountLabel } from './leadTypes';
 
 interface LeadDetailDrawerProps {
   leadId: string | null;
@@ -260,10 +259,25 @@ export function LeadDetailDrawer({ leadId, open, onOpenChange, onLeadChanged }: 
                     )}
                   </div>
                 )}
-                {lead.size_signal && (
+                {(lead.size_signal || lead.employee_count_min != null || lead.employee_count_max != null) && (
                   <div>
                     <span className="text-muted-foreground">Size: </span>
-                    <span className="text-foreground">{lead.size_signal}</span>
+                    <span className="text-foreground">
+                      {employeeCountLabel(lead.employee_count_min, lead.employee_count_max)
+                        ? `${employeeCountLabel(lead.employee_count_min, lead.employee_count_max)} people`
+                        : null}
+                      {employeeCountLabel(lead.employee_count_min, lead.employee_count_max) && lead.size_signal ? ' · ' : ''}
+                      {lead.size_signal}
+                    </span>
+                  </div>
+                )}
+                {lead.tech_stack && (
+                  <div>
+                    <span className="text-muted-foreground">Tech today: </span>
+                    <span className="text-foreground">{lead.tech_stack}</span>
+                    {lead.tech_stack_source && (
+                      <span className="text-muted-foreground"> ({lead.tech_stack_source})</span>
+                    )}
                   </div>
                 )}
                 {lead.why_fit && (

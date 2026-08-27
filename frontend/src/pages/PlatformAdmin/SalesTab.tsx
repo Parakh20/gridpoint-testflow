@@ -36,7 +36,7 @@ import { LeadDetailDrawer } from './LeadDetailDrawer';
 import { SelfServeSignupsPanel } from './SelfServeSignupsPanel';
 import { OutreachQueuePanel } from './OutreachQueuePanel';
 import { OutreachDraftsPanel } from './OutreachDraftsPanel';
-import { Lead, LeadStage, LEAD_STAGES, STAGE_LABEL } from './leadTypes';
+import { Lead, LeadStage, LEAD_STAGES, STAGE_LABEL, employeeCountLabel } from './leadTypes';
 
 const STAGE_BADGE: Record<LeadStage, string> = {
   NEW: 'bg-muted text-muted-foreground',
@@ -223,6 +223,7 @@ export function SalesTab({ active }: { active: boolean }) {
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-muted-foreground">Company</TableHead>
                 <TableHead className="text-muted-foreground">Pri</TableHead>
+                <TableHead className="text-muted-foreground">People</TableHead>
                 <TableHead className="text-muted-foreground">Stage</TableHead>
                 <TableHead className="text-muted-foreground">Region</TableHead>
                 <TableHead className="text-muted-foreground">Touches</TableHead>
@@ -241,6 +242,9 @@ export function SalesTab({ active }: { active: boolean }) {
                   >
                     <TableCell className="font-medium text-foreground">{l.company_name}</TableCell>
                     <TableCell className="font-mono text-muted-foreground">{l.priority ?? '—'}</TableCell>
+                    <TableCell className="font-mono text-muted-foreground" title={l.size_signal ?? undefined}>
+                      {employeeCountLabel(l.employee_count_min, l.employee_count_max) ?? '—'}
+                    </TableCell>
                     <TableCell>
                       <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STAGE_BADGE[l.stage])}>
                         {STAGE_LABEL[l.stage]}
