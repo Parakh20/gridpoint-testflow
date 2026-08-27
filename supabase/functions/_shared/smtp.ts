@@ -18,11 +18,17 @@
 //   SMTP_FROM_NAME     display name on the From header
 //   SMTP_HOST/PORT     override for a non-Gmail mailbox
 
-// Imported dynamically inside sendPlainMail, not at module top level. This
-// module is pulled into platform-admin-data, which serves every admin action --
-// a top-level import that fails to resolve would take the whole admin panel down
-// rather than just the ability to send mail.
-const DENOMAILER = 'https://deno.land/x/denomailer@1.6.0/mod.ts';
+// Imported dynamically inside sendPlainMail rather than at module top level.
+// This module is pulled into platform-admin-data, which serves every admin
+// action, so a top-level import that failed to resolve would take the whole
+// admin panel down rather than just the ability to send mail.
+//
+// The specifier MUST stay a literal. An earlier version held it in a const and
+// imported the variable, which reads identically but is not statically
+// analyzable -- `supabase functions deploy` bundles with esbuild, the module
+// never made it into the bundle, and every send failed at runtime with
+// "SMTP library failed to load". A literal specifier is bundled while still
+// deferring evaluation, which gives both properties with no trade-off.
 
 const DEFAULT_HOST = 'smtp.gmail.com';
 const DEFAULT_PORT = 465; // implicit TLS; 587 STARTTLS also works but is slower to hand-shake
@@ -88,7 +94,7 @@ export async function sendPlainMail(opts: {
     close: () => Promise<void>;
   };
   try {
-    ({ SMTPClient } = await import(DENOMAILER));
+    ({ SMTPClient } = await import('https://deno.land/x/denomailer@1.6.0/mod.ts'));
   } catch (err) {
     return {
       ok: false,
